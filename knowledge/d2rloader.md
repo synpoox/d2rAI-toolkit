@@ -35,6 +35,24 @@ Make your plugin check the loaded sounds row count after each table load (D2RLoa
 `DataTablesLoaded`) and tell the player to restart when it is lower than the mod's
 (`plugin-template/src/sound_guard.cpp`). Put "start the game twice the first time" in your install notes.
 
+## A plugin DLL needs its manifest resource
+
+D2RLoader 1.3.1 reads a resource from the DLL before it calls anything in it: `RCDATA` id 1001
+(`D2RL_PLUGIN_MANIFEST_RESOURCE_ID`) holding the plugin ABI version as a DWORD (`04 00 00 00` for PluginSDK 0.4.0).
+A DLL without it is rejected even when its exports and `PluginInfo` are right; the startup list shows:
+
+```text
+[ERROR]      <name>.dll [global] — Plugin is not compatible with this D2RLoader version
+  └ [DETAIL]     This looks like an old alpha plugin. Update the plugin before using it
+```
+
+Every plugin needs a `.rc` like `plugin-template/src/plugin.rc` (the SDK examples each have one) in its target
+sources, with `RC` in the CMake project's languages. Keep `/W4 /utf-8` and other C++ flags behind
+`$<COMPILE_LANGUAGE:CXX>` or `rc.exe` gets them.
+
+**Also:** a plugin flagged `ModScopedOnly` loads only from `mods\<Mod>\d2rloader\plugins\` while that mod runs, not
+from the game-wide `d2rloader\plugins\` folder.
+
 ## Other plugins
 
 D2RLoader loads the active mod's plugins (`mods\<Mod>\d2rloader\plugins\`) first, then the game-wide ones

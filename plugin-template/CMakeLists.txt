@@ -8,7 +8,7 @@
 # MODKIT_SDK_DIR points at the PluginSDK checkout. The default fits this repo (plugin-template/../third_party);
 # after copying the template into your own mod project, pass -DMODKIT_SDK_DIR=<path to PluginSDK>.
 cmake_minimum_required(VERSION 3.29)
-project(modkit_plugin LANGUAGES CXX)
+project(modkit_plugin LANGUAGES CXX RC)
 
 set(MODKIT_PLUGIN_NAME "mod-core" CACHE STRING "Plugin id, DLL name, console command and <name>-off.txt prefix")
 set(MODKIT_PLUGIN_VERSION "0.1.0" CACHE STRING "PluginInfo::version (shared plugins must match in multiplayer)")
@@ -30,6 +30,7 @@ add_library(modkit_plugin SHARED
 	src/item_type_check.cpp
 	src/skill_functions.cpp
 	src/hook_example.cpp
+	src/plugin.rc  # ABI manifest resource: D2RLoader rejects a plugin DLL without it
 )
 target_link_libraries(modkit_plugin PRIVATE D2RLPlugin::D2RLPlugin)
 target_compile_definitions(modkit_plugin PRIVATE
@@ -40,6 +41,6 @@ target_compile_definitions(modkit_plugin PRIVATE
 )
 set_target_properties(modkit_plugin PROPERTIES OUTPUT_NAME "${MODKIT_PLUGIN_NAME}")
 if(MSVC)
-	target_compile_options(modkit_plugin PRIVATE /W4 /permissive- /EHsc /utf-8)
+	target_compile_options(modkit_plugin PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/W4 /permissive- /EHsc /utf-8>)
 	set_property(TARGET modkit_plugin PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")  # static CRT: no VC++ runtime dependency
 endif()

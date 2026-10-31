@@ -11,6 +11,7 @@ one game image. The plugin checks the image's PE timestamp (`0x6ab3782c`). On an
 | File | What it is |
 | --- | --- |
 | `src/plugin.cpp` | Entry point: `PluginInfo`, the parts table (`g_parts`), the status console command |
+| `src/plugin.rc` | Plugin manifest resource (RCDATA 1001 = plugin ABI version). D2RLoader reads it before loading; without it the DLL is rejected as "an old alpha plugin". Keep it in every plugin |
 | `src/log.*` | Log helper (`plog::Info/Warn/Error`, prefixed with the plugin name; `plog::Sample` for hot paths) |
 | `src/build_guard.h` | Image check: PE TimeDateStamp of the running game against `ExpectedImage` |
 | `src/off_switch.*` | Reads `<name>-off.txt`: part words to leave out |

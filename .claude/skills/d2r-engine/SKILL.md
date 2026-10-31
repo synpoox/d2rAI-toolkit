@@ -16,7 +16,9 @@ lives), then build it part by part with this skill.
 1. Copy `plugin-template/` into the mod project (e.g. `<project>/plugin/`), build with
    `powershell -ExecutionPolicy Bypass -File plugin\build.ps1 -Name <mod>-core` (point `-Sdk` at this repo's
    `third_party/PluginSDK`). Add the DLL path to mod.json `plugins`; `modkit install` copies it to
-   `<game>/mods/<Mod>/d2rloader/plugins/`. Players run the mod through D2RLoader.
+   `<game>/mods/<Mod>/d2rloader/plugins/`. Players run the mod through D2RLoader. Keep `src/plugin.rc` (the ABI
+   manifest resource) in every plugin, including one written from scratch: without it D2RLoader rejects the DLL as
+   "an old alpha plugin" (knowledge/d2rloader.md).
 2. The plugin only hooks the exact game image it was written for (PE timestamp check, 0x6ab3782c = D2R 3.3.0
    build 93847 under D2RLoader 1.3.1). After a game or loader update: re-dump, re-find every address, update.
 3. Keep the template's guards on: build guard (image stamp, off on mismatch), environment guard (other plugins,
