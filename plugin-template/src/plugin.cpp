@@ -1,6 +1,6 @@
 // D2RLoader plugin entry point (template). Copy plugin-template/ into your mod project and extend it.
 //
-// Target: D2R 3.3.0 build 93847 under D2RLoader 1.3.1, PluginSDK 0.3.0.
+// Target: D2R 3.3.0 build 93847 under D2RLoader 1.3.1, PluginSDK 0.4.0.
 //
 // What it does at load:
 //  - declares itself Shared (server + client behaviour), ModScopedOnly (loads only from

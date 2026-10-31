@@ -1,4 +1,4 @@
-# D2RLoader plugin template (D2R 3.3.0 build 93847, D2RLoader 1.3.1, PluginSDK 0.3.0).
+# D2RLoader plugin template (D2R 3.3.0 build 93847, D2RLoader 1.3.1, PluginSDK 0.4.0).
 #
 # Build:  powershell -ExecutionPolicy Bypass -File build.ps1            (or by hand:)
 #         cmake -S . -B build -A x64 -DMODKIT_PLUGIN_NAME=mod-core

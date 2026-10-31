@@ -1,7 +1,7 @@
 # Knowledge base
 
 What a D2R overhaul mod runs into, learned from a large classic-to-D2R overhaul port. Target: **D2R 3.3.0
-build 93847** with **D2RLoader 1.3.1** (PluginSDK 0.3.0, ABI 4). Everything here uses only D2R's own files and engine:
+build 93847** with **D2RLoader 1.3.1** (PluginSDK 0.4.0, ABI 4). Everything here uses only D2R's own files and engine:
 the toolkit has no MPQ/DC6/DCC conversion pipeline. Bringing a classic mod over (its tables, its engine DLL's
 rules) is covered in [porting-classic-mods.md](porting-classic-mods.md).
 

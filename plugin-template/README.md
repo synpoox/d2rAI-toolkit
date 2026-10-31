@@ -4,7 +4,7 @@ A minimal mod-scoped D2RLoader plugin for Diablo II: Resurrected. Copy this fold
 it. It is the part of an overhaul that data files alone cannot do: new skill functions, formula codes, hooks on
 engine functions.
 
-Target: **D2R 3.3.0 build 93847 + D2RLoader 1.3.1, PluginSDK 0.3.0.** Every address in `src/d2r.h` belongs to that
+Target: **D2R 3.3.0 build 93847 + D2RLoader 1.3.1, PluginSDK 0.4.0.** Every address in `src/d2r.h` belongs to that
 one game image. The plugin checks the image's PE timestamp (`0x6ab3782c`). On any other image it loads, logs
 "not the expected game image: every engine part stays off", and changes nothing.
 

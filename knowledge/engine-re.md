@@ -74,7 +74,7 @@ the state arrays at D2R's own offsets (+0xaf0), so **moving engine data D2RCore 
 "states fix" stopped all state sync: monsters unhoverable, no overlays). The server skill charge function
 `0x436830` is also hooked at its entry by the loader.
 
-## 6. Writing hooks (PluginSDK 0.3.0)
+## 6. Writing hooks (PluginSDK 0.4.0)
 
 ```cpp
 // MOV [RSP+0x10],RBX / MOV [RSP+0x18],RBP / MOV [RSP+0x20],RSI

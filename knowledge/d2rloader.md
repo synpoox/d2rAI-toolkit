@@ -1,6 +1,6 @@
 # D2RLoader: facts and traps
 
-What a mod that ships through D2RLoader 1.3.1 (PluginSDK 0.3.0) runs into on players' machines. Seen in a large
+What a mod that ships through D2RLoader 1.3.1 (PluginSDK 0.4.0) runs into on players' machines. Seen in a large
 overhaul released to players. Plugin API details: [engine-re.md](engine-re.md) and
 `third_party/PluginSDK`.
 
