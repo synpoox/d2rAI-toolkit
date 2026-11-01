@@ -2,7 +2,7 @@
 # print its output lines.
 #   powershell -ExecutionPolicy Bypass -File tools/ghidra_query.ps1 <Script.java> [-Ghidra <dir>] [-Work <dir>] [args...]
 #   e.g.  tools/ghidra_query.ps1 Decompile.java 0x3e3f60      (writes <Work>\decomp\0x3e3f60.c)
-# -Ghidra: Ghidra install dir (env MODKIT_GHIDRA, default C:\ghidra\ghidra_12.1.4_PUBLIC)
+# -Ghidra: Ghidra install dir (env MODKIT_GHIDRA, default the newest C:\ghidra*\ or C:\ghidra\ghidra*\ install)
 # -Work:   projects/dumps dir (env MODKIT_GHIDRA_WORK, default C:\ghidra-work); the project is
 #          <Work>\project\D2R.gpr made by ghidra_analyze.ps1, the program the newest <Work>\D2RLoader_*_dump.exe.
 # Full Ghidra output: <Work>\query.log. The project must not be open in the Ghidra GUI (it is locked then).
@@ -11,7 +11,7 @@ param([Parameter(Mandatory = $true, Position = 0)][string]$Script,
       [string]$Work = "",
       [Parameter(ValueFromRemainingArguments = $true)][string[]]$ScriptArgs)
 $ErrorActionPreference = 'Stop'
-if (-not $Ghidra) { $Ghidra = if ($env:MODKIT_GHIDRA) { $env:MODKIT_GHIDRA } else { "C:\ghidra\ghidra_12.1.4_PUBLIC" } }
+if (-not $Ghidra) { $Ghidra = if ($env:MODKIT_GHIDRA) { $env:MODKIT_GHIDRA } else { (@(Get-ChildItem "C:\ghidra*", "C:\ghidra\ghidra*" -Directory -ErrorAction SilentlyContinue | Where-Object { Test-Path (Join-Path $_.FullName "support\analyzeHeadless.bat") } | Sort-Object Name -Descending | ForEach-Object FullName) + "C:\ghidra")[0] } }
 if (-not $Work) { $Work = if ($env:MODKIT_GHIDRA_WORK) { $env:MODKIT_GHIDRA_WORK } else { "C:\ghidra-work" } }
 $headless = Join-Path $Ghidra "support\analyzeHeadless.bat"
 if (-not (Test-Path $headless)) { throw "Ghidra not found: $headless (set -Ghidra or MODKIT_GHIDRA)" }
