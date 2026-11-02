@@ -14,6 +14,8 @@ $ErrorActionPreference = 'Stop'
 if (-not $Ghidra) { $Ghidra = if ($env:MODKIT_GHIDRA) { $env:MODKIT_GHIDRA } else { (@(Get-ChildItem "C:\ghidra*", "C:\ghidra\ghidra*" -Directory -ErrorAction SilentlyContinue | Where-Object { Test-Path (Join-Path $_.FullName "support\analyzeHeadless.bat") } | Sort-Object Name -Descending | ForEach-Object FullName) + "C:\ghidra")[0] } }
 if (-not $Work) { $Work = if ($env:MODKIT_GHIDRA_WORK) { $env:MODKIT_GHIDRA_WORK } else { "C:\ghidra-work" } }
 $headless = Join-Path $Ghidra "support\analyzeHeadless.bat"
+# Keep settings (and the OSGi script cache) in the work dir: the default roaming folder can fail in Felix.
+$env:_JAVA_OPTIONS = "-Dapplication.settingsdir=$(Join-Path $Work 'settings')"
 if (-not (Test-Path $headless)) { throw "Ghidra not found: $headless (set -Ghidra or MODKIT_GHIDRA)" }
 $projDir = Join-Path $Work "project"
 if (-not (Test-Path (Join-Path $projDir "D2R.gpr"))) { throw "no D2R project in $projDir; run tools/ghidra_analyze.ps1 first" }
