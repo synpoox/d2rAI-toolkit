@@ -68,6 +68,30 @@ How to detect: list the process's modules (`CreateToolhelp32Snapshot` / `Module3
 contains `\d2rloader\plugins\`; ask each for `D2RLoaderGetPluginInfo` to read its `id`. d2rloader.log's `[PLUGIN]`
 lines list them too. See `plugin-template/src/env_guard.cpp`.
 
+## Item service on D2RCore 1.3.1-beta
+
+The SDK is newer than this loader. `ItemService` is 88 bytes here against 112 in PluginSDK 0.4.0, so `getItemDetails`,
+`getItemTooltip` and `getItemPreviewTooltip` are missing, and calling them crashes the plugin. Check
+`HasItemServiceField` before any optional field.
+
+- Transmute reaches a UI message listener as target `HoradricCubePanelMessage`, command `Convert` (build 93847). The
+  listener can return `Consume` and do its own work on the game thread.
+- The `UniqueItems` row (Rotw bank, build 93847) is 348 bytes, with 12 property slots from offset 152, each
+  `int32 id, par, min, max` (empty id -1). `id` is the Properties.txt `*Id` that `PropertySpec` takes.
+- Without `getItemDetails`, a rolled value needs `editNativeItem` (`NativeHooks` flag) and a native stat read.
+- Inventory item info has real seeds and item level on the game thread only; on the UI thread they read 0 and 1.
+- `executeTransaction` can rebuild a unique from its own seeds with an added `PropertySpec`; the property survives
+  save and reload and the unique's rolls stay. It is a new item, so socketed inputs must be refused or their contents
+  destroyed.
+- `editItem` and `executeExistingItemTransaction` cannot add properties.
+- `ItemTooltipEvent.item` is the client's copy of the item. It reads no custom stats, and the handle differs from the
+  player's. Use `getItemInfo` on the UI thread, then find the player's item by `runtimeId` on the game thread.
+- A new itemstatcost row needs `Save Bits` to reach the save file; without them the stat is lost on reload. The
+  largest `Save Bits` in the stock table is 24. Save Add lets it hold negative values.
+- Rebuilding an already rebuilt unique from its seeds rerolls it (build 93847).
+- Item tooltip listeners add lines, but `ÿc3`, `%c3` and `ÿc;` print literally there, and raw `\xFF` changes the
+  tooltip's font.
+
 ## Versions and builds
 
 | Fact | Detail |
