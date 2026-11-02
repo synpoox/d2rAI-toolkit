@@ -46,6 +46,8 @@ Maps under `data/hd/items/` (JSON arrays of one-key objects):
 | `uniques.json` | uniqueitems `index` lowercased, spaces and hyphens -> `_`, apostrophes dropped (`Buriza-Do Kyanon` -> `buriza_do_kyanon`) | `{ "normal": ..., "uber": ..., "ultra": ... }` (picture per base tier) |
 | `sets.json` | setitems `index`, same normalisation | same as uniques |
 
+**A unique's own art needs a non-blank `invfile`** (build 93847): with it blank the game shows the base item's picture and ignores `uniques.json`. All 143 stock uniques with their own art set it; the base item's `invfile` is enough.
+
 **Every item code, unique and set item needs an entry pointing at an existing sprite.** A missing one makes the
 client request `data/hd/global/ui/items/<table>/[default_unit]` every frame (blz-log spam) and then crash (vendor
 screen, Item Spawner: access violation at D2R+0x29538e). Entries for uniques/sets the mod removed must go too (a
@@ -75,6 +77,8 @@ Skill tree backgrounds: `Spells\Skill_Trees\<Xx>Skilltree` (`skillBackgroundFile
 | Reference | layout `"filename": "PANEL\\x\\y"` = `data/hd/global/ui/panel/x/y.sprite` (case-insensitive) |
 | From classic 512 x 704 art | scale x 2.2695 across, x 2.1406 down |
 | Examples | `PANEL\\Inventory\\Classic_Background`, `PANEL\\Inventory\\Background`, `PANEL\\Horadric_Cube\\HoradricCube_BG`, `PANEL\\Stash\\StashPanel_BG_Personal` / `_Shared` |
+| Blank background | `PANEL\\panel_bg`: frame and header only. The Add Sockets and Cube backgrounds have their slots baked in |
+| Stock pieces for new panels | `PANEL\\Inventory\\Inventory_Paperdoll_Weapon` (197 x 392, an empty 2x4 slot), `Lobby\\Final\\LobbyArrowLargeR` (94 x 108, 4 frames; an `ImageWidget` takes `"scale"` in its rect) |
 
 Panel art may hold things D2R draws itself elsewhere (a gold box where D2R's stash tabs go): cut and move them in
 the sprite build step. See [ui-layouts.md](ui-layouts.md).
@@ -178,3 +182,9 @@ Keep a list of every stand-in so the art work is easy to plan.
 
 D2R ships its own legacy art (about 21,000 .dcc, 3,600 .cof, 1,300 .dc6, 266 .dt1, 2,277 .ds1): reuse it freely.
 Ship only new files; leave D2R's names alone so its HD and classic versions stay matched.
+
+## New objects
+
+A new `objects` row needs two HD files or it spawns and works but draws nothing: a line in
+`data/hd/objects/objects.json` (`"<snake_case class>": { "asset_path": "<folder>" }`, `ShrineAltar` -> `shrine_altar`)
+and `data/hd/objects/<folder>/<name>.json`. A copy of the stock object's json reuses its model (build 93847).

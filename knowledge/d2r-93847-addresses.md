@@ -306,6 +306,10 @@ frame), +0x30 step counter (Fire Wall's).
 | `0x34e9d0` | (object, level byte) set portal destination (clears the high byte) |
 | `0x34ad40` | portal destination getter (16 bits: object data +0x08 low, +0x78 high) |
 | `0x5da800` | cube output "Red Portal" |
+| `0x490410` | (unitType, row, x, y, game, room, 1, 0, 0, 0) -> unit: spawn a unit; type 2 = object. Tested from a game-thread callback |
+| `0x4022a0` | debug `SpawnObject` handler: a worked example of the spawn. Game: `0x4062f0(0x4061e0(1))`; player: `0x484c90(*(game+0x138), 0)`; room: `0x34b440(unit)`; free spot: `0x402f50(room, xy, 5, 0x3e01, &room)`; objects row count: `0x38fc70(*(u8*)(game+0x106))` |
+| `0x23a51c0` | object operate table, 75 entries, indexed by objects.txt `OperateFn` (compiled row `+0x15e`); entry = `int fn(args*)`, args = { game, object, player, seed, id }. Slot 60 is null and unused: a plugin can write its own function there, no hook needed. Called from `0x592c40` and `0x593630` |
+| `0x239b980` | object init table, 81 entries, indexed by `InitFn` (compiled row `+0x15c`) |
 | `0x5d88b0` | (game + 0x1aac8, &key) -> int* per-game counter |
 
 ## Cube
@@ -448,3 +452,13 @@ the current pointer when wrapping a D2R function. srvdofunc `0x238ea00` (free 17
 110-129), server missile hit `0x2391030` (free 61-70), client missile hit `0x2358710` (6, 7 empty), server missile
 do `0x2390e80` (46-54 empty), client missile do `0x2358430` (14 unused). Item spell flag:
 `PatchWriteU32(0x236fe30 + 12*slot + 8, 0 -> 1)`.
+
+## Inventory grid widget (build 93847)
+- Vtable of the inventory grid: `0x1CF3800`. Slot `0xC0` is the item info build (`0x2C4AC0`, widget, out, item) and slot `0xF8` is the item placement (`0x2C4B80`, widget, out origin, packed size, visual). The belt has its own vtable, `0x1CE2FA0`.
+- The placement's origin is x, y, width, height in screen px. Writing an entry with `PatchWrite` needs no code bytes and leaves the item draw hook at `0x2A72D0` free for one other plugin.
+- The highlight behind an item is placed one cell at a time, so its size argument is not the item's size.
+- Odd-size centring moves drawing only: clicks and tooltips keep the real cells.
+- `WidgetHandle` from the widget service is an id, not a widget pointer.
+- Unit reads: unit bucket `0x4925B0` (type, game, id; list next +0x158, id +8), missile owner `0x490300` (game, missile), monster flag test `0x38E870` (unit, u16; 8 Unique seen in code), monster affixes `0x38E310` (unit, zero-terminated bytes).
+- Self-buff do-function `0x553E60` (game, unit, skill, level) casts any Frozen Armor-style skill row. `0x34E790` clears the skill-used flag it leaves, `0x4370B0` (unit, state, 1) clears a state and replaces same-group states, `0x3351B0` tests a state.
+- Monster type flags for `0x38E870`, named by the debug display at `0x167130`: 2 Super Unique, 4 Champion, 8 Unique, 0x10 Minion, 0x200 Herald, 0x400 Herald Minion. The same function shows 9 affix slots at `0x38E310`.

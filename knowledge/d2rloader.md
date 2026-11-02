@@ -133,3 +133,13 @@ The template declares `Shared | ModScopedOnly | NativeHooks`:
   client in TCP/IP games, so bump the version with every release.
 - **ModScopedOnly**: loads only from the mod's plugin folder while that mod runs.
 - **NativeHooks**: may patch game code.
+
+## Plugin panels (D2RLoader 1.3.1-beta, build 93847)
+
+- `setWidgetEventMessage` is a null entry on this loader, and calling it crashes: check `HasWidgetServiceField` first.
+- The widget service has no `setText`: its table ends at `getInputText`, and calling past the end crashes. `setWidgetVisible`,
+  `setWidgetEnabled`, `findPanel` and `findWidget` work, so a panel can show or hide fixed text but not change it.
+- A button whose `onClickMessage` has an unknown target is never dispatched. Use a stock target,
+  `PanelManager:OpenPanel:<plugin-id>/<name>`, then read `event->text` in a UI message listener and consume it.
+- Retail saves allow one custom player page: a second `registerPlayerPage` returns `Conflict`. Items on a page are saved
+  with the character and stay there when the panel closes.
