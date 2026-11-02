@@ -41,18 +41,18 @@ def lib() -> ctypes.WinDLL:
     c = ctypes.WinDLL(str(path))
     # CascLib is built ANSI (CASC_UNICODE off).
     c.CascOpenStorage.argtypes = [ctypes.c_char_p, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE)]
-    c.CascOpenStorage.restype = wintypes.BOOL
+    c.CascOpenStorage.restype = ctypes.c_bool
     c.CascCloseStorage.argtypes = [wintypes.HANDLE]
-    c.CascCloseStorage.restype = wintypes.BOOL
+    c.CascCloseStorage.restype = ctypes.c_bool
     c.CascOpenFile.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD, wintypes.DWORD,
                                ctypes.POINTER(wintypes.HANDLE)]
-    c.CascOpenFile.restype = wintypes.BOOL
+    c.CascOpenFile.restype = ctypes.c_bool
     c.CascGetFileSize.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
     c.CascGetFileSize.restype = wintypes.DWORD
     c.CascReadFile.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD)]
-    c.CascReadFile.restype = wintypes.BOOL
+    c.CascReadFile.restype = ctypes.c_bool
     c.CascCloseFile.argtypes = [wintypes.HANDLE]
-    c.CascCloseFile.restype = wintypes.BOOL
+    c.CascCloseFile.restype = ctypes.c_bool
     c.CascFindFirstFile.argtypes = [wintypes.HANDLE, ctypes.c_char_p, ctypes.POINTER(CASC_FIND_DATA), ctypes.c_char_p]
     c.CascFindFirstFile.restype = wintypes.HANDLE
     c.CascFindNextFile.argtypes = [wintypes.HANDLE, ctypes.POINTER(CASC_FIND_DATA)]
