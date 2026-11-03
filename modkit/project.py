@@ -7,8 +7,10 @@ A project is a folder:
       patches/*.json    change lists, applied in file-name order (each: {"ops": [...]} or a bare list)
       assets/           PNGs and other inputs the patches name
       files/data/...    files copied as they are into the mod (applied before the patches)
+      generated/data/...  optional, git-ignored output of the project's own generator (e.g. merged data from another
+                        mod), copied after files/ and before the patches
 
-`modkit build mymod` starts from the pristine game files (base.py) every time, applies files/ and every patch, and
+`modkit build mymod` starts from the pristine game files (base.py) every time, applies files/, generated/ and every patch, and
 writes only the changed files to mymod/out/data/. The same patches always give the same mod, so a patch can be
 read, reviewed and reverted like code. Operations are listed in OPS (docs in knowledge/modkit-ops.md).
 """
@@ -99,15 +101,16 @@ class Build:
         if self.out.parent.exists():
             shutil.rmtree(self.out.parent)
         self.out.mkdir(parents=True)
-        files = self.project / "files" / "data"
-        if files.exists():
-            for p in files.rglob("*"):
-                if p.is_file():
-                    rel = "data/" + p.relative_to(files).as_posix()
-                    dest = self.out / rel[5:]
-                    dest.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(p, dest)
-                    self._copied.add(rel)
+        for layer in ("files", "generated"):
+            files = self.project / layer / "data"
+            if files.exists():
+                for p in files.rglob("*"):
+                    if p.is_file():
+                        rel = "data/" + p.relative_to(files).as_posix()
+                        dest = self.out / rel[5:]
+                        dest.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(p, dest)
+                        self._copied.add(rel)
         for patch in sorted((self.project / "patches").glob("*.json")):
             doc = json.loads(patch.read_text("utf-8"))
             ops = doc["ops"] if isinstance(doc, dict) else doc
