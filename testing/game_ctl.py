@@ -7,6 +7,7 @@
   python testing/game_ctl.py --slot N key esc enter ctrl+s  keys, as window messages
   python testing/game_ctl.py --slot N click 0.5 0.5 [right]  click at a fraction of the client area
   python testing/game_ctl.py --slot N console "some command"  a console line, run through the plugin harness
+  python testing/game_ctl.py --slot N release              give the mouse and keyboard back to the person at the PC
   python testing/game_ctl.py --slot N harness on|off       write / remove the plugin's harness word file
 
 The slot comes from --slot or MODKIT_SLOT. There is no default: slot 1 is the user's own game and is refused.
@@ -274,6 +275,12 @@ class Harness:
             self.set("y", self.h["cursor_start"][1])
             self.set("active", 1)
 
+    def release(self) -> None:
+        """The game reads the real cursor, buttons and modifiers again (until the next click)."""
+        self.set("buttons", 0)
+        self.set("mods", 0)
+        self.set("active", 0)
+
     def set_mods(self, mods) -> None:
         self.set("mods", sum(MOD_BITS[m] for m in mods))
 
@@ -530,7 +537,6 @@ class Game:
                 continue
             hn = Harness(cfg, block)
             if hn.magic_ok():
-                hn.activate()
                 self._harness, self._harness_pid = hn, pid
                 return hn
         return None
@@ -576,6 +582,7 @@ class Game:
         block, so the real cursor never moves; window messages are posted as well."""
         hwnd = self.need_window()
         hn = self.need_harness()
+        hn.activate()  # only clicks take the virtual cursor; `release` gives it back
         w, h = client_size(hwnd)
         x, y = int(fx * w), int(fy * h)
 
@@ -721,7 +728,8 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     tc.add_config_arg(ap)
     ap.add_argument("--slot", type=int, help="slot number (or MODKIT_SLOT); slot 1 is refused")
-    ap.add_argument("cmd", nargs="?", choices=("status", "start", "stop", "shot", "key", "click", "console", "harness"))
+    ap.add_argument("cmd", nargs="?", choices=("status", "start", "stop", "shot", "key", "click", "console", "harness",
+                                                  "release"))
     ap.add_argument("args", nargs="*")
     a = ap.parse_args(argv)
     if not a.cmd:
@@ -765,6 +773,9 @@ def _run(g: Game, a) -> int:
         print(text.rstrip() or "(no output captured)")
     elif c == "harness":
         g.harness_switch((args[:1] or ["on"])[0] == "on")
+    elif c == "release":
+        g.need_harness().release()
+        print(f"slot {g.slot}: the game reads the real mouse and keyboard again")
     return 0
 
 

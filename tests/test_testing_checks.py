@@ -516,6 +516,8 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual([self.block.get(h[k]) for k in ("idx_x", "idx_y", "idx_buttons", "idx_mods")], [10, 20, 3, 5])
         with self.assertRaises(KeyError):
             self.h.set_mods(["hyper"])
+        self.h.release()
+        self.assertEqual([self.block.get(h[k]) for k in ("idx_active", "idx_buttons", "idx_mods")], [0, 0, 0])
 
     def test_a_custom_layout_is_honoured(self):
         cfg = make_cfg(self.tmp.name, harness={"idx_x": 12, "idx_y": 13, "magic": 77})
@@ -611,8 +613,8 @@ class GameTests(unittest.TestCase):
         self.addCleanup(lambda: (stop.set(), t.join(1)))
         with mock.patch.object(gs, "slot_processes", return_value=[(4242, "D2R.exe")]):
             self.assertIs(g.harness().block, block)
-            self.assertEqual(block.get(h["idx_active"]), 1)
             self.assertTrue(g.console("echo hi", timeout=2))
+            self.assertEqual(block.get(h["idx_active"]), 0)  # console lines leave the real mouse to the user
             mark = g.console_mark()
             self.assertEqual(g.console_text("again", settle=0.05), "handled\n")
             self.assertEqual(g.wait_console("handled", mark, timeout=1), "handled\n")
