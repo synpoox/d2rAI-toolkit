@@ -462,3 +462,14 @@ do `0x2390e80` (46-54 empty), client missile do `0x2358430` (14 unused). Item sp
 - Unit reads: unit bucket `0x4925B0` (type, game, id; list next +0x158, id +8), missile owner `0x490300` (game, missile), monster flag test `0x38E870` (unit, u16; 8 Unique seen in code), monster affixes `0x38E310` (unit, zero-terminated bytes).
 - Self-buff do-function `0x553E60` (game, unit, skill, level) casts any Frozen Armor-style skill row. `0x34E790` clears the skill-used flag it leaves, `0x4370B0` (unit, state, 1) clears a state and replaces same-group states, `0x3351B0` tests a state.
 - Monster type flags for `0x38E870`, named by the debug display at `0x167130`: 2 Super Unique, 4 Champion, 8 Unique, 0x10 Minion, 0x200 Herald, 0x400 Herald Minion. The same function shows 9 affix slots at `0x38E310`.
+
+## Item property lines (`D2Client/UI/mods.cpp`)
+
+| RVA | Signature | Meaning |
+|---|---|---|
+| `0x2dc4b0` | (item, char* out, int size, int, u32, int, u32, u32, void*, void*) | merges the item's stat lists and writes its blue property lines to `out` (size 1024). No direct callers in the dump. An inline hook at the entry works: bytes `48 89 5C 24 20 55 56 57 41 54 41 55 41 56 41 57` (16) |
+| `0x2da760` | (flag, out, size, item, ...) | builds the lines from the merged list. D2RLoader has patched its entry (`jmp [rip+...]`, table in `.maho`), so hook `0x2dc4b0` instead |
+
+After `0x2dc4b0` returns, `out` is plain ASCII with one line per LF, bottom line first and no colour codes (tested in game). Lines with the same stat are already merged, so a line can hold values from more than one source.
+
+Unlike tooltip listeners, this buffer takes colour codes: U+E07E plus the code character. `;` is purple and `3` is the property blue; a code holds for the rest of its line and later lines (tested in game).
