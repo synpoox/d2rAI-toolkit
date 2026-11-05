@@ -13,7 +13,8 @@
      "skilldesc": {...},                 skilldesc.txt overrides (description lines, damage display)
      "tree": {"page": 1, "row": 2, "column": 3},   skill tree slot (page 1-3, row 1-6, column 1-3)
      "text": {"name": "...", "short": "...", "long": "...", "alt": "..."},   tooltip strings
-     "icon": "assets/frost_lance.png" or {"from": "Ice Blast"},   new icon (HD + classic) or another's IconCel
+     "icon": "assets/frost_lance.png" or {"from": "Ice Blast"},   new icon (HD + classic) or another's IconCel;
+                                         {"copy": "Fanaticism"} appends that skill's picture to this class's strip
      "missiles": [{"name": "frostlance", "clone": "icebolt", "set": {...}, "hdLike": "icebolt"}],
      "states":   [{"name": "frostlanced", "clone": "freeze", "set": {...}}],
      "hdSequenceLike": "Whirlwind"       for anim SQ skills: whose HD body animation to copy (default: clone)
@@ -125,6 +126,14 @@ def build_skill(b, op: dict) -> None:
         if isinstance(icon, str):
             if icon_cel is None:
                 icon_cel = b.icon_strip(charclass).append(images.read_png(b.asset(icon)))
+            descs.set(desc, "IconCel", icon_cel)
+        elif isinstance(icon, dict) and "copy" in icon:
+            if icon_cel is None:  # another skill's picture, appended to this class's strip (it may be another class's)
+                other = skills.need(icon["copy"])
+                src_strip = b.icon_strip(skills.get(other, "charclass"))
+                cel = int(descs.get(descs.need(skills.get(other, "skilldesc")), "IconCel"))
+                picture = images.crop(src_strip.strip, cel * src_strip.stride, 0, src_strip.frame_width, src_strip.strip[1])
+                icon_cel = b.icon_strip(charclass).append(picture)
             descs.set(desc, "IconCel", icon_cel)
         elif isinstance(icon, dict):
             other = descs.need(skills.get(skills.need(icon["from"]), "skilldesc"))
