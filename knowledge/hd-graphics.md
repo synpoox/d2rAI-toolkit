@@ -86,7 +86,8 @@ the sprite build step. See [ui-layouts.md](ui-layouts.md).
 ## Missiles
 
 - `data/hd/missiles/missiles.json`: one object, `"dependencies": {...}` first, then **missile name (lowercased) ->
-  model name**; models are `data/hd/missiles/<model>.json` (+ particles/textures).
+  model name** (no vanilla missile name has a capital, so whether D2R lower-cases a mod's `ZharBolts` before the
+  case-sensitive lookup is unproven: write both spellings); models are `data/hd/missiles/<model>.json` (+ particles/textures).
 - `CelFile` in missiles.txt is used **only by the classic renderer**.
 - A missile missing from the map is **invisible in HD** (it still works). Map new missiles to a D2R model with a
   similar look; `"null"` for invisible ones. A good automatic stopgap: the model D2R uses for a vanilla missile with
@@ -121,6 +122,9 @@ the sprite build step. See [ui-layouts.md](ui-layouts.md).
   (+ DCC), **used even in HD for timing**; and `data/hd/character/monsters.json`: **monstats `Id` -> HD model name**
   (`data/hd/character/enemy/<model>/...`, with its own `<model>_state_machine.json`).
 - A missing COF crashes ("Could not add cof file"); a monster `Id` missing from monsters.json has no HD model.
+- **IMPORTANT: every JSON key is case-sensitive.** monsters.json is looked up by the monstats `Id` exactly as spelled:
+  a mod monster `hellbovineMap` keyed as `hellbovinemap` is invisible in HD (proven in game, PD2 port, 2026-11-04).
+  Vanilla Ids are all lower case, so D2R's own file never shows this. Never lower-case a key D2R builds from a name.
 - Cheapest new monster: reuse a D2R monster's `Code` and monstats2 visual columns, and map its `Id` to that HD model.
   With its own classic files (COF/DCC + `animdata.d2` records) it keeps its own timing and classic art and only
   borrows the HD model.
