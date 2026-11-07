@@ -5,8 +5,9 @@
 #         cmake --build build --config Release
 # Output: build/Release/<MODKIT_PLUGIN_NAME>.dll -> copy to <game>/mods/<Mod>/d2rloader/plugins/
 #
-# MODKIT_SDK_DIR points at the PluginSDK checkout. The default fits this repo (plugin-template/../third_party);
-# after copying the template into your own mod project, pass -DMODKIT_SDK_DIR=<path to PluginSDK>.
+# MODKIT_SDK_DIR points at the PluginSDK checkout and MODKIT_COMMON_DIR at the shared plugin library
+# (shared/plugin-common: guards, off switch, log, crash guard, game bindings). The defaults fit this repo; after copying
+# the template into your own mod project, pass both paths into your toolkit checkout.
 cmake_minimum_required(VERSION 3.29)
 project(modkit_plugin LANGUAGES CXX RC)
 
@@ -15,24 +16,22 @@ set(MODKIT_PLUGIN_VERSION "0.1.0" CACHE STRING "PluginInfo::version (shared plug
 set(MODKIT_MOD_NAME "" CACHE STRING "Mod folder the plugin ships in (mods/<name>); the environment guard warns when another runs")
 set(MODKIT_SOUND_ROWS "0" CACHE STRING "Rows of the mod's sounds.txt (0 = no new sounds); below it the sound guard asks for a restart")
 set(MODKIT_SDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/PluginSDK" CACHE PATH "D2RLoader PluginSDK directory")
+set(MODKIT_COMMON_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../shared/plugin-common" CACHE PATH "The toolkit's shared plugin library")
 
 set(D2RLPLUGIN_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 add_subdirectory(${MODKIT_SDK_DIR} PluginSDK EXCLUDE_FROM_ALL)
+add_subdirectory(${MODKIT_COMMON_DIR} plugin-common)
 
 add_library(modkit_plugin SHARED
 	src/plugin.cpp
-	src/d2r.cpp
-	src/log.cpp
-	src/off_switch.cpp
-	src/env_guard.cpp
 	src/sound_guard.cpp
 	src/item_type_check.cpp
 	src/skill_functions.cpp
 	src/hook_example.cpp
 	src/plugin.rc  # ABI manifest resource: D2RLoader rejects a plugin DLL without it
 )
-target_link_libraries(modkit_plugin PRIVATE D2RLPlugin::D2RLPlugin)
+target_link_libraries(modkit_plugin PRIVATE plugin_common)
 target_compile_definitions(modkit_plugin PRIVATE
 	MODKIT_PLUGIN_NAME="${MODKIT_PLUGIN_NAME}"
 	MODKIT_PLUGIN_VERSION="${MODKIT_PLUGIN_VERSION}"

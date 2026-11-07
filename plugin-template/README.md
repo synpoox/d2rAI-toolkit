@@ -4,22 +4,18 @@ A minimal mod-scoped D2RLoader plugin for Diablo II: Resurrected. Copy this fold
 it. It is the part of an overhaul that data files alone cannot do: new skill functions, formula codes, hooks on
 engine functions.
 
-Target: **D2R 3.3.0 build 93847 + D2RLoader 1.3.1, PluginSDK 0.4.0.** Every address in `src/d2r.h` belongs to that
-one game image. The plugin checks the image's PE timestamp (`0x6ab3782c`). On any other image it loads, logs
+Target: **D2R 3.3.0 build 93847 + D2RLoader 1.3.1, PluginSDK 0.4.0.** Every address in the shared library's
+`rvas_93847.h` (`../shared/plugin-common`) belongs to that one game image. The plugin checks the image's PE timestamp (`0x6ab3782c`). On any other image it loads, logs
 "not the expected game image: every engine part stays off", and changes nothing.
 
 | File | What it is |
 | --- | --- |
 | `src/plugin.cpp` | Entry point: `PluginInfo`, the parts table (`g_parts`), the status console command |
 | `src/plugin.rc` | Plugin manifest resource (RCDATA 1001 = plugin ABI version). D2RLoader reads it before loading; without it the DLL is rejected as "an old alpha plugin". Keep it in every plugin |
-| `src/log.*` | Log helper (`plog::Info/Warn/Error`, prefixed with the plugin name; `plog::Sample` for hot paths) |
-| `src/build_guard.h` | Image check: PE TimeDateStamp of the running game against `ExpectedImage` |
-| `src/off_switch.*` | Reads `<name>-off.txt`: part words to leave out |
-| `src/env_guard.*` | Environment guard: another mod running, this DLL outside its mod folder, a second copy, other plugins |
+| `../shared/plugin-common` | The toolkit's shared plugin library, linked as `plugin_common`: log, image check (`build_guard.h`), off switch, environment guard, crash guard, the build 93847 bindings (`rvas_93847.h`, `d2r.h`). See its README |
 | `src/sound_guard.*` | Sound-table guard: catches sound ids past the loaded table (the first-start cache) and asks for a restart |
 | `src/item_type_check.*`, `src/item_type_ids.h` | Item type id self-check: the ids D2R.exe tests by number, against the mod's |
 | `tools/item_type_ids.py` | Checks a built itemtypes.txt and writes `item_type_ids.h` |
-| `src/d2r.h`, `src/d2r.cpp` | Address registry for build 93847: RVAs, typed function pointers (`d2r::api`), record offsets, `MissileParams`/`SummonParams`, `At<T>`, D2 RNG |
 | `src/skill_functions.*` | Example of a new server skill function (`srvdofunc` 172, a missile fan) |
 | `src/hook_example.*` | Example inline hook (Whirlwind's hit delay `0x56ac00`, passed through and counted) |
 | `CMakeLists.txt`, `build.ps1` | Build |
@@ -27,7 +23,7 @@ one game image. The plugin checks the image's PE timestamp (`0x6ab3782c`). On an
 ## Build
 
 You need CMake 3.29 or newer and Visual Studio with the C++ workload. The PluginSDK comes from
-`../third_party/PluginSDK` (a git submodule of d2r-modkit).
+`../third_party/PluginSDK` (a git submodule of d2r-modkit) and the shared library from `../shared/plugin-common`.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File build.ps1                    # -> build\Release\mod-core.dll
@@ -47,7 +43,8 @@ CMake variables: `MODKIT_PLUGIN_NAME` (default `mod-core`) sets the DLL name, pl
 off-file name. `MODKIT_PLUGIN_VERSION` (default `0.1.0`) is the plugin version; bump it with every release, because
 shared plugins must match between host and client in multiplayer. `MODKIT_MOD_NAME` is the mod folder the plugin
 ships in (`mods\<name>`); empty skips the mod checks. `MODKIT_SOUND_ROWS` is the row count of the mod's sounds.txt;
-0 means the mod adds no sounds. `MODKIT_SDK_DIR` is the PluginSDK path. The
+0 means the mod adds no sounds. `MODKIT_SDK_DIR` is the PluginSDK path and
+`MODKIT_COMMON_DIR` the shared library's (pass both after copying the template out of the toolkit). The
 build uses the static CRT, so the DLL does not need the VC++ redistributable, and compiles with `/W4 /permissive-
 /utf-8`. `build/` is git-ignored.
 
@@ -138,8 +135,8 @@ D2R 3.3 uses slots up to 171, so **slots 172-190 are free**.
    `int64_t Fn(d2r::Game* game, d2r::Unit* unit, int32_t skillId, int32_t level) noexcept`.
    Return non-zero when the skill ran. Check every pointer, and never throw.
 2. Build it from `d2r::api`:
-   - `getSkillRecord` gives the skills.txt row. Read its columns with `At<T>(skill, d2r::Sk...)`.
-   - `d2r::EvalCalc(game, unit, skill, d2r::SkCalc1, skillId, level)` evaluates a formula column.
+   - `getSkillRecord` gives the skills.txt row. Read its columns with `At<T>(skill, d2r::rva::Sk...)`.
+   - `d2r::EvalCalc(game, unit, skill, d2r::rva::SkCalc1, skillId, level)` evaluates a formula column.
    - `skillTargetXY` and `skillTargetUnit` give the target.
    - Fill a `d2r::MissileParams` and call `createMissile`.
    - Fill a `d2r::SummonParams` and call `summonPet`, then `setPetLevel`, `petSkillStats` and `addPetToParty`, as
@@ -198,7 +195,7 @@ Plan it with [knowledge/new-game-systems.md](../knowledge/new-game-systems.md) b
 ## Rules
 
 - Every RVA, offset and entry byte sequence is for build 93847 only. After a game or D2RLoader update, dump the
-  image again, re-find each address, and only then change `ExpectedImage` in `build_guard.h`.
+  image again, re-find each address, and only then write the new build's `rvas_<build>.h` in the shared library.
 - Inline hooks need whole instructions, at least 14 bytes, with REX prefixes included. Hook function types must be
   `noexcept`.
 - Check for an existing D2RLoader hook (`jmp [rip+x]` at the entry) before you patch any engine function.

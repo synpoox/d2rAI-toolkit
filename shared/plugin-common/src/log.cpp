@@ -16,9 +16,9 @@ void Write(Level level, const char* fmt, va_list args) noexcept {
 	if (g_context == nullptr || fmt == nullptr) {
 		return;
 	}
-	char body[900];
+	char body[2400];  // room for a part that lists every slot it installed
 	std::vsnprintf(body, sizeof(body), fmt, args);
-	char line[1024];
+	char line[2500];
 	std::snprintf(line, sizeof(line), "%s: %s", g_prefix, body);
 	switch (level) {
 	case Level::Info: g_context->LogInfo(line); break;
