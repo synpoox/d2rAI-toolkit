@@ -40,7 +40,7 @@ DEFAULTS: dict[str, Any] = {
         "window_step": [60, 40],
         "copy_mode": "copy",            # "copy" or "hardlink" (hard links only for link_dirs, same drive)
         "link_dirs": ["Data"],          # top-level folders that may be hard-linked (read-only game data)
-        "exclude": ["Logs"],            # top-level names that are not copied into a slot
+        "exclude": ["Logs"],            # names or paths ("d2rloader/plugins") not copied into a slot
         "mods_policy": "skip",          # "skip": the mods folder is not copied (the installer fills it); "copy"
     },
     "mod": {
