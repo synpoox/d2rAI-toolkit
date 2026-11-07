@@ -1,8 +1,8 @@
 # Knowledge base
 
 What a D2R overhaul mod runs into, learned from a large classic-to-D2R overhaul port. Target: **D2R 3.3.0
-build 93847** with **D2RLoader 1.3.1** (PluginSDK 0.4.0, ABI 4). Everything here uses only D2R's own files and engine:
-the toolkit has no MPQ/DC6/DCC conversion pipeline. Bringing a classic mod over (its tables, its engine DLL's
+build 93847** with **D2RLoader 1.3.1** (PluginSDK 0.4.0, ABI 4). Everything here uses only D2R's own files and engine;
+reading a classic mod's own archives is `shared/classic_import`'s job (its README). Bringing a classic mod over (its tables, its engine DLL's
 rules) is covered in [porting-classic-mods.md](porting-classic-mods.md).
 
 | File | What it covers |
@@ -21,6 +21,7 @@ rules) is covered in [porting-classic-mods.md](porting-classic-mods.md).
 | [d2rloader.md](d2rloader.md) | D2RLoader facts and traps: default mod, the cache-building first start, other plugins, version checks, its files |
 | [porting-classic-mods.md](porting-classic-mods.md) | Porting a classic 1.13c-era mod: inventory, table-by-table conversion, ids that must not move, function numbers, events, art order |
 | [modkit-ops.md](modkit-ops.md) | The modkit's patch operations (JSON ops applied by `modkit build`) |
+| [cheat-commands.md](cheat-commands.md) | Setting up an in-game test from D2RLoader's console: every cheat command, item spawn lines, what they did in game |
 
 ## Rules that apply to every file
 
@@ -30,4 +31,8 @@ rules) is covered in [porting-classic-mods.md](porting-classic-mods.md).
 - Every hook and table write is byte-checked (`InstallInlineHook` / `PatchWriteU64` with the expected bytes); a
   mismatch must refuse, never patch blind.
 - Data before code: many "new" behaviours are an existing D2R function with different table values.
+- **PluginSDK service before a native hook.** Read the SDK's `README.md` and `include/D2RLPlugin/` for a service that
+  does the job (items: `createItem`, `executeTransaction`, `executeExistingItemTransaction`, `splitStack`; inventory;
+  game rules; and others). Hook D2R code only when no service covers it, and say in the code why. A byte patch goes
+  through the SDK's MutationService.
 - Facts marked "observed" or "unverified" were seen once in one port and not proven in general.
