@@ -346,7 +346,8 @@ def copy_install(cfg: tc.Config, n: int, link: bool | None = None, dry_run: bool
         raise SlotError(f"game.install_dir {src_root} does not exist")
     g = cfg["game"]
     use_link = (g["copy_mode"] == "hardlink") if link is None else link
-    skip = {x.lower() for x in g["exclude"]}
+    # a top-level name ("Logs") or a path below it ("d2rloader/plugins")
+    skip = {x.replace("\\", "/").strip("/").lower() for x in g["exclude"]}
     link_dirs = {x.lower() for x in g["link_dirs"]}
     if g["mods_policy"] == "skip":
         skip.add("mods")
@@ -356,9 +357,9 @@ def copy_install(cfg: tc.Config, n: int, link: bool | None = None, dry_run: bool
     for root, dirs, files in os.walk(src_root):
         rel = os.path.relpath(root, src_root)
         top = "" if rel == "." else rel.split(os.sep)[0].lower()
-        if rel == ".":
-            dirs[:] = [d for d in dirs if d.lower() not in skip]
-            files = [f for f in files if f.lower() not in skip]
+        relp = "" if rel == "." else rel.replace(os.sep, "/").lower() + "/"
+        dirs[:] = [d for d in dirs if relp + d.lower() not in skip]
+        files = [f for f in files if relp + f.lower() not in skip]
         droot = dst_root if rel == "." else os.path.join(dst_root, rel)
         if not dry_run:
             os.makedirs(droot, exist_ok=True)

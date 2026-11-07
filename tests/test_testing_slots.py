@@ -367,6 +367,20 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(again["files"]["copied"], 0)  # nothing changed: nothing copied
         self.assertIn('default_mod = "MyMod"', Path(self.cfg.loader_config_path(2)).read_text())  # kept
 
+    def test_exclude_takes_paths_below_the_top_level(self):
+        inst = Path(self.cfg.install_dir)
+        (inst / "d2rloader" / "plugins").mkdir(parents=True)
+        (inst / "d2rloader" / "plugins" / "user-plugin.dll").write_bytes(b"p")
+        (inst / "d2rloader" / "crashes").mkdir()
+        (inst / "d2rloader" / "crashes" / "dump.dmp").write_bytes(b"d")
+        cfg = make_cfg(self.tmp.name, game={"exclude": ["Logs", "d2rloader/plugins", "D2RLoader\Crashes\dump.dmp"]})
+        gs.setup(cfg, 2)
+        dst = Path(cfg.slot_dir(2))
+        self.assertFalse((dst / "d2rloader" / "plugins").exists())
+        self.assertFalse((dst / "d2rloader" / "crashes" / "dump.dmp").exists())
+        self.assertTrue((dst / "d2rloader" / "config" / "d2rloader.toml").exists())  # siblings still copied
+        self.assertFalse((dst / "Logs").exists())
+
     def test_sync_copies_only_what_changed_and_never_deletes(self):
         gs.setup(self.cfg, 2)
         dst = Path(self.cfg.slot_dir(2))
