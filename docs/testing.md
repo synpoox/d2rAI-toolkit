@@ -77,6 +77,9 @@ What makes a slot independent:
   called `D2R.exe`.
 - **Own loader config.** `setup` writes `default_mod = <mod.folder>` into the slot's copy of the loader config. A later
   `setup` does not overwrite that file, so edits you make in a slot stay.
+- **Straight to character select.** `setup` (and `slot_install.py`, `release_install.py`) writes `"First Time": 1`
+  into the slot save folder's `Settings.json`, so the game skips the logo videos and the gamma screen. `setup` also
+  turns on D2RLoader's Gameplay > *Enable RotW legacy graphics keybind* in the slot's loader config.
 - **Own window.** The window is resized to `game.client_size` and placed at `window_origin + window_step * (slot - 1)`.
 
 `mods_policy = "skip"` (the default) leaves the `mods` folder out of the copy: you or your install script fill it, with

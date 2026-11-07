@@ -51,6 +51,13 @@ class SlotInstallTests(unittest.TestCase):
         self.assertEqual(self.savepaths(), ["MyMod-s3/", "MyMod-s3/"])
         self.assertTrue(Path(self.cfg.save_dir(3)).is_dir())
 
+    def test_save_folder_skips_first_run_screens_and_keeps_settings(self):
+        Path(self.cfg.save_dir(3)).mkdir(parents=True)
+        Path(self.cfg.save_dir(3), "Settings.json").write_text('{"Gamma": 155, "First Time": 0}')
+        si.install(self.cfg, 3, str(self.project), owner="lane")
+        settings = json.loads(Path(self.cfg.save_dir(3), "Settings.json").read_text())
+        self.assertEqual(settings, {"Gamma": 155, "First Time": 1, "Tutorial": 1})
+
     def test_install_points_the_slot_loader_at_the_mod(self):
         toml = Path(self.cfg.loader_config_path(3))
         toml.parent.mkdir(parents=True)

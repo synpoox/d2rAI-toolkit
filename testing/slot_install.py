@@ -38,7 +38,7 @@ def install(cfg: tc.Config, n: int, project: str, owner: str | None = None) -> s
     msg = modkit_install(Path(project), Path(cfg.slot_dir(n)), savepath=savepath, check_running=False)
     if cfg["loader"]["set_default_mod"]:  # as setup does: the slot launches the mod just installed
         game_slots.set_loader_value(cfg, n, cfg["loader"]["default_mod_key"], cfg.mod_folder())
-    os.makedirs(cfg.save_dir(n), exist_ok=True)
+    game_slots.prepare_save_dir(cfg, n)  # also skips D2R's first-run screens
     return f"{msg}; savepath {savepath}"
 
 
