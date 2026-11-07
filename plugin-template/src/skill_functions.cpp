@@ -3,7 +3,7 @@
 // How it works
 // ------------
 // When a skill's cast frame is reached, the server looks up skills.txt's `srvdofunc` value in a table of function
-// pointers (d2r::SrvDoTable, RVA 0x238ea00, 191 slots) and calls that slot as
+// pointers (d2r::rva::SrvDoTable, RVA 0x238ea00, 191 slots) and calls that slot as
 //     int64_t fn(Game* game, Unit* caster, int32_t skillId, int32_t skillLevel)   -> non-zero = the skill ran.
 // D2R 3.3 uses slots up to 171. Slots 172-190 are empty (null pointers), so a plugin can put its own functions there.
 // In skills.txt, set `srvdofunc` of your skill to the SLOT NUMBER; that is all the data side needs:
@@ -60,13 +60,13 @@ auto SrvDoMissileFan(Game* game, Unit* unit, int32_t skillId, int32_t level) noe
 		return 0;
 	}
 
-	const int32_t missile = At<int16_t>(skill, d2r::SkSrvMissileA);
-	if (!d2r::ValidMissile(game, missile)) {
+	const int32_t missile = At<int16_t>(skill, d2r::rva::SkSrvMissileA);
+	if (!d2r::ValidMissile(d2r::DataFlag(game), missile)) {
 		return 0;
 	}
-	int32_t count = d2r::EvalCalc(game, unit, skill, d2r::SkCalc1, skillId, level);
+	int32_t count = d2r::EvalCalc(game, unit, skill, d2r::rva::SkCalc1, skillId, level);
 	count = count < 1 ? 1 : (count > 64 ? 64 : count);  // a broken formula must not spawn thousands of missiles
-	int32_t spread = d2r::EvalCalc(game, unit, skill, d2r::SkCalc2, skillId, level);
+	int32_t spread = d2r::EvalCalc(game, unit, skill, d2r::rva::SkCalc2, skillId, level);
 	spread = spread <= 0 ? 30 : (spread > 360 ? 360 : spread);
 
 	// Aim direction, normalised to 20 subtiles so the rotated points stay precise for close targets.
@@ -114,7 +114,7 @@ constexpr SlotFunction Functions[] = {
 	// {173, SrvDoYourSkill, "your skill"},
 };
 
-static_assert(sizeof(Functions) / sizeof(Functions[0]) <= d2r::SrvDoSlots - d2r::SrvDoFirstFree);
+static_assert(sizeof(Functions) / sizeof(Functions[0]) <= d2r::rva::SrvDoSlots - d2r::rva::SrvDoFirstFree);
 
 }  // namespace
 
@@ -126,9 +126,9 @@ auto InstallSkillFunctions(const D2RL::PluginContext* context, char* report, siz
 		report[0] = '\0';
 	}
 	for (const SlotFunction& f : Functions) {
-		bool ok = f.slot >= d2r::SrvDoFirstFree && f.slot < d2r::SrvDoSlots;
+		bool ok = f.slot >= d2r::rva::SrvDoFirstFree && f.slot < d2r::rva::SrvDoSlots;
 		if (ok) {
-			const uint64_t rva = d2r::SrvDoTable + static_cast<uint64_t>(f.slot) * 8;
+			const uint64_t rva = d2r::rva::SrvDoTable + static_cast<uint64_t>(f.slot) * 8;
 			ok = context->PatchWriteU64(rva, Empty, sizeof(Empty), reinterpret_cast<uint64_t>(f.function));
 		}
 		installed += ok ? 1 : 0;

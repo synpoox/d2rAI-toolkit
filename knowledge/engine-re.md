@@ -62,7 +62,7 @@ analyzeHeadless <projectDir> D2R -process <dump.exe> -noanalysis -readOnly -scri
    ordinals map to D2R functions by behaviour, not by name.
 6. **Thread samples for hangs**: repeated RIPs in a hung game point at the loop (see 9).
 
-Put every confirmed address in one header with its signature as a comment (the template's `d2r.h`).
+Put every confirmed address in one header with its signature as a comment (the shared library's `rvas_93847.h`).
 
 ## 5. Before hooking: is D2RLoader already there?
 

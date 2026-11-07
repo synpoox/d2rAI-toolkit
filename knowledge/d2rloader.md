@@ -66,7 +66,7 @@ D2RLoader loads the active mod's plugins (`mods\<Mod>\d2rloader\plugins\`) first
 
 How to detect: list the process's modules (`CreateToolhelp32Snapshot` / `Module32First`) and keep those whose path
 contains `\d2rloader\plugins\`; ask each for `D2RLoaderGetPluginInfo` to read its `id`. d2rloader.log's `[PLUGIN]`
-lines list them too. See `plugin-template/src/env_guard.cpp`.
+lines list them too. See `shared/plugin-common/src/env_guard.cpp`.
 
 ## Item service on D2RCore 1.3.1-beta
 

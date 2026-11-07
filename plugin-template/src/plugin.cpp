@@ -1,4 +1,5 @@
-// D2RLoader plugin entry point (template). Copy plugin-template/ into your mod project and extend it.
+// D2RLoader plugin entry point (template). Copy plugin-template/ into your mod project and extend it. The guards, off
+// switch, log, crash guard and game bindings come from the toolkit's shared library (shared/plugin-common).
 //
 // Target: D2R 3.3.0 build 93847 under D2RLoader 1.3.1, PluginSDK 0.4.0.
 //
@@ -9,6 +10,7 @@
 //  - build_guard.h: checks the game image (PE TimeDateStamp). Every RVA belongs to one image; on any other image the
 //    engine parts stay off and say so, so a D2R/D2RLoader update cannot make the plugin patch random code;
 //  - off_switch.h: reads "<plugin>-off.txt" next to the DLL: words naming parts to leave out (bisecting a crash);
+//  - crash_guard.h: logs a FAULT line (address, why, whether this plugin is on the stack) when the game faults;
 //  - env_guard.h: warns when D2RLoader runs another mod, when this DLL is not in the mod's own folder, or when a second
 //    copy of it is loaded; names the other plugins (no game address: runs even on a wrong image);
 //  - installs each part and logs one line per part;
@@ -19,6 +21,7 @@
 #include <D2RLPlugin/api.h>
 
 #include "build_guard.h"
+#include "crash_guard.h"
 #include "d2r.h"
 #include "env_guard.h"
 #include "hook_example.h"
@@ -172,21 +175,20 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 	}
 	g_context = context;
 	plog::Init(context, PluginName);
+	crash_guard::Install(PluginVersion, context->exeBase);
 	g_stamp = build_guard::ImageStamp(context->exeBase);
-	const bool imageOk = build_guard::Matches(g_stamp);
 	if (context->pluginPath != nullptr) {
 		std::snprintf(g_selfPath, sizeof(g_selfPath), "%ls", context->pluginPath);
 	}
 	char image[200];
 	build_guard::Describe(image, sizeof(image), g_stamp, context->buildVersion);
 	plog::Info("%s loaded (mod %s, %s, file %s)", PluginVersion, context->activeMod != nullptr ? context->activeMod : "?", image, g_selfPath);
-	off_switch::Read();
+	off_switch::Read(context->pluginPath);
 	if (off_switch::Words()[0] != '\0') {
 		plog::Info("%s-off.txt leaves out: %s", PluginName, off_switch::Words());
 	}
-	if (imageOk) {
-		d2r::Bind(context->exeBase);
-	} else {
+	const bool imageOk = d2r::Bind(context->exeBase);  // binds nothing on any other image
+	if (!imageOk) {
 		plog::Warn("not the expected game image: every engine part stays off");
 	}
 	InstallParts(context, imageOk);
@@ -194,5 +196,6 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 }
 
 D2RL_PLUGIN_EXPORT void D2RLoaderUnloadPlugin() noexcept {
+	crash_guard::Remove();
 	g_context = nullptr;
 }

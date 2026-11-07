@@ -9,11 +9,15 @@
 //
 // On a mismatch: install no part, log why, say it in the status command (and, if you like, on screen with D2RLoader's
 // overlay service). After a game update: re-dump, re-find every address (knowledge/engine-re.md), then change
-// ExpectedImage.
+// rva::ImageStamp (rvas_<build>.h).
 #pragma once
 
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif
 #include <windows.h>
+
+#include "rvas_93847.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -21,7 +25,7 @@
 
 namespace build_guard {
 
-constexpr uint32_t ExpectedImage = 0x6ab3782cU;  // D2R 3.3.0 under D2RLoader 1.3.1 (Battle.net 93847 / Steam 94995)
+constexpr uint32_t ExpectedImage = d2r::rva::ImageStamp;  // the image rvas_93847.h describes
 
 // TimeDateStamp of the PE image at `exeBase` (0 when there is none).
 inline auto ImageStamp(uintptr_t exeBase) noexcept -> uint32_t {

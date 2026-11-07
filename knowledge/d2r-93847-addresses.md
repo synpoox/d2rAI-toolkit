@@ -258,9 +258,11 @@ empty). Functions holding one inline its destruction (see `0x5630e0`'s epilogue)
 
 MissileParams (0xa0 bytes, classic 1.10 block +0x10 after three pointers): +0 u32 flags, +8 owner, +0x10 origin,
 +0x18 target, +0x20 missile, +0x24 x, +0x28 y (0 = origin), +0x2c/+0x30 target x/y, +0x34 gfx arg, +0x38
-velocity, +0x3c skill, +0x40 level, +0x44 loops, +0x4c frame, +0x50 activate frame, +0x54 attack bonus, +0x5c range
-(with flag 0x8000), **+0x70 init kind** (replaces classic init function pointer: 1 = charged-strike bolt, 4 =
-multishot), +0x74 init argument (e.g. index).
+velocity, +0x3c skill, +0x40 level, +0x44 loops, +0x4c frame, +0x50 activate frame, +0x54 activation (frames before
+the missile starts; Multiple Shot puts skills.txt calc2 there; earlier read as attack bonus), +0x5c range (frames the
+missile lives; with flag 0x8000), +0x68 source key (unit state key of the missile a chain starts from: Chain
+Lightning's srvhit 12), **+0x70 create callback** (replaces classic init function pointer: an index into the create
+callbacks, run on the new missile with +0x74 as its argument; 1 = Firestorm's, 0 = none). Observed in game.
 
 Missile record (classic 1.13c layout moved +0x24 from +0x24): +0x28 u16 pCltDoFunc, +0x2a pCltHitFunc, +0x2c
 pSrvDoFunc, +0x2e pSrvHitFunc, +0x3a i16 SubMissile1, +0x40 CltSubMissile1, +0x46 HitSubMissile1, +0x4e
