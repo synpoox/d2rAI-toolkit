@@ -399,6 +399,9 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(info["name"], "x")  # other keys are kept
         toml = Path(cfg.loader_config_path(3)).read_text()
         self.assertIn('default_mod = "MyMod"', toml)
+        self.assertIn("always_enable_rotw_legacy_graphics_keybind = true", toml)
+        settings = json.loads(Path(cfg.save_dir(3), "Settings.json").read_text())
+        self.assertEqual(settings, {"First Time": 1, "Tutorial": 1})  # no logo videos, no gamma screen
         # slot 1's own copies are untouched
         self.assertEqual(json.loads(Path(cfg.mod_dir(1), "MyMod.mpq", "modinfo.json").read_text())["savepath"], "MyMod/")
         self.assertNotIn('default_mod = "MyMod"', Path(cfg.loader_config_path(1)).read_text())

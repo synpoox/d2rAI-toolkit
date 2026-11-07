@@ -35,11 +35,11 @@ cp testing/testing.example.toml modkit-testing.toml
 python testing/game_slots.py setup
 python testing/game_slots.py status
 
-# 3. Put your mod into a slot (the slot copy skips the mods folder by default).
-python -m modkit --game D:/d2r-slots/slot-2 install my-project
-
-# 4. Take a slot for yourself. "any" = the first free slot; wait up to 30 minutes in the queue.
+# 3. Take a slot for yourself. "any" = the first free slot; wait up to 30 minutes in the queue.
 python testing/game_slots.py lock any my-lane --wait 1800        # prints which slot you got
+
+# 4. Put your mod into that slot (the slot copy skips the mods folder by default). Keeps the slot's own savepath.
+MODKIT_RUN=my-lane python testing/slot_install.py --slot 2 my-project
 
 # 5. Run the checks on that slot. MODKIT_RUN names you; screenshots and results go to ~/modkit-runs/my-lane/.
 MODKIT_RUN=my-lane python testing/game_checks.py run --slot 2
@@ -77,11 +77,17 @@ What makes a slot independent:
   called `D2R.exe`.
 - **Own loader config.** `setup` writes `default_mod = <mod.folder>` into the slot's copy of the loader config. A later
   `setup` does not overwrite that file, so edits you make in a slot stay.
+- **Straight to character select.** `setup` (and `slot_install.py`, `release_install.py`) writes `"First Time": 1`
+  into the slot save folder's `Settings.json`, so the game skips the logo videos and the gamma screen. `setup` also
+  turns on D2RLoader's Gameplay > *Enable RotW legacy graphics keybind* in the slot's loader config.
 - **Own window.** The window is resized to `game.client_size` and placed at `window_origin + window_step * (slot - 1)`.
 
 `mods_policy = "skip"` (the default) leaves the `mods` folder out of the copy: you or your install script fill it, with
-`python -m modkit --game <slot folder> install <project>` or with [`release_install.py`](#test-what-players-get).
-`modkit install` refuses while any `D2R.exe` or `D2RLoader.exe` runs on the machine, so install before you start games.
+`testing/slot_install.py --slot N <project>` or with [`release_install.py`](#test-what-players-get).
+`slot_install.py` runs `modkit install` and writes the slot's own savepath (`saves.slot_name`) into both
+`modinfo.json` files, so the slot never plays on the project's save folder. It needs the slot lock held by
+`MODKIT_RUN` and refuses while that slot's game runs; games in other slots may keep running. Plain
+`python -m modkit --game <slot folder> install` refuses a slot folder of the testing config and points you here.
 Set `mods_policy = "copy"` to copy your own mods folder as well.
 
 ## The config file

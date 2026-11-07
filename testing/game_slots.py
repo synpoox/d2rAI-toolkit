@@ -121,8 +121,9 @@ def processes(names: tuple[str, ...] | None = None) -> list[tuple[int, str, str]
 
 
 def under(path: str, folder: str) -> bool:
-    p = os.path.normcase(os.path.abspath(path))
-    f = os.path.normcase(os.path.abspath(folder)).rstrip("\\/")
+    # realpath: Windows reports a process image by its resolved path, so a slots folder that is a link must match
+    p = os.path.normcase(os.path.realpath(path))
+    f = os.path.normcase(os.path.realpath(folder)).rstrip("\\/")
     return p.startswith(f + os.sep)
 
 
@@ -416,6 +417,31 @@ def set_savepath(cfg: tc.Config, n: int) -> list[str]:
     return written
 
 
+# Settings.json keys that mark D2R's first run as done: without them a new save folder plays the logo videos and the
+# gamma calibration screen before the character select screen
+FIRST_RUN_DONE = {"First Time": 1, "Tutorial": 1}
+
+
+def prepare_save_dir(cfg: tc.Config, n: int) -> str:
+    """Make slot N's save folder and mark D2R's first run done in its Settings.json (other keys are kept), so the
+    game starts on the character select screen. Returns the Settings.json path."""
+    guard_writable(cfg, n)
+    os.makedirs(cfg.save_dir(n), exist_ok=True)
+    path = os.path.join(cfg.save_dir(n), "Settings.json")
+    data = {}
+    if os.path.isfile(path):
+        try:
+            with open(path, encoding="utf-8-sig") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            data = {}
+    if any(data.get(k) != v for k, v in FIRST_RUN_DONE.items()):
+        data.update(FIRST_RUN_DONE)
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(json.dumps(data, indent=2) + "\n")
+    return path
+
+
 def set_toml_value(text: str, section: str, key: str, value: str) -> str:
     """Return `text` with `key = value` set in [section]. A present or commented-out line for the key is replaced;
     otherwise the line goes right after the header, and a missing section is added at the end. `value` is TOML text."""
@@ -450,6 +476,21 @@ def set_loader_value(cfg: tc.Config, n: int, key: str, value: str) -> bool:
     return True
 
 
+def set_legacy_graphics_keybind(cfg: tc.Config, n: int) -> bool:
+    """Keep the Toggle Renderer (legacy graphics) keybind on for RotW characters in the slot's loader config."""
+    guard_writable(cfg, n)
+    p = cfg.loader_config_path(n)
+    if not os.path.isfile(p):
+        return False
+    with open(p, encoding="utf-8") as f:
+        text = f.read()
+    new = set_toml_value(text, "d2rcore.player", "always_enable_rotw_legacy_graphics_keybind", "true")
+    if new != text:
+        with open(p, "w", encoding="utf-8", newline="\n") as f:
+            f.write(new)
+    return True
+
+
 def setup(cfg: tc.Config, n: int, link: bool | None = None, dry_run: bool = False, out=print) -> dict:
     """Make slot N ready: copy/sync the install, loader copy, savepath, default mod, save folder."""
     guard_writable(cfg, n)
@@ -463,7 +504,8 @@ def setup(cfg: tc.Config, n: int, link: bool | None = None, dry_run: bool = Fals
     res["modinfo"] = set_savepath(cfg, n)
     if cfg["loader"]["set_default_mod"]:
         res["loader_config"] = set_loader_value(cfg, n, cfg["loader"]["default_mod_key"], cfg.mod_folder())
-    os.makedirs(cfg.save_dir(n), exist_ok=True)
+    set_legacy_graphics_keybind(cfg, n)
+    res["settings"] = prepare_save_dir(cfg, n)
     return res
 
 

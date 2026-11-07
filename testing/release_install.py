@@ -382,7 +382,8 @@ def install(cfg: tc.Config, n: int, channel: str | None = None, site_spec: str |
         args = " ".join(a for a in (launch.get("launch_arguments", ""), cfg["release"]["extra_launch_args"]) if a)
         game_slots.set_loader_value(cfg, n, lk["args_key"], args)
         changes["launch_arguments"] = args
-    os.makedirs(cfg.save_dir(n), exist_ok=True)
+    game_slots.prepare_save_dir(cfg, n)  # also skips D2R's first-run screens
+    game_slots.set_legacy_graphics_keybind(cfg, n)
     with open(sf, "w", encoding="utf-8", newline="\n") as f:
         json.dump(changes, f, indent=2)
         f.write("\n")

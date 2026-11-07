@@ -25,7 +25,25 @@ def game_running() -> bool:
     return "d2r.exe" in out or "d2rloader.exe" in out
 
 
-def install(project: Path, game: Path) -> str:
+def configured_slot(game: Path) -> int | None:
+    """The test slot number (2 and up) when `game` is a slot folder of the testing config (testing/README.md), else
+    None. No config, or one that does not load, means no slots."""
+    import sys
+    testing = str(Path(__file__).resolve().parent.parent / "testing")
+    if testing not in sys.path:
+        sys.path.insert(0, testing)
+    try:
+        import testing_config as tc
+        path = tc.find_config_path()
+        n = tc.load(path).slot_of_dir(str(game)) if path else None
+    except Exception:  # noqa: BLE001  a broken testing config must not stop a plain install
+        return None
+    return n if n and n > 1 else None
+
+
+def install(project: Path, game: Path, savepath: str | None = None, check_running: bool = True) -> str:
+    """savepath overrides mod.json's (a test slot keeps its own save folder). check_running=False lets a caller that
+    checked only the target folder's game (testing/slot_install.py) install while other copies of the game run."""
     project = Path(project)
     mod = json.loads((project / "mod.json").read_text("utf-8"))
     name = mod["name"]
@@ -34,14 +52,18 @@ def install(project: Path, game: Path) -> str:
         raise FileNotFoundError(f"{src} missing: run modkit build first")
     if not (game / "D2R.exe").exists():
         raise FileNotFoundError(f"{game} is not a D2R folder")
-    if game_running():
+    slot = None if savepath else configured_slot(game)
+    if slot:
+        raise RuntimeError(f"{game} is test slot {slot}: install with testing/slot_install.py --slot {slot}, which "
+                           "keeps the slot's own savepath")
+    if check_running and game_running():
         raise RuntimeError("D2R / D2RLoader is running: close the game before installing")
     root = game / "mods" / name
     mpq = root / f"{name}.mpq"
     if (mpq / "data").exists():
         shutil.rmtree(mpq / "data")
     shutil.copytree(src, mpq / "data")
-    modinfo = json.dumps({"name": name, "savepath": mod.get("savepath", f"{name}/")}, indent=2)
+    modinfo = json.dumps({"name": name, "savepath": savepath or mod.get("savepath", f"{name}/")}, indent=2)
     for target in (mpq / "modinfo.json", root / "modinfo.json"):
         target.write_text(modinfo, encoding="utf-8")
 
