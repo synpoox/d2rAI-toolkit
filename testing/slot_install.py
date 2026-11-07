@@ -39,6 +39,7 @@ def install(cfg: tc.Config, n: int, project: str, owner: str | None = None) -> s
     if cfg["loader"]["set_default_mod"]:  # as setup does: the slot launches the mod just installed
         game_slots.set_loader_value(cfg, n, cfg["loader"]["default_mod_key"], cfg.mod_folder())
     game_slots.prepare_save_dir(cfg, n)  # also skips D2R's first-run screens
+    game_slots.set_legacy_graphics_keybind(cfg, n)
     return f"{msg}; savepath {savepath}"
 
 

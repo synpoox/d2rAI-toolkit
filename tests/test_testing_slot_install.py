@@ -64,6 +64,7 @@ class SlotInstallTests(unittest.TestCase):
         toml.write_text('[d2rloader]\ndefault_mod = "OtherMod"\n')
         si.install(self.cfg, 3, str(self.project), owner="lane")
         self.assertIn('default_mod = "MyMod"', toml.read_text())
+        self.assertIn("always_enable_rotw_legacy_graphics_keybind = true", toml.read_text())
 
     @unittest.skipUnless(os.name == "nt", "junctions are Windows only")
     def test_slot_process_found_through_a_linked_slots_folder(self):
@@ -81,9 +82,31 @@ class SlotInstallTests(unittest.TestCase):
         self.assertEqual(self.savepaths(), ["MyMod-s3/", "MyMod-s3/"])
         self.assertEqual(Path(self.cfg.mod_dir(3), "MyMod.mpq/data/global/a.txt").read_text(), "b")
 
+    def use_config(self):
+        """Point MODKIT_TESTING_CONFIG at this test's slots, as the owner's environment does."""
+        path = Path(self.tmp.name, "testing.json")
+        path.write_text(json.dumps(self.cfg.data))
+        return mock.patch.dict("os.environ", {"MODKIT_TESTING_CONFIG": str(path)})
+
+    def test_plain_modkit_install_refuses_a_configured_slot(self):
+        with self.use_config(), mock.patch.object(mi, "game_running", return_value=False):
+            with self.assertRaisesRegex(RuntimeError, "slot_install.py --slot 3"):
+                mi.install(self.project, Path(self.cfg.slot_dir(3)))
+            self.assertFalse(Path(self.cfg.mod_dir(3)).exists())
+            si.install(self.cfg, 3, str(self.project), owner="lane")  # the slot-safe install still works
+        self.assertEqual(self.savepaths(), ["MyMod-s3/", "MyMod-s3/"])
+
     def test_non_slot_install_keeps_project_savepath(self):
-        with mock.patch.object(mi, "game_running", return_value=False):
-            mi.install(self.project, Path(self.cfg.slot_dir(2)))
+        other = Path(self.tmp.name, "my-own-game")
+        other.mkdir()
+        (other / "D2R.exe").write_text("")
+        with self.use_config(), mock.patch.object(mi, "game_running", return_value=False):
+            mi.install(self.project, other)  # a folder that is not a slot: today's behaviour
+        mod = other / "mods" / "MyMod"
+        self.assertEqual([json.loads(p.read_text())["savepath"] for p in (mod / "MyMod.mpq/modinfo.json", mod / "modinfo.json")],
+                         ["MyMod/", "MyMod/"])
+        with mock.patch.object(mi, "configured_slot", return_value=None),                 mock.patch.object(mi, "game_running", return_value=False):
+            mi.install(self.project, Path(self.cfg.slot_dir(2)))  # no testing config: no slots known
         self.assertEqual(self.savepaths(2), ["MyMod/", "MyMod/"])
         with mock.patch.object(mi, "game_running", return_value=True):
             with self.assertRaisesRegex(RuntimeError, "close the game"):

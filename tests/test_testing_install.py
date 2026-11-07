@@ -240,6 +240,7 @@ class InstallTests(SiteBase):
         toml = Path(self.cfg.loader_config_path(2)).read_text()
         self.assertIn('default_mod = "MyMod"', toml)
         self.assertIn('launch_arguments = "-txt -w"', toml)
+        self.assertIn("always_enable_rotw_legacy_graphics_keybind = true", toml)
         self.assertTrue(os.path.isdir(self.cfg.save_dir(2)))
         state = json.loads(Path(ri.state_file(self.cfg, 2)).read_text())
         self.assertEqual(state["version"], "1.0.0")

@@ -87,7 +87,7 @@ What makes a slot independent:
 `slot_install.py` runs `modkit install` and writes the slot's own savepath (`saves.slot_name`) into both
 `modinfo.json` files, so the slot never plays on the project's save folder. It needs the slot lock held by
 `MODKIT_RUN` and refuses while that slot's game runs; games in other slots may keep running. Plain
-`python -m modkit --game <slot folder> install` writes the project's savepath and refuses while any game runs.
+`python -m modkit --game <slot folder> install` refuses a slot folder of the testing config and points you here.
 Set `mods_policy = "copy"` to copy your own mods folder as well.
 
 ## The config file
