@@ -11,6 +11,7 @@ Windows is needed to run the game; everything else (locks, config, checks, relea
 | `game_ctl.py` | Starts, stops and drives one slot's game: screenshots, keys, clicks, console commands. |
 | `game_checks.py` | Small checks framework: `@check` registry, runner, results JSON, summary, screenshots. |
 | `example_checks.py` | Example checks to copy (`config-sane`, `game-starts`, `main-menu-visible`, `console-echo`, `no-new-crash-files`). |
+| `slot_install.py` | Installs a built mod project into a slot (`modkit install`), keeping the slot's own savepath. |
 | `release_install.py` | Installs the PUBLISHED release into a slot, as a player would get it. |
 
 ## Quick start
@@ -19,6 +20,7 @@ Windows is needed to run the game; everything else (locks, config, checks, relea
 cp testing/testing.example.toml modkit-testing.toml        # edit game.install_dir, game.slots_dir, [mod]
 python testing/game_slots.py setup 2                       # copy your install into slot 2
 python testing/game_slots.py lock 2 my-lane                # take the slot (queue: add --wait 600)
+MODKIT_RUN=my-lane python testing/slot_install.py --slot 2 my-project   # your built mod, slot's savepath
 MODKIT_RUN=my-lane python testing/game_checks.py run --slot 2
 python testing/game_slots.py unlock 2 my-lane
 ```
@@ -50,6 +52,7 @@ python testing/game_slots.py unlock N [OWNER] [--force]
 python testing/game_ctl.py   --slot N status|start|stop|shot NAME|key KEY..|click FX FY [right]|console CMD|harness on|off
 python testing/game_checks.py list [names or tags]
 python testing/game_checks.py run [names or tags] --slot N [--run-id ID] [--keep] [--stop-on-fail] [--module M] [--path DIR]
+python testing/slot_install.py --slot N PROJECT
 python testing/release_install.py check [--channel C] [--site S]
 python testing/release_install.py install --slot N [--channel C] [--site S] [--method auto|archive|objects] [--harness-dll FILE]
 python testing/release_install.py restore|status --slot N

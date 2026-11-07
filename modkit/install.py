@@ -25,7 +25,9 @@ def game_running() -> bool:
     return "d2r.exe" in out or "d2rloader.exe" in out
 
 
-def install(project: Path, game: Path) -> str:
+def install(project: Path, game: Path, savepath: str | None = None, check_running: bool = True) -> str:
+    """savepath overrides mod.json's (a test slot keeps its own save folder). check_running=False lets a caller that
+    checked only the target folder's game (testing/slot_install.py) install while other copies of the game run."""
     project = Path(project)
     mod = json.loads((project / "mod.json").read_text("utf-8"))
     name = mod["name"]
@@ -34,14 +36,14 @@ def install(project: Path, game: Path) -> str:
         raise FileNotFoundError(f"{src} missing: run modkit build first")
     if not (game / "D2R.exe").exists():
         raise FileNotFoundError(f"{game} is not a D2R folder")
-    if game_running():
+    if check_running and game_running():
         raise RuntimeError("D2R / D2RLoader is running: close the game before installing")
     root = game / "mods" / name
     mpq = root / f"{name}.mpq"
     if (mpq / "data").exists():
         shutil.rmtree(mpq / "data")
     shutil.copytree(src, mpq / "data")
-    modinfo = json.dumps({"name": name, "savepath": mod.get("savepath", f"{name}/")}, indent=2)
+    modinfo = json.dumps({"name": name, "savepath": savepath or mod.get("savepath", f"{name}/")}, indent=2)
     for target in (mpq / "modinfo.json", root / "modinfo.json"):
         target.write_text(modinfo, encoding="utf-8")
 

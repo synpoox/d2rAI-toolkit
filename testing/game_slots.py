@@ -121,8 +121,9 @@ def processes(names: tuple[str, ...] | None = None) -> list[tuple[int, str, str]
 
 
 def under(path: str, folder: str) -> bool:
-    p = os.path.normcase(os.path.abspath(path))
-    f = os.path.normcase(os.path.abspath(folder)).rstrip("\\/")
+    # realpath: Windows reports a process image by its resolved path, so a slots folder that is a link must match
+    p = os.path.normcase(os.path.realpath(path))
+    f = os.path.normcase(os.path.realpath(folder)).rstrip("\\/")
     return p.startswith(f + os.sep)
 
 
