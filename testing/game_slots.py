@@ -71,9 +71,9 @@ def pid_alive(pid: int) -> bool:
     return True
 
 
-def processes(names: tuple[str, ...] | None = None) -> list[tuple[int, str, str]]:
-    """[(pid, exe name, full image path)] of processes with these image names (lower case). Windows only: on
-    other systems the list is empty."""
+def processes(names: tuple[str, ...] | None = None, match=None) -> list[tuple[int, str, str]]:
+    """[(pid, exe name, full image path)] of processes with these image names (lower case), or whose name
+    match(name) accepts. Windows only: on other systems the list is empty."""
     if os.name != "nt":
         return []
     import ctypes
@@ -113,7 +113,8 @@ def processes(names: tuple[str, ...] | None = None) -> list[tuple[int, str, str]
     pe.dwSize = ctypes.sizeof(PE)
     ok = k32.Process32FirstW(snap, ctypes.byref(pe))
     while ok:
-        if names is None or pe.szExeFile.lower() in names:
+        nm = pe.szExeFile
+        if (names is None and match is None) or (names is not None and nm.lower() in names) or (match and match(nm)):
             out.append((pe.th32ProcessID, pe.szExeFile, image_path(pe.th32ProcessID)))
         ok = k32.Process32NextW(snap, ctypes.byref(pe))
     k32.CloseHandle(snap)
@@ -131,7 +132,48 @@ def slot_processes(cfg: tc.Config, n: int) -> list[tuple[int, str]]:
     """(pid, name) of the loader / game processes whose image lives in slot N's folder. Never matches by name
     alone: another slot's game has the same image name."""
     game = cfg.slot_dir(n)
-    return [(pid, nm) for pid, nm, path in processes(cfg.process_names(n)) if path and under(path, game)]
+    found = processes(match=lambda nm: cfg.is_process_name(n, nm))
+    return [(pid, nm) for pid, nm, path in found if path and under(path, game)]
+
+
+def matched_names(cfg: tc.Config, n: int) -> list[str]:
+    """The image names slot N's processes are matched by (shown by `status`)."""
+    g = cfg["game"]
+    names = [cfg.loader_name(n)] + ([cfg.process_pattern(n)] if cfg.process_pattern(n) else [])
+    return names + [x for x in (g["loader_exe"], g["game_exe"]) if x not in names]
+
+
+# ---------------------------------------------------------------- window title from the lock owner
+
+
+def issue_number(owner: str | None) -> str | None:
+    """The issue number in a lock owner such as agent-492-uberdiab: its first all-digit part (parts split at
+    `-`, `_`, `.`), or None. The default owner run-<pid> of game_ctl has no issue."""
+    import re
+    parts = re.split(r"[-_.]", owner or "")
+    if parts[0] == "run":
+        return None
+    return next((p for p in parts if p.isdigit() and len(p) <= 6), None)
+
+
+def slot_tag(n: int, owner: str | None) -> str:
+    """`[S8 #492 agent-492-uberdiab]`: put in front of a slot game's window title so the taskbar and alt-tab show
+    whose game it is. No owner: `[S8]`."""
+    if not owner:
+        return f"[S{int(n)}]"
+    num = issue_number(owner)
+    return f"[S{int(n)} {'#' + num + ' ' if num else ''}{owner}]"
+
+
+def strip_slot_tag(title: str) -> str:
+    """The game's own title, without a slot tag in front."""
+    import re
+    return re.sub(r"^\[S[0-9]+(?: [^\]]*)?\] ", "", title, count=1)
+
+
+def tagged_title(title: str, n: int, owner: str | None) -> str:
+    """TITLE with slot N's tag for OWNER in front (an old tag is replaced)."""
+    return f"{slot_tag(n, owner)} {strip_slot_tag(title)}"
 
 
 # ---------------------------------------------------------------- owner text and lock files
@@ -529,7 +571,7 @@ def slot_state(cfg: tc.Config, n: int) -> dict:
             continue
     return {"slot": n, "dir": game, "present": have, "own": cfg.is_slot_one(n),
             "running": slot_processes(cfg, n) if have else [],
-            "lock": None if lk is None else lk.describe(),
+            "lock": None if lk is None else lk.describe(), "names": matched_names(cfg, n),
             "stale": bool(lk and lk.text and is_stale(lk)), "savepath": sp}
 
 
@@ -539,6 +581,7 @@ def format_status(st: dict) -> str:
     name = "slot 1 (your own game, never touched)" if st.get("own") else f"slot {st['slot']}"
     lock = "free" if st["lock"] is None else ("STALE " if st["stale"] else "") + f"locked: {st['lock']}"
     return (f"{name}: {st['dir']} {'ok' if st['present'] else 'MISSING (run setup)'}; "
+            f"matches {', '.join(st.get('names') or []) or '-'}; "
             f"running {st['running'] or '-'}; {lock if not st.get('own') else 'not lockable'}; savepath {st['savepath']}")
 
 

@@ -22,7 +22,9 @@ module imports everywhere and says "needs Windows" instead of crashing.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
+import shutil
 import struct
 import subprocess
 import sys
@@ -360,7 +362,7 @@ def find_windows(pids: set[int], title_prefix: str = "") -> list[int]:
             n = u.GetWindowTextLengthW(h)
             buf = ctypes.create_unicode_buffer(n + 1)
             u.GetWindowTextW(h, buf, n + 1)
-            if not buf.value.startswith(title_prefix):
+            if not game_slots.strip_slot_tag(buf.value).startswith(title_prefix):
                 return True
         r = wt.RECT()
         u.GetWindowRect(h, ctypes.byref(r))
@@ -369,6 +371,20 @@ def find_windows(pids: set[int], title_prefix: str = "") -> list[int]:
 
     u.EnumWindows(cb, 0)
     return [h for _, h in sorted(found, reverse=True)]
+
+
+def window_title(hwnd: int) -> str:
+    import ctypes
+    u = _user32()
+    n = u.GetWindowTextLengthW(hwnd)
+    buf = ctypes.create_unicode_buffer(n + 1)
+    u.GetWindowTextW(hwnd, buf, n + 1)
+    return buf.value
+
+
+def set_window_title(hwnd: int, title: str) -> bool:
+    """SetWindowTextW from outside the game (a WM_SETTEXT message): no hook, nothing loaded into the game."""
+    return bool(_user32().SetWindowTextW(hwnd, title))
 
 
 def client_size(hwnd: int) -> tuple[int, int]:
@@ -673,11 +689,7 @@ class Game:
         if not ok:
             raise GameCtlError(msg)
         if not self.is_running():
-            loader = self.cfg.loader_path(self.slot)
-            if not os.path.isfile(loader):
-                loader = self.cfg.base_loader_path(self.slot)
-            if not os.path.isfile(loader):
-                raise GameCtlError(f"no loader at {loader}: run game_slots.py setup {self.slot}")
+            loader = self.owner_loader()
             off = self.log_mark()
             self.harness_switch(True)
             si = subprocess.STARTUPINFO()
@@ -689,12 +701,61 @@ class Game:
             if line and not wait_log(self.cfg.loader_log(self.slot), line, timeout, off):
                 raise GameCtlError(f"timed out after {timeout:g} s waiting for {line!r} in the loader log")
         hwnd = wait_for(self.window, 60, 1.0, "the game window")
+        self.show_owner(hwnd)
         send_to_back(hwnd)
         g = self.cfg["game"]
         ox, oy = g["window_origin"]
         dx, dy = g["window_step"]
         fit_window(hwnd, g["client_size"][0], g["client_size"][1], ox + dx * (self.slot - 1), oy + dy * (self.slot - 1))
         return True
+
+    def lock_owner(self) -> str | None:
+        info = game_slots.lock_info(self.cfg, self.slot)
+        return info.owner if info else None
+
+    def owner_loader(self) -> str:
+        """The loader to launch, named after the slot's lock owner (<stem>-sN-<owner>.exe) so Task Manager shows
+        whose game it is. A hard link of the slot's loader (a copy on another drive); old owner copies that no
+        longer run are removed. Falls back to the plain slot loader when the link cannot be made."""
+        plain = self.cfg.loader_path(self.slot)
+        if not os.path.isfile(plain):
+            plain = self.cfg.base_loader_path(self.slot)
+        if not os.path.isfile(plain):
+            raise GameCtlError(f"no loader at {plain}: run game_slots.py setup {self.slot}")
+        owner = self.lock_owner()
+        # the owner becomes part of a file name: only a valid one (a hand-made owner.txt may hold anything)
+        name = self.cfg.owner_loader_name(self.slot, owner if game_slots.valid_owner(owner or "") else None)
+        target = os.path.join(self.cfg.slot_dir(self.slot), name)
+        for f in os.listdir(self.cfg.slot_dir(self.slot)):
+            low = f.lower()
+            old_copy = self.cfg.is_process_name(self.slot, f) and low not in self.cfg.process_names(self.slot)
+            if old_copy and low != name.lower():
+                with contextlib.suppress(OSError):  # running (locked by Windows) or already gone
+                    os.remove(os.path.join(self.cfg.slot_dir(self.slot), f))
+        if target == plain or (os.path.isfile(target) and os.path.getsize(target) == os.path.getsize(plain)):
+            return target
+        try:
+            with contextlib.suppress(FileNotFoundError):
+                os.remove(target)
+            try:
+                os.link(plain, target)
+            except OSError:
+                shutil.copy2(plain, target)
+            return target
+        except OSError as e:
+            self.log(f"cannot make {name} ({e}): launching {os.path.basename(plain)}")
+            return plain
+
+    def show_owner(self, hwnd: int | None = None) -> str | None:
+        """Put the slot's lock owner in front of the game window's title: `[S8 #492 agent-492-uberdiab] Diablo
+        II: Resurrected`. Returns the new title (None without a window)."""
+        hwnd = hwnd or self.window()
+        if not hwnd:
+            return None
+        title = game_slots.tagged_title(window_title(hwnd), self.slot, self.lock_owner())
+        if window_title(hwnd) != title:
+            set_window_title(hwnd, title)
+        return title
 
     def stop(self, timeout: float = 20.0) -> None:
         """Close the game of this slot (WM_CLOSE, then kill only the slot's own PIDs), remove the harness word
