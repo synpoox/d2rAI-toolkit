@@ -5,8 +5,8 @@ and the project's deviation list, and returns a Report: every deviation the list
 it into markdown for a PR. A project keeps its own command line (scopes, paths, exit codes) and passes its own fixes.
 
 The deviation list is a markdown file. A table with a Deviation and a Status column holds entries (Status one of the
-project's `statuses`); a table with a Gate column holds patterns (`table.row.column` in backticks, fnmatch, lower
-case). A Gate row in a table without Status names its entry by Deviation.
+project's `statuses`, which the project always names); a table with a Gate column holds patterns
+(`table.row.column` in backticks, fnmatch, lower case). A Gate row in a table without Status names its entry by Deviation.
 """
 from __future__ import annotations
 
@@ -22,7 +22,6 @@ from .ids import Table
 from .tables import row_keys
 
 SHOWN = 200  # open deviations listed in the report; the counts cover the rest
-STATUSES = ("not yet", "approximated", "cut")  # the order the report counts them in
 # (table, mod header, the source row in the mod's spelling (changed in place), source header, source row)
 Fix = Callable[[str, list[str], list[str], list[str], list[str]], None]
 
@@ -100,22 +99,21 @@ def compare(name: str, src: Table, mod: Table, ren: dict[str, dict[str, str]] | 
     """Deviations of `mod` from `src`: missing columns (table.*.col), missing rows (table.row.*), changed cells.
     The source's comment columns and eol are not data; a column D2R keeps only as a comment (*Id) is the row's
     position, and a repeated column is read once, as the merge reads it. The source's rows, columns and cells are read
-    in the mod's spelling: renamed by `ren` (ids.renames) and ids.COLUMN_MAP, spelled by `spell`, fixed by the
+    in the mod's spelling: columns matched as the merges match them (ids.source_columns), rows renamed by `ren`
+    (ids.renames), cells spelled by `spell`, fixed by the
     project's `fix_row` and `fix`, and NUM_REFS and ID_COLS columns in the mod's ids (`id_map`, ids.ids_of). `rows`
     pairs a tables.json table's rows as its merge did. Excel's quote marks are not data."""
     res = Result(name)
-    mod_cols = {c.lower(): i for i, c in enumerate(mod.header)}
-    to_mod = {p.lower(): d.lower() for d, p in ids.COLUMN_MAP.get(name, {}).items()}
-    cols, seen = [], set()
+    def data(i: int) -> bool:
+        return not src.header[i].startswith("*") and src.header[i].lower() != "eol"
+    to_src = ids.source_columns(name, src.header, mod.header)
+    # the key column is the row's name, matched as the key; a renamed column D2R split in several is compared in each
+    cols = [(src.header[i], i, j) for j, i in enumerate(to_src)
+            if i is not None and data(i) and (i != src.key or rows != "name")]
+    used, mod_cols, lower = set(to_src), {c.lower() for c in mod.header}, [c.lower() for c in src.header]
     for i, c in enumerate(src.header):
-        mc = to_mod.get(c.lower(), c.lower())
-        if c.startswith("*") or c.lower() == "eol" or f"*{mc}" in mod_cols or (c and c.lower() in seen):
-            continue
-        seen.add(c.lower())
-        if mc in mod_cols:
-            if i != src.key or rows != "name":  # the key column is the row's name, matched as the key
-                cols.append((c, i, mod_cols[mc]))
-        else:
+        repeat = c and lower.index(c.lower()) < i  # read once, as the merge reads it
+        if i not in used and data(i) and not repeat and f"*{c.lower()}" not in mod_cols:
             res.open.append((f"{name}.*.{c}", "", ""))
     for row, pr, mr in pairs(name, src, mod, ren, lists or {}, rows, by_row, list_paired):
         if mr is None:
@@ -123,7 +121,7 @@ def compare(name: str, src: Table, mod: Table, ren: dict[str, dict[str, str]] | 
             continue
         want, pr = list(mr), (fix_row(name, src.header, pr) if fix_row else pr)
         for _, i, j in cols:
-            want[j] = spell(name, mod.header[j], pr[i], ren) if ren else pr[i].replace('"', "")
+            want[j] = spell(name, mod.header[j], pr[i], ren or {})  # as the merge spells it, lists or none
         if fix:
             fix(name, mod.header, want, src.header, pr)
         for j, c in enumerate(mod.header):  # level tables' row numbers, in the mod's ids
@@ -134,7 +132,7 @@ def compare(name: str, src: Table, mod: Table, ren: dict[str, dict[str, str]] | 
     return res
 
 
-def deviations(path: Path, statuses: tuple[str, ...] = STATUSES) -> tuple[list[str], dict[str, int]]:
+def deviations(path: Path, statuses: tuple[str, ...]) -> tuple[list[str], dict[str, int]]:
     """The deviation list's Gate patterns and its entry count by status (format in the module docstring). Fails on a
     status not in `statuses` and on a Gate row that names no entry."""
     patterns, cols, entries = [], None, dict.fromkeys(statuses, 0)
@@ -171,13 +169,14 @@ def triage(res: Result, patterns: list[str]) -> Result:
     return res
 
 
-def gate(src_excel: Path, mod_excel: Path, d2r_excel: Path, deviation_list: Path,
+def gate(src_excel: Path, mod_excel: Path, d2r_excel: Path, deviation_list: Path, statuses: tuple[str, ...],
          select: Callable[[str], bool] = lambda table: True, lists: dict[str, list[ids.Line]] | None = None,
-         tables_json: dict | None = None, statuses: tuple[str, ...] = STATUSES,
+         tables_json: dict | None = None,
          compare_args: Callable[[str], dict] = lambda table: {}, source: str = "source",
          extract_hint: str = "run the extract") -> Report:
     """Compare every source table `select` picks with the mod's: the merged one in mod_excel, else D2R's (not merged
-    yet), else none (a deviation of the whole table). `lists` are the project's id lists, `tables_json` its
+    yet), else none (a deviation of the whole table). `statuses` are the project's deviation statuses, in the order
+    the report counts them (no default: each project names its own). `lists` are the project's id lists, `tables_json` its
     tables.json (for each table's `rows`); compare_args(table) gives that table's extra compare() arguments (id_map,
     by_row, list_paired, fix_row, fix, spell). A deviation list pattern for a whole merged table fails the run."""
     if not d2r_excel.is_dir():  # else every unmerged table would read as unshipped

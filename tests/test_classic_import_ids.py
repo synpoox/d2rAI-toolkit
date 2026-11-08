@@ -164,6 +164,13 @@ class MergeTableTests(unittest.TestCase):
                                   [("xyz", 0, "xyz")], {})[0]
         self.assertEqual(weapons.rows, [["xyz", "-10", ""]])  # the source's unnamed column fills no D2R column
 
+    def test_add_columns_leaves_the_callers_table_as_it_was(self):
+        d2r = table("name|code\nKey|key\n")
+        merged, _ = ids.merge_table("misc", table("name|code|auto prefix\nKey|key|9\n"), d2r, [("Key", 0, "Key")], {},
+                                    add_columns=("auto prefix", "auto prefix"))
+        self.assertEqual((merged.header, merged.rows), (["name", "code", "auto prefix"], [["Key", "key", "9"]]))
+        self.assertEqual((d2r.header, d2r.rows), (["name", "code"], [["Key", "key"]]))
+
     def test_left_out_rows(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "ids-levels.tsv"
@@ -204,6 +211,26 @@ class MergeTableTests(unittest.TestCase):
                                  spell=lambda t, c, v, ren: f"<{v}>")[0]
         self.assertEqual(merged.rows, [["A", "<1>!"], ["B", "<3>!"]])  # the key is the list's name, after the hooks
         self.assertEqual(seen, [("1", ["A", "9"]), ("3", None)])
+
+
+class SourceColumnsTests(unittest.TestCase):
+    def test_the_rename_map_wins_then_the_same_name_first_occurrence_unnamed_none(self):
+        # skills: D2R's localdelay is 1.13c's delay, even where the source also has a localdelay column
+        self.assertEqual(ids.source_columns("skills", ["skill", "localdelay", "Delay", "", "x", "X"],
+                                            ["Skill", "localdelay", "x", "", "new"]), [0, 2, 4, None, None])
+        self.assertEqual(ids.source_columns("hireling", ["Hireling", "Resist"], ["ResistFire", "ResistCold"]), [1, 1])
+
+    def test_the_merges_and_the_gate_pair_the_same_columns(self):
+        from shared.classic_import import diff, tables
+        src = table("skill|localdelay|delay\nA|1|2\n")
+        d2r = table("skill|localdelay\nA|0\n")
+        by_ids = ids.merge_table("skills", src, d2r, [("A", 0, "A")], {})[0].rows
+        by_tables = tables.merge_table("skills", src, d2r, {}).rows
+        self.assertEqual(by_ids, by_tables)
+        self.assertEqual(by_ids, [["A", "2"]])
+        # the gate reads the same pairing: the cell matches, and the unread localdelay is a dropped column
+        self.assertEqual(diff.compare("skills", src, ids.Table.of(d2r.header, by_ids)).open,
+                         [("skills.*.localdelay", "", "")])
 
 
 class ListFileTests(unittest.TestCase):

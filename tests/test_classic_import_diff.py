@@ -40,12 +40,13 @@ class GateTests(unittest.TestCase):
         (self.root / "deviations.md").write_text(
             "# Deviation list\n\n| Deviation | Status | Gate | Work item |\n|---|---|---|---|\n" + rows, "utf-8")
 
-    def gate(self, **kw):
-        return diff.gate(self.excel("src"), self.excel("mod"), self.excel("d2r"), self.root / "deviations.md", **kw)
+    def gate(self, statuses=("not yet", "approximated", "cut"), **kw):
+        return diff.gate(self.excel("src"), self.excel("mod"), self.excel("d2r"), self.root / "deviations.md", statuses,
+                         **kw)
 
     def test_a_missing_d2r_folder_is_an_error_not_unshipped_tables(self):
         with self.assertRaisesRegex(diff.GateError, "no D2R tables"):
-            diff.gate(self.excel("src"), self.excel("mod"), self.root / "nowhere", self.root / "deviations.md")
+            diff.gate(self.excel("src"), self.excel("mod"), self.root / "nowhere", self.root / "deviations.md", ("cut",))
 
     def test_no_source_tables_is_an_error_not_a_pass(self):
         with self.assertRaisesRegex(diff.GateError, r"no classic tables under .*src.*: extract first"):
@@ -133,6 +134,25 @@ class GateTests(unittest.TestCase):
                                    tables_json={"shrines": {"rows": "position"}, "monstats": {}}).open(),
                          [("shrines.*.Shrine Type", "", ""), ("shrines.1.Code", "1", "2")])
 
+    def test_with_no_id_lists_cells_are_still_spelled_as_the_merge_spells_them(self):
+        # review of #20: an empty rename map skipped spell, so a fixed formula read as a deviation
+        self.write("src", "skills", table("skill | calc1", 'Bash | -"min(a,b)"'))
+        self.write("mod", "skills", table("skill | calc1", "Bash | 0-min(a,b)"))
+        self.assertEqual(self.gate().open(), [])
+        self.assertEqual(self.gate(lists={}).open(), [])
+        src = ids.Table.of(["skill", "calc1"], [["Bash", '-"min(a,b)"']])
+        mod = ids.Table.of(["skill", "calc1"], [["Bash", "0-min(a,b)"]])
+        self.assertEqual(diff.compare("skills", src, mod, {}).open, [])
+        self.assertEqual(diff.compare("skills", src, mod).open, [])
+        custom = diff.compare("skills", ids.Table.of(["skill", "x"], [["Bash", "1"]]),
+                              ids.Table.of(["skill", "x"], [["Bash", "<1>"]]), {}, spell=lambda t, c, v, r: f"<{v}>")
+        self.assertEqual(custom.open, [])  # a project's spell runs with no lists too
+
+    def test_a_renamed_column_d2r_split_in_several_is_compared_in_each(self):
+        self.write("src", "hireling", table("Hireling | Resist", "Rogue | 5"))
+        self.write("mod", "hireling", table("Hireling | ResistFire | ResistCold", "Rogue | 5 | 7"))
+        self.assertEqual(self.gate().open(), [("hireling.Rogue.Resist", "5", "7")])
+
     def test_select_picks_the_tables(self):
         for t in ("skills", "armor", "lvlmaze"):
             self.write("src", t, table("Name | x", "a | 1"))
@@ -157,7 +177,7 @@ class GateTests(unittest.TestCase):
         lists = {"magicprefix": [("Virulent", 1, "Virulent"), ("Virulent#2", 2, "Virulent")]}
         self.write("src", "magicprefix", table("Name | level", "Virulent | 5", "Virulent | 9"))
         self.write("mod", "magicprefix", table("Name | level", "Virulent | 92", "Virulent | 5", "Virulent | 9"))
-        # renamed columns (ids.COLUMN_MAP), and a repeated column whose first holds the values
+        # renamed columns (ids.RENAME_MAP), and a repeated column whose first holds the values
         self.write("src", "armor", table("name | code | DrehyaMax | mindam | mindam", "Buckler | buc | 3 | 1 | 0"))
         self.write("mod", "armor", table("name | code | AnyaMax | mindam", "Buckler | buc | 3 | 1"))
         # a table merged row by row keeps D2R's names; Excel's quote marks are not part of a cube recipe's name

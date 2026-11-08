@@ -3,7 +3,7 @@ and the D2R schema facts that merge needs (#5).
 
 A list, merge/ids-<table>.tsv, has one line per source row (the classic table being ported): `source name <tab> id
 <tab> name`, the row's id and key name in the mod. Ids count records as the game does (an `Expansion` row is not one);
-a repeated source name is listed as `name#2`. An id of `-` leaves the source row out (a cut area, a placeholder row);
+a repeated source name is listed as `name#2`. An id of `-` leaves the source row out (a cut area, an unused row);
 the third column then says why. An id at or below D2R's last row merges the source row onto that D2R row and keeps
 D2R's name, so D2R's own files that name it stay valid (DISPLAY_KEYS tables keep the source's: there the key is the
 text the player sees); a higher id appends the row. Lines are only ever added (seed), never renumbered.
@@ -17,10 +17,10 @@ Seeding a new source row picks, in order:
      NO_NAME_MATCH);
   3. the next free id after D2R's last row, under its source name (+ the project's suffix if the mod has that name).
 
-Merging a row (merge_table): D2R's row, with every column the source also has (or COLUMN_MAP maps) set to the source's
-value, spelled by `spell` (quotes gone, references to the id-listed tables renamed, formulas in D2R's spelling).
-Columns D2R added keep D2R's value on a D2R row and stay blank on an appended one. NUM_REFS columns take the mod's
-ids, ID_COLS and `*Id` columns the row's own. A project's own fixes come in as hooks (spell, fix_row, finish).
+Merging a row (merge_table): D2R's row, with every column the source also has (or RENAME_MAP renames) set to the
+source's value (source_columns), spelled by `spell` (quotes gone, references to the id-listed tables renamed,
+formulas in D2R's spelling). Columns D2R added keep D2R's value on a D2R row and stay blank on an appended one.
+NUM_REFS columns take the mod's ids, ID_COLS and `*Id` columns the row's own. A project's own fixes come in as hooks (spell, fix_row, finish).
 """
 from __future__ import annotations
 
@@ -46,8 +46,9 @@ LEFT_OUT = -1  # the id read_list gives a `-` line
 # 1.13c spells two vendors' columns by their old names
 _NPC = {f"{d2r}{s}": f"{c113}{s}" for d2r, c113 in (("Anya", "Drehya"), ("Hratli", "Hralti"))
         for s in ("Min", "Max", "MagicMin", "MagicMax", "MagicLvl")}
-# D2R column -> 1.13c column, where the name differs by more than letter case
-COLUMN_MAP = {"skills": {"localdelay": "delay"}, "missiles": {"EMax": "Emax"}, "weapons": _NPC, "armor": _NPC,
+# the rename map: D2R column -> 1.13c column, where D2R renamed it (more than letter case). Not the column_map module,
+# which maps one classic schema onto another
+RENAME_MAP = {"skills": {"localdelay": "delay"}, "missiles": {"EMax": "Emax"}, "weapons": _NPC, "armor": _NPC,
               "misc": _NPC, "uniqueitems": {"spawnable": "enabled"},
               "itemtypes": {"MaxSockets1": "MaxSock1", "MaxSockets2": "MaxSock25", "MaxSockets3": "MaxSock40"},
               "levels": {f"MonLvl{ex}{d}": f"MonLvl{n}{ex}" for n, d in ((1, ""), (2, "(N)"), (3, "(H)")) for ex in ("", "Ex")},
@@ -193,7 +194,7 @@ def check(table: str, lines: list[Line], src: list[str], d2r: list[str], source:
             if port[0] >= i:
                 raise IdError(f"{f}: port row '{p}' must copy an earlier row")
         elif p.lower() not in src_names:
-            # shortcut: a source row gone after a re-baseline fails; give its id a placeholder row when that happens
+            # shortcut: a source row gone after a re-baseline fails; keep its id with a disabled row when that happens
             raise IdError(f"{f}: '{p}' is not a {source} row any more")
         if i == LEFT_OUT:
             continue
@@ -277,6 +278,18 @@ class Table:
         return self.newline.join("\t".join(r) for r in [self.header, *self.rows]) + self.newline
 
 
+def source_columns(table: str, src_header: list[str], d2r_header: list[str]) -> list[int | None]:
+    """For each D2R column, the source column that fills it, or None: the one RENAME_MAP names for it, else the one of
+    the same name, letter case aside. A repeated source column's first holds the values (armor's mindam, maxdam); an
+    unnamed one (weapons) fills nothing. Every merge and the gate match columns with this."""
+    at: dict[str, int] = {}
+    for i, c in enumerate(src_header):
+        if c:
+            at.setdefault(c.lower(), i)
+    renamed = {d.lower(): s.lower() for d, s in RENAME_MAP.get(table, {}).items()}
+    return [at.get(renamed.get(c.lower(), c.lower())) for c in d2r_header]
+
+
 def spell(table: str, col: str, v: str, ren: dict[str, dict[str, str]]) -> str:
     """A source cell as the mod's column `col` holds it: quotes gone, references renamed, formulas in D2R's spelling.
     A project with more to fix (function numbers D2R reuses for its own) passes its own spell to the merges."""
@@ -302,17 +315,10 @@ def merge_table(table: str, src: Table, d2r: Table, lines: list[Line], ren: dict
     NUM_REFS columns. fix_row fixes a source row (a copy) before the merge reads it; finish fixes each merged source
     row before its key and id columns are set; d2r_columns keep D2R's value on a merged row; add_columns are columns
     D2R's file lacks but its loader reads, added when the source has them. `source` names the source in messages."""
-    for c in add_columns:
-        if c not in d2r.header and c in src.header:
-            d2r.header.append(c)
-            for r in d2r.rows:
-                r.append("")
-    at: dict[str, int] = {}
-    for i, c in enumerate(src.header):
-        if c:  # an unnamed column (weapons) matches nothing
-            at.setdefault(c.lower(), i)  # a repeated column (armor's mindam, maxdam): the first holds the values
-    cmap = COLUMN_MAP.get(table, {})
-    cols = [(j, at.get(c.lower(), at.get(cmap.get(c, "").lower()))) for j, c in enumerate(d2r.header)]
+    added = [c for c in dict.fromkeys(add_columns) if c not in d2r.header and c in src.header]
+    if added:  # a copy: the caller's D2R table stays as it was
+        d2r = Table.of(d2r.header + added, [r + [""] * len(added) for r in d2r.rows], d2r.newline, d2r.key)
+    cols = list(enumerate(source_columns(table, src.header, d2r.header)))
     used = {i for _, i in cols if i is not None}
     dropped = [c for i, c in enumerate(src.header) if i not in used and c.lower() not in ("id", "eol")]
     fix = fix_row or (lambda t, h, r: list(r))

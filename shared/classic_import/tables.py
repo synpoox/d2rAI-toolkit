@@ -5,8 +5,8 @@
                  "only_rows": [row key, ...]}, ...}   (defaults first)
 
 A source row merges onto the D2R row of the same name (lower case; a repeated name pairs by its order, #1, #2, ...):
-D2R's columns take the source's value where the source has the column (or ids.COLUMN_MAP maps it), and keep D2R's
-value otherwise, comment columns (*...) included. D2R-only rows keep their place and numbers. Source-only rows append
+D2R's columns take the source's value where the source has the column (or ids.RENAME_MAP renames it:
+ids.source_columns), and keep D2R's value otherwise, comment columns (*...) included. D2R-only rows keep their place and numbers. Source-only rows append
 after D2R's last row, D2R-only columns blank; "leave out" drops them. "rows": "position" pairs rows by their place
 instead, for tables whose row number is the id and whose name columns differ between the games (shrines); a list of
 columns pairs rows by those columns' values (hireling: Version, Id, Difficulty, Level). "move": {column: {source
@@ -93,14 +93,9 @@ def merge_table(table: str, src: Table, d2r: Table, ren: dict[str, dict[str, str
         if missing := keep - {k.lower() for k in row_keys(src, rows)}:
             raise ValueError(f"{table} only_rows: the source has no row {', '.join(sorted(missing))}")
         source_only_rows = "leave out"
-    at = {}
-    for i, c in enumerate(src.header):
-        if c:  # an unnamed column matches nothing; a repeated column's first holds the values
-            at.setdefault(c.lower(), i)
-    cmap = {d.lower(): p.lower() for d, p in ids.COLUMN_MAP.get(table, {}).items()}
     kept = {c.lower() for c in d2r_columns}
-    cols = [(j, None if c.startswith("*") else at.get(cmap.get(c.lower(), c.lower())), c.lower() in kept)
-            for j, c in enumerate(d2r.header)]
+    cols = [(j, None if c.startswith("*") else s, c.lower() in kept)
+            for (j, c), s in zip(enumerate(d2r.header), ids.source_columns(table, src.header, d2r.header))]
     moved = set()
     if move:
         src = Table.of(list(src.header), [list(r) for r in src.rows], src.newline)
