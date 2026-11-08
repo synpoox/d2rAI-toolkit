@@ -50,7 +50,7 @@ Releases, Nexus Mods, or a mix) is in `docs/distribution.md`: read it when the o
 When the project sets `[catalog]` in `release.toml`, players install through the Resurrected launcher, which reads
 release assets on GitHub. The steps are in `docs/release.md` "Launcher release (schema 3)":
 `package_release.py --game-exe <real D2R.exe> --notes <notes>`, then `github_release.py <v> --assets dist --dry-run`,
-then without `--dry-run`. It publishes a draft first and makes it public only after the uploaded files are checked.
+then without `--dry-run`, with `RESURRECTED_VALIDATE_RELEASE` pointing at the launcher's `validate-release`. It publishes a draft first and makes it public only after the uploaded files are checked.
 Ask the owner before the run without `--dry-run`. A failure leaves a private draft; never edit or replace a public
 release (a fix is a new version).
 

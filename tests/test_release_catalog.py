@@ -187,16 +187,23 @@ class RefusalTests(CatalogBase):
         files = {f["path"]: f["size"] for f in man["files"]}
         folders = {"d2rloader", "d2rloader/config", "d2rloader/patches", "MyMod.mpq", "MyMod.mpq/data",
                    "MyMod.mpq/data/global", "MyMod.mpq/data/global/excel"}
-        self.assertEqual(pr.catalog_problems(man, entries=(files, folders, [])), [])
-        extra = dict(files, **{"stray.txt": 1})
-        self.assertIn("7z holds stray.txt, which files does not list", pr.catalog_problems(man, entries=(extra, folders, [])))
+
+        def listing(f=files, d=folders, outside=(), top="MyMod"):
+            return pr._archive_listing_problems((f, d, list(outside), top), man["files"], man["empty_dirs"], "MyMod")
+        self.assertEqual(listing(), [])
+        self.assertIn("7z holds stray.txt, which files does not list", listing(dict(files, **{"stray.txt": 1})))
         short = {k: v for k, v in files.items() if k != TOML}
-        self.assertIn(f"files lists {TOML}, which the 7z does not hold", pr.catalog_problems(man, entries=(short, folders, [])))
-        resized = dict(files, **{TOML: files[TOML] + 1})
-        self.assertTrue(any("B in the 7z" in p for p in pr.catalog_problems(man, entries=(resized, folders, []))))
-        self.assertTrue(any("empty folders" in p for p in
-                            pr.catalog_problems(man, entries=(files, folders - {"d2rloader/patches"}, []))))
-        self.assertTrue(any("outside the top folder" in p for p in pr.catalog_problems(man, entries=(files, folders, ["x"]))))
+        self.assertIn(f"files lists {TOML}, which the 7z does not hold", listing(short))
+        self.assertTrue(any("B in the 7z" in p for p in listing(dict(files, **{TOML: files[TOML] + 1}))))
+        self.assertTrue(any("empty folders" in p for p in listing(d=folders - {"d2rloader/patches"})))
+        self.assertTrue(any("outside the top folder" in p for p in listing(outside=["x"])))
+        self.assertIn("the 7z's top folder is 'Other', install_root names 'MyMod'", listing(top="Other"))
+
+    def test_size_caps(self):
+        man, b, feed = self.generate()
+        self.assertTrue(any("over the launcher's" in p for p in pr.catalog_problems(man, feed, b + b" " * pr.MAX_MANIFEST)))
+        self.assertTrue(any("the feed is" in p for p in
+                            pr.catalog_problems(man, feed, b, feed_bytes=b" " * (pr.MAX_FEED + 1))))
 
 
 @needs_7z
@@ -226,12 +233,11 @@ class PackageTests(CatalogBase):
         b = (out / "release-manifest.json").read_bytes()
         man, feed = json.loads(b), json.loads((out / "feed.json").read_bytes())
         seven = out / "MyMod-1.2.3-alpha.7z"
-        self.assertEqual(pr.catalog_problems(man, feed, b, pr.archive_entries(seven)), [])
+        self.assertEqual(pr.catalog_problems(man, feed, b, seven), [])
         self.assertEqual((man["archive"]["size"], man["archive"]["sha256"]), (seven.stat().st_size, pr.sha256(seven)))
         self.assertEqual(man["release_notes"], "Patch notes.")
-        sums = gr.read_sums(out / "SHA256SUMS")
-        self.assertEqual({sums[n] for n in ("release-manifest.json", "feed.json", seven.name)},
-                         {pr.sha256(out / n) for n in ("release-manifest.json", "feed.json", seven.name)})
+        sums = gr.read_sums(out / "SHA256SUMS")  # exactly the GitHub release assets
+        self.assertEqual(sums, {n: pr.sha256(out / n) for n in ("release-manifest.json", "feed.json", seven.name)})
         self.assertEqual(json.loads((out / "downloader-manifest.json").read_text())["schemaVersion"], 2)
 
     def test_main_refuses_and_writes_nothing(self):
@@ -257,8 +263,9 @@ class PackageTests(CatalogBase):
 class FakeGh:
     """Records gh calls; `release download` copies from `served` (default: what was uploaded)."""
 
-    def __init__(self, existing=None, fail=None):
+    def __init__(self, existing=None, fail=None, latest=""):
         self.calls, self.uploaded, self.existing, self.fail, self.served = [], {}, existing, fail, None
+        self.latest = latest
 
     def __call__(self, args):
         self.calls.append(args)
@@ -266,6 +273,8 @@ class FakeGh:
         ok = lambda out="": subprocess.CompletedProcess(args, 0, out, "")  # noqa: E731
         if verb == self.fail:
             return subprocess.CompletedProcess(args, 1, "", "HTTP 502")
+        if verb == "release view" and args[2] == "-R":  # no tag: the Latest release
+            return ok(self.latest) if self.latest else subprocess.CompletedProcess(args, 1, "", "release not found")
         if verb == "release view":
             return ok(self.existing) if self.existing is not None else subprocess.CompletedProcess(args, 1, "", "not found")
         if verb == "release upload":
@@ -301,16 +310,29 @@ class PublishTests(CatalogBase):
                                                       (seven.name, "release-manifest.json", "feed.json")), encoding="utf-8")
         self.log = []
 
-    def publish(self, gh, dry_run=False):
-        return gr.publish_assets(self.cfg, "1.2.3", self.dist, dry_run=dry_run, gh=gh, log=self.log.append)
+    def publish(self, gh, dry_run=False, **kw):
+        kw.setdefault("skip_launcher_validation", True)
+        return gr.publish_assets(self.cfg, "1.2.3", self.dist, dry_run=dry_run, gh=gh, log=self.log.append, **kw)
+
+    def rewrite(self, change):
+        """Change the manifest, then make the feed and SHA256SUMS consistent with it again."""
+        man = json.loads((self.dist / "release-manifest.json").read_bytes())
+        change(man)
+        b = pr.json_bytes(man)
+        (self.dist / "release-manifest.json").write_bytes(b)
+        (self.dist / "feed.json").write_bytes(pr.json_bytes(
+            pr.catalog_feed(self.cfg, man, b, pr.asset_url(self.cfg, "1.2.3", "release-manifest.json"))))
+        (self.dist / "SHA256SUMS").write_text("".join(f"{pr.sha256(self.dist / n)}  {n}\n" for n in
+                                                      ("MyMod-1.2.3.7z", "release-manifest.json", "feed.json")), encoding="utf-8")
 
     def test_draft_upload_verify_then_public(self):
         gh = FakeGh()
         url = self.publish(gh)
         self.assertEqual(url, "https://github.com/someone/my-mod/releases/tag/v1.2.3")
-        self.assertEqual(gh.verbs(), ["release view", "release create", "release upload", "release download", "release edit"])
-        self.assertIn("--draft", gh.calls[1])
-        self.assertNotIn("--prerelease", gh.calls[1])
+        self.assertEqual(gh.verbs(), ["release view", "release view", "release create", "release upload", "release download",
+                                      "release edit"])
+        self.assertIn("--draft", gh.calls[2])
+        self.assertNotIn("--prerelease", gh.calls[2])
         self.assertEqual(set(gh.uploaded), {"MyMod-1.2.3.7z", "release-manifest.json", "feed.json", "SHA256SUMS"})
         self.assertEqual(gh.calls[-1][-2:], ["--draft=false", "--latest"])
 
@@ -339,12 +361,12 @@ class PublishTests(CatalogBase):
     def test_an_existing_draft_is_reused(self):
         gh = FakeGh(existing="true")
         self.publish(gh)
-        self.assertEqual(gh.verbs(), ["release view", "release upload", "release download", "release edit"])
+        self.assertEqual(gh.verbs(), ["release view", "release view", "release upload", "release download", "release edit"])
 
     def test_dry_run_checks_but_sends_nothing(self):
         gh = FakeGh()
-        self.publish(gh, dry_run=True)
-        self.assertEqual(gh.calls, [])
+        self.publish(gh, dry_run=True, skip_launcher_validation=False)  # a dry run does not need the validator
+        self.assertEqual(gh.verbs(), ["release view", "release view"])  # read-only
         self.assertTrue(any(line.startswith("would run: gh release create v1.2.3") for line in self.log))
 
     def test_local_problems_stop_before_gh(self):
@@ -354,6 +376,58 @@ class PublishTests(CatalogBase):
             self.publish(gh)
         self.assertIn("sha256 does not match SHA256SUMS", str(e.exception))
         self.assertEqual(gh.calls, [])
+
+    def test_dry_run_refuses_a_public_tag(self):
+        with self.assertRaises(gr.PublishFailed):
+            self.publish(FakeGh(existing="false"), dry_run=True)
+
+    def test_archive_must_match_the_manifest(self):
+        self.rewrite(lambda m: m["archive"].update(size=m["archive"]["size"] + 1))
+        with self.assertRaises(gr.PublishFailed) as e:
+            self.publish(FakeGh())
+        self.assertIn("not archive.size / archive.sha256", str(e.exception))
+        self.rewrite(lambda m: m["archive"].update(size=m["archive"]["size"] - 1, sha256="ab" * 32))
+        with self.assertRaises(gr.PublishFailed) as e:
+            self.publish(FakeGh())
+        self.assertIn("not archive.size / archive.sha256", str(e.exception))
+
+    def test_top_folder_must_be_the_install_root(self):
+        self.rewrite(lambda m: m.update(install_root="mods/Other"))
+        gh = FakeGh()
+        with self.assertRaises(gr.PublishFailed) as e:
+            self.publish(gh)
+        self.assertIn("install_root names 'Other'", str(e.exception))
+        self.assertEqual(gh.calls, [])
+
+    def test_sums_must_list_exactly_the_assets(self):
+        with open(self.dist / "SHA256SUMS", "a", encoding="utf-8") as f:
+            f.write(f"{'ab' * 32}  RELEASE_NOTES-1.2.3.md\n")
+        with self.assertRaises(gr.PublishFailed) as e:
+            self.publish(FakeGh())
+        self.assertIn("SHA256SUMS lists", str(e.exception))
+
+    def test_a_real_run_needs_the_launcher_validator(self):
+        with mock.patch.dict(os.environ, {gr.VALIDATOR_ENV: ""}):
+            gh = FakeGh()
+            with self.assertRaises(gr.PublishFailed) as e:
+                self.publish(gh, skip_launcher_validation=False)
+        self.assertIn("--skip-launcher-validation", str(e.exception))
+        self.assertEqual(gh.calls, [])
+
+    def test_an_older_version_does_not_take_latest(self):
+        gh = FakeGh(latest="v1.3.0")
+        with self.assertRaises(gr.PublishFailed) as e:
+            self.publish(gh)
+        self.assertIn("older than the current Latest v1.3.0", str(e.exception))
+        self.assertNotIn("release create", gh.verbs())
+        self.publish(FakeGh(latest="v1.3.0"), allow_older=True)
+        self.publish(FakeGh(latest="v1.2.3-rc1"))  # a pre-release of this version is older
+
+    def test_missing_gh_is_a_clean_error(self):
+        with mock.patch.object(subprocess, "run", side_effect=FileNotFoundError("gh")):
+            with self.assertRaises(gr.PublishFailed) as e:
+                gr.gh_runner(["release", "view"])
+        self.assertIn("cannot run gh", str(e.exception))
 
     def test_the_launcher_validator_can_refuse(self):
         with mock.patch.dict(os.environ, {gr.VALIDATOR_ENV: str(self.tmp / "no-such-validate-release.exe")}):

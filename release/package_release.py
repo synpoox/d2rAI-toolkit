@@ -12,7 +12,7 @@ and it writes into dist/:
   release-manifest.json        with [catalog] set: schema 3 for the Resurrected launcher (see "Schema 3" below)
   feed.json                    with [catalog] set: the schema 3 feed that recommends this release
   RELEASE_NOTES-<version>.md   a skeleton to fill in: requirements and install steps
-  SHA256SUMS                   sha256 of the 7z(s), the manifests, the feed and the notes (sha256sum -c format)
+  SHA256SUMS                   sha256 of the 7z(s), the manifest and the notes; with [catalog] only of the GitHub assets (7z, manifest, feed)
   <Folder>-<version>-nexus.7z  with --nexus: the same mod folder plus <Folder>/INSTALL.txt (install steps for players who
                                download by hand or with a mod manager), for an upload to Nexus Mods (docs/distribution.md)
 
@@ -316,8 +316,8 @@ def json_bytes(obj) -> bytes:
 
 
 def archive_entries(archive: Path, sevenzip=None):
-    """The 7z's entries below its top folder: ({path: size} of the files, {path} of the folders, [entries outside it]).
-    Raises RuntimeError when 7-Zip cannot list it."""
+    """The 7z's entries below its top folder: ({path: size} of the files, {path} of the folders, [entries outside it],
+    the top folder's name). Raises RuntimeError when 7-Zip cannot list it."""
     exe = sevenzip or find_7z()
     if not exe:
         raise RuntimeError(NO_7Z)
@@ -339,7 +339,7 @@ def archive_entries(archive: Path, sevenzip=None):
             folders.add(rel)
         elif rel:
             files[rel] = int(props.get("Size") or 0)
-    return files, folders, outside
+    return files, folders, outside, top
 
 
 # The launcher's rules (src-tauri/src/catalog/ and contract/inventory.rs), so nothing it would reject is written.
@@ -350,6 +350,8 @@ SEMVER_RE = re.compile(r"\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?")
 DATE_RE = re.compile(r"\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])")
 EXECUTABLE_KEYS = ("command", "cmd", "script", "execute", "shell", "hook", "argument")
 RESERVED = {"CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"}
+MAX_MANIFEST = 8 << 20  # the launcher's read limits
+MAX_FEED = 1 << 20
 MANIFEST_KEYS = {"schema_version", "product_id", "release_id", "display_version", "release_date", "status", "release_notes",
                  "min_launcher_version", "install_root", "archive", "files", "empty_dirs", "compatibility", "saves"}
 
@@ -458,9 +460,11 @@ def _inventory_problems(files, dirs) -> tuple:
     return bad, shipped
 
 
-def _archive_listing_problems(entries, files, dirs) -> list:
-    in7z, folders, outside = entries
+def _archive_listing_problems(entries, files, dirs, folder) -> list:
+    in7z, folders, outside, top = entries
     bad = [f"7z entry outside the top folder: {p}" for p in outside]
+    if top != folder:
+        bad.append(f"the 7z's top folder is {top!r}, install_root names {folder!r}")
     want = {f.get("path"): f.get("size") for f in files}
     bad += [f"7z holds {p}, which files does not list" for p in sorted(set(in7z) - set(want))]
     bad += [f"files lists {p}, which the 7z does not hold" for p in sorted(set(want) - set(in7z))]
@@ -507,11 +511,17 @@ def _feed_problems(feed, man, man_bytes) -> list:
     return bad
 
 
-def catalog_problems(man: dict, feed: dict = None, man_bytes: bytes = None, entries=None) -> list:
-    """Everything the launcher would refuse in this manifest (plus the feed, and the 7z listing from archive_entries,
-    when given). [] = good."""
+def catalog_problems(man: dict, feed: dict = None, man_bytes: bytes = None, archive: Path = None, feed_bytes: bytes = None,
+                     sevenzip=None) -> list:
+    """Everything the launcher would refuse in this manifest, plus the feed and the 7z file itself when given: its size
+    and sha256 against archive.size / archive.sha256, its top folder against install_root, its entries against files +
+    empty_dirs. [] = good."""
     bad = []
     add = bad.append
+    if man_bytes is not None and len(man_bytes) > MAX_MANIFEST:
+        add(f"the manifest is {len(man_bytes)} B, over the launcher's {MAX_MANIFEST} B")
+    if feed_bytes is not None and len(feed_bytes) > MAX_FEED:
+        add(f"the feed is {len(feed_bytes)} B, over the launcher's {MAX_FEED} B")
     if set(man) != MANIFEST_KEYS:
         add(f"manifest keys: missing {sorted(MANIFEST_KEYS - set(man))}, unknown {sorted(set(man) - MANIFEST_KEYS)}")
     bad += [f"command, script, hook or argument key: {k}" for k in executable_keys(man) + executable_keys(feed or {})]
@@ -591,8 +601,17 @@ def catalog_problems(man: dict, feed: dict = None, man_bytes: bytes = None, entr
     if sv.get("loader_save_format") is not None:
         bad += _setting_problems("saves.loader_save_format", sv["loader_save_format"], shipped)
 
-    if entries is not None:
-        bad += _archive_listing_problems(entries, files, dirs)
+    if archive is not None:
+        archive = Path(archive)
+        if not archive.is_file():
+            add(f"no archive at {archive}")
+        else:
+            if archive.stat().st_size != a.get("size") or sha256(archive) != a.get("sha256"):
+                add(f"{archive.name}: its size / sha256 are not archive.size / archive.sha256")
+            try:
+                bad += _archive_listing_problems(archive_entries(archive, sevenzip), files, dirs, root.partition("/")[2])
+            except RuntimeError as e:
+                add(str(e))
     if feed is not None:
         bad += _feed_problems(feed, man, man_bytes)
     return bad
@@ -821,10 +840,7 @@ def main(argv=None) -> int:
         cman = catalog_manifest(cfg, version, files, seven_path, dirs, builds, catalog_notes)
         cman_bytes = json_bytes(cman)
         cfeed = catalog_feed(cfg, cman, cman_bytes, asset_url(cfg, version, CATALOG_MANIFEST))
-        try:
-            problems = catalog_problems(cman, cfeed, cman_bytes, archive_entries(seven_path, sevenzip))
-        except RuntimeError as e:
-            problems = [str(e)]
+        problems = catalog_problems(cman, cfeed, cman_bytes, seven_path, json_bytes(cfeed), sevenzip)
         if problems:
             print("error: the launcher would refuse this release; nothing written:\n  " + "\n  ".join(problems[:40]))
             seven_path.unlink(missing_ok=True)
@@ -848,7 +864,9 @@ def main(argv=None) -> int:
                                    indent=1) + "\n", encoding="utf-8", newline="\n")
     notes = out / f"RELEASE_NOTES-{version}.md"
     notes.write_text(release_notes(cfg, version, seven_path.name), encoding="utf-8", newline="\n")
-    (out / "SHA256SUMS").write_text("".join(f"{sha256(p)}  {p.name}\n" for p in (*sums, *written, man_path, notes)),
+    # with [catalog], SHA256SUMS covers exactly the GitHub release assets (github_release.py --assets uploads those)
+    summed = [seven_path, *written] if catalog else [*sums, man_path, notes]
+    (out / "SHA256SUMS").write_text("".join(f"{sha256(p)}  {p.name}\n" for p in summed),
                                     encoding="utf-8", newline="\n")
     shutil.rmtree(out / "stage")
     print(f"{seven_path.name}: {len(files)} files, {sum(f['size'] for f in files) / 1e6:.0f} MB unpacked, "

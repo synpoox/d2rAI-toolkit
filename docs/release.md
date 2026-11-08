@@ -149,7 +149,7 @@ Writes into `dist/` (`package.dist`):
 | `downloader-manifest.json` | The self-hosted downloader's manifest ([schema below](#release-manifest)) with every file's size and sha256. `publish_release.py` uploads it to the host as `releases/<v>/release-manifest.json`. |
 | `release-manifest.json`, `feed.json` | Only with `[catalog]` set: schema 3 for the Resurrected launcher ([below](#launcher-release-schema-3)). |
 | `RELEASE_NOTES-1.0.1.md` | A skeleton: requirements and install steps. Fill in the `TODO` parts if you ship it. |
-| `SHA256SUMS` | sha256 of the files above (`sha256sum -c` format). |
+| `SHA256SUMS` | sha256 of the files above (`sha256sum -c` format). With `[catalog]` set, only of the GitHub release assets: the 7z, `release-manifest.json` and `feed.json`. |
 
 It copies the folder to `dist/stage/` first and works on the copy. It **refuses** to package files that match
 `package.forbidden`: test-harness files, `imgui.ini`, `debugsettings.json`, `input-bindings.toml`, saves and their
@@ -254,18 +254,26 @@ The launcher's feed URL is then `https://github.com/<repos.github>/releases/late
    python release/package_release.py --mod-dir path/to/MyMod --version 0.2.0-alpha --game-exe "<D2R folder>/D2R.exe" --notes notes.md
    ```
    It prints every problem and writes nothing if the launcher would refuse the release.
-3. Dry run: all checks, the gh commands printed, nothing sent.
+3. Build the launcher's validator once (and again after launcher updates), in a checkout of the launcher:
+   ```sh
+   cd resurrected-launcher/src-tauri
+   cargo build --example validate-release
+   ```
+   and point `RESURRECTED_VALIDATE_RELEASE` at `target/debug/examples/validate-release.exe`. A real publish refuses to
+   run without it unless you pass `--skip-launcher-validation`.
+4. Dry run: all checks, read-only `gh release view` calls (it fails the same way as a real run when the tag is already
+   public or older than the current Latest), the remaining gh commands printed, nothing sent.
    ```sh
    python release/github_release.py 0.2.0-alpha --assets dist --dry-run
    ```
-4. Publish:
+5. Publish:
    ```sh
    python release/github_release.py 0.2.0-alpha --assets dist
    ```
    On success the release is public and Latest, and the launcher offers it. On failure it stays a draft that only you
-   can see: fix the cause and run step 4 again (the draft is reused), or delete the draft on GitHub.
-5. Optional, once the launcher ships its validator: set `RESURRECTED_VALIDATE_RELEASE` to the `validate-release`
-   executable before step 4, and it runs on the downloaded assets too.
+   can see: fix the cause and run step 5 again (the draft is reused), or delete the draft on GitHub. A version older
+   than the current Latest is refused, because Latest is where the launcher's feed comes from; `--allow-older` makes
+   it Latest anyway.
 
 A version that is public never changes. To fix a published release, package a new version.
 
@@ -275,11 +283,12 @@ A version that is public never changes. To fix a published release, package a ne
 - The archive URL is `https://github.com/<repos.github>/releases/download/v<version>/<7z>`; the feed's `recommended`
   points at the `release-manifest.json` asset next to it, with its exact size and sha256.
 - The packager checks everything the launcher would refuse before it writes anything: placeholder or zero hashes,
-  non-HTTPS URLs, unsafe or case-duplicate paths, counts, command keys, and the 7z's own entry list against
+  non-HTTPS URLs, unsafe or case-duplicate paths, counts, command keys, size limits (manifest 8 MiB, feed 1 MiB), the
+  7z's own size and sha256 against `archive`, its top folder against `install_root`, and its entry list against
   `files` + `empty_dirs`. One problem and nothing is written. An `--incomplete` build gets no schema 3 files.
 - `--assets` (needs `gh`, signed in): creates `v<version>` as a **draft**, uploads the 7z, `release-manifest.json`,
-  `feed.json` and `SHA256SUMS`, downloads them back and checks them again (and runs the launcher's
-  `validate-release <manifest> <feed> <archive>` when `RESURRECTED_VALIDATE_RELEASE` names it). Only then is the
+  `feed.json` and `SHA256SUMS`, downloads them back and checks them again with the same checks and the launcher's
+  `validate-release <manifest> <feed> <archive>` (`RESURRECTED_VALIDATE_RELEASE`). Only then is the
   release made public and Latest, which moves `releases/latest/download/feed.json`, the launcher's feed URL, to it.
   Any failure leaves the draft (a rerun reuses it) and exits 1. A public release is never changed: a new release ID
   needs a new version. The release is not marked pre-release, since GitHub's Latest skips pre-releases.
