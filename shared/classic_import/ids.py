@@ -1,5 +1,5 @@
 """Append-only id lists: how a project merges the classic tables a save or D2R's code reads by row number onto D2R's,
-and the D2R schema facts that merge needs (moved from pd2-resurrected's pd2_ids, #5).
+and the D2R schema facts that merge needs (#5).
 
 A list, merge/ids-<table>.tsv, has one line per source row (the classic table being ported): `source name <tab> id
 <tab> name`, the row's id and key name in the mod. Ids count records as the game does (an `Expansion` row is not one);
@@ -16,11 +16,17 @@ Seeding a new source row picks, in order:
   2. a D2R row of the same name that no other line took (rows both games added after vanilla; not for affixes,
      NO_NAME_MATCH);
   3. the next free id after D2R's last row, under its source name (+ the project's suffix if the mod has that name).
+
+Merging a row (merge_table): D2R's row, with every column the source also has (or COLUMN_MAP maps) set to the source's
+value, spelled by `spell` (quotes gone, references to the id-listed tables renamed, formulas in D2R's spelling).
+Columns D2R added keep D2R's value on a D2R row and stay blank on an appended one. NUM_REFS columns take the mod's
+ids, ID_COLS and `*Id` columns the row's own. A project's own fixes come in as hooks (spell, fix_row, finish).
 """
 from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Callable
 
 from modkit.tsv import NEGATIVE
 
@@ -238,4 +244,175 @@ def fix_formula(text: str) -> str:
 
 def rewrite_formula(text: str, ren: dict[str, dict[str, str]]) -> str:
     """Names inside a formula's skill('..'), miss('..') and stat('..') in the mod's names (renames())."""
-    return FORMULA_REF.sub(lambda m: f"{m[1]}('{ren[FORMULA_TABLE[m[1]]].get(m[2].lower(), m[2])}'", text)
+    return FORMULA_REF.sub(lambda m: f"{m[1]}('{ren.get(FORMULA_TABLE[m[1]], {}).get(m[2].lower(), m[2])}'", text)
+
+
+class Table:
+    """A classic or D2R .txt table as the merges read it: latin-1, its newline kept, every row padded to the header."""
+    def __init__(self, path: Path, key: str | None = None):
+        text = path.read_bytes().decode("latin-1")  # keeps CRLF, which read_text would turn into LF
+        self.newline = "\r\n" if "\r\n" in text else "\n"
+        lines = text.split(self.newline)
+        while lines and not lines[-1]:
+            lines.pop()
+        self.header = lines[0].split("\t")
+        self.rows = [(line.split("\t") + [""] * len(self.header))[:len(self.header)] for line in lines[1:]]
+        self.key = self.header.index(key) if key else 0
+
+    @classmethod
+    def of(cls, header: list[str], rows: list[list[str]], newline: str = "\r\n", key: int = 0) -> "Table":
+        t = cls.__new__(cls)
+        t.header, t.rows, t.newline, t.key = header, rows, newline, key
+        return t
+
+    def records(self) -> list[int]:
+        """Row positions of the records, numbered as the game numbers them: an `Expansion` row (first column) is not
+        one."""
+        return [i for i, r in enumerate(self.rows) if r[0] != "Expansion"]
+
+    def names(self) -> list[str]:
+        return [self.rows[i][self.key] for i in self.records()]
+
+    def text(self) -> str:
+        return self.newline.join("\t".join(r) for r in [self.header, *self.rows]) + self.newline
+
+
+def spell(table: str, col: str, v: str, ren: dict[str, dict[str, str]]) -> str:
+    """A source cell as the mod's column `col` holds it: quotes gone, references renamed, formulas in D2R's spelling.
+    A project with more to fix (function numbers D2R reuses for its own) passes its own spell to the merges."""
+    v = v.replace('"', "")
+    if col in REFS.get(table, {}):
+        return ren.get(REFS[table][col], {}).get(v.lower(), v)
+    if col in FORMULAS.get(table, []):
+        return rewrite_formula(fix_formula(v), ren)
+    return v
+
+
+Spell = Callable[[str, str, str, dict[str, dict[str, str]]], str]
+FixRow = Callable[[str, list[str], list[str]], list[str]]  # (table, source header, source row) -> fixed copy
+# (mod header, merged row, source row by column name, D2R's row at that id or None): a project's own fixes, in place
+Finish = Callable[[list[str], list[str], dict[str, str], "list[str] | None"], None]
+
+
+def merge_table(table: str, src: Table, d2r: Table, lines: list[Line], ren: dict[str, dict[str, str]],
+                ids: dict[str, dict[str, str]] | None = None, *, spell: Spell = spell, fix_row: FixRow | None = None,
+                finish: Finish | None = None, d2r_columns: tuple[str, ...] = (), add_columns: tuple[str, ...] = (),
+                source: str = "the source's") -> tuple[Table, list[str]]:
+    """The mod's table, and the source columns it drops. ids: table -> {source row number: mod id} (ids_of), for
+    NUM_REFS columns. fix_row fixes a source row (a copy) before the merge reads it; finish fixes each merged source
+    row before its key and id columns are set; d2r_columns keep D2R's value on a merged row; add_columns are columns
+    D2R's file lacks but its loader reads, added when the source has them. `source` names the source in messages."""
+    for c in add_columns:
+        if c not in d2r.header and c in src.header:
+            d2r.header.append(c)
+            for r in d2r.rows:
+                r.append("")
+    at: dict[str, int] = {}
+    for i, c in enumerate(src.header):
+        if c:  # an unnamed column (weapons) matches nothing
+            at.setdefault(c.lower(), i)  # a repeated column (armor's mindam, maxdam): the first holds the values
+    cmap = COLUMN_MAP.get(table, {})
+    cols = [(j, at.get(c.lower(), at.get(cmap.get(c, "").lower()))) for j, c in enumerate(d2r.header)]
+    used = {i for _, i in cols if i is not None}
+    dropped = [c for i, c in enumerate(src.header) if i not in used and c.lower() not in ("id", "eol")]
+    fix = fix_row or (lambda t, h, r: list(r))
+    src_rows = {p.lower(): [v.replace('"', "") for v in fix(table, src.header, src.rows[k])]
+                for p, k in zip(ident(src.names()), src.records())}
+    id_cols = [j for j, c in enumerate(d2r.header) if c.lower() == "*id" or c == ID_COLS.get(table)]
+    nums = {j: NUM_REFS[table][c] for j, c in enumerate(d2r.header) if c in NUM_REFS.get(table, {})}
+    keep = {j for j, c in enumerate(d2r.header) if c in d2r_columns}
+    out = [list(r) for r in d2r.rows]
+    recs = d2r.records()
+    appended: list[list[str]] = []
+    for p, i, n in sorted((line for line in lines if line[1] != LEFT_OUT), key=lambda line: line[1]):
+        row = out[recs[i]] if i < len(recs) else [""] * len(d2r.header)
+        if i >= len(recs):
+            out.append(row)
+            appended.append(row)
+        port = port_row(p)
+        if port:
+            like, sets = port
+            row[:] = out[recs[like]] if like < len(recs) else appended[like - len(recs)]
+            for c, v in sets.items():
+                if c not in d2r.header:
+                    raise IdError(f"ids-{table}.tsv: port row '{p}': {table} has no column '{c}'")
+                row[d2r.header.index(c)] = v
+        else:
+            pr = src_rows[p.lower()]
+            for j, k in cols:
+                if k is None or (j in keep and i < len(recs)):
+                    continue
+                row[j] = spell(table, d2r.header[j], pr[k], ren)
+                if j in nums and row[j]:
+                    if row[j] not in (ids or {}).get(nums[j], {}):
+                        raise IdError(f"{table} '{n}': {d2r.header[j]} names {source} {nums[j]} row {row[j]}, "
+                                      "which has no id")
+                    row[j] = ids[nums[j]][row[j]]
+            if finish:
+                finish(d2r.header, row, dict(zip(src.header, pr)), d2r.rows[recs[i]] if i < len(recs) else None)
+        row[d2r.key] = n
+        for j in id_cols:
+            row[j] = str(i)
+    return Table.of(d2r.header, out, d2r.newline, d2r.key), dropped
+
+
+def excel(root: Path) -> Path:
+    return root / "global" / "excel"
+
+
+def load(data: Path, table: str) -> Table:
+    return Table(excel(data) / f"{table}.txt", KEY.get(table))
+
+
+def lists_for(merge_dir: Path, tables: list[str], src_data: Path, d2r_data: Path, **check_args: str
+              ) -> dict[str, list[Line]]:
+    """The project's id lists, each checked against both games' tables (check_args: check's source and seed_hint)."""
+    lists = {}
+    for t in tables:
+        lines = read_list(list_path(merge_dir, t))
+        check(t, lines, load(src_data, t).names(), load(d2r_data, t).names(), **check_args)
+        lists[t] = lines
+    return lists
+
+
+def ids_of(lists: dict[str, list[Line]], src_names: dict[str, list[str]]) -> dict[str, dict[str, str]]:
+    """table -> {source row number: mod id}, for the tables in src_names (a checked list covers every row). Left-out
+    rows have none, so a reference to one fails the merge."""
+    out = {}
+    for t, names in src_names.items():
+        mod = {p.lower(): i for p, i, _ in lists[t]}
+        out[t] = {str(k): str(mod[p.lower()]) for k, p in enumerate(ident(names)) if mod[p.lower()] != LEFT_OUT}
+    return out
+
+
+def write(table: str, merged: Table, out_data: Path) -> None:
+    dest = excel(out_data) / f"{table}.txt"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(merged.text().encode("latin-1"))
+
+
+def seed_lists(merge_dir: Path, tables: list[str], src_data: Path, d2r_data: Path, vanilla: dict[str, int],
+               suffix: str) -> dict[str, int]:
+    """Append lines for the source rows the lists lack (seed). Returns lines added per table."""
+    added = {}
+    for t in tables:
+        path = list_path(merge_dir, t)
+        existing = read_list(path)
+        new = seed(t, load(src_data, t).names(), load(d2r_data, t).names(), existing, vanilla.get(t, 0), suffix)
+        if new:
+            text = path.read_text("utf-8") if path.exists() else "# source name\tid\tname (append-only)\n"
+            path.write_text(text + "".join(f"{p}\t{i}\t{n}\n" for p, i, n in new), "utf-8")
+        added[t] = len(new)
+    return added
+
+
+def apply(rule: Path, src_data: Path, d2r_data: Path, out_data: Path, tables: list[str]) -> None:
+    """The merge driver's rule kind for merge/ids-<table>.tsv: check the project's lists (`tables`, bound with
+    functools.partial) and write that table, references to the listed tables renamed and NUM_REFS columns in the
+    mod's ids. A project with its own fixes calls merge_table with its hooks instead."""
+    table = rule.stem[len("ids-"):]
+    lists = lists_for(rule.parent, tables, src_data, d2r_data)
+    nums = {t for refs in NUM_REFS.values() for t in refs.values()} & set(tables)
+    ids = ids_of(lists, {t: load(src_data, t).names() for t in nums})
+    write(table, merge_table(table, load(src_data, table), load(d2r_data, table), lists[table], renames(lists),
+                             ids)[0], out_data)
