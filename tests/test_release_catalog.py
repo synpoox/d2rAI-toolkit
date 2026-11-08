@@ -291,8 +291,9 @@ class FakeGh:
         return [" ".join(c[:2]) for c in self.calls]
 
 
-@needs_7z
-class PublishTests(CatalogBase):
+class PublishBase(CatalogBase):
+    """A packaged dist/ (the 7z, release-manifest.json, feed.json, SHA256SUMS) to publish with a fake gh."""
+
     def setUp(self):
         super().setUp()
         self.dist = self.tmp / "dist"
@@ -325,6 +326,9 @@ class PublishTests(CatalogBase):
         (self.dist / "SHA256SUMS").write_text("".join(f"{pr.sha256(self.dist / n)}  {n}\n" for n in
                                                       ("MyMod-1.2.3.7z", "release-manifest.json", "feed.json")), encoding="utf-8")
 
+
+@needs_7z
+class PublishTests(PublishBase):
     def test_draft_upload_verify_then_public(self):
         gh = FakeGh()
         url = self.publish(gh)
@@ -434,6 +438,219 @@ class PublishTests(CatalogBase):
             with self.assertRaises(gr.PublishFailed) as e:
                 self.publish(FakeGh())
         self.assertIn(gr.VALIDATOR_ENV, str(e.exception))
+
+
+# ------------------------------------------------------------------- one shared catalog feed for every product
+FEED_REPO, FEED_TAG = "someone/launcher", "catalog"
+FEED_URL = f"https://github.com/{FEED_REPO}/releases/download/{FEED_TAG}/feed.json"
+
+
+def other_product(release="other-2.0.0"):
+    return {"product_id": "other", "availability": "available",
+            "recommended": {"release_id": release, "manifest_url": "https://github.com/someone/other/releases/download/"
+                            "v2.0.0/release-manifest.json", "manifest_size": 10, "manifest_sha256": "cd" * 32}}
+
+
+def shared_feed_now(*extra):
+    return {"schema_version": 3, "products": [other_product(), *extra,
+                                              {"product_id": "project-09", "availability": "upcoming"}]}
+
+
+class SharedFeedTests(CatalogBase):
+    def setUp(self):
+        super().setUp()
+        self.cfg["catalog"].update(feed_url=FEED_URL, feed_repo=FEED_REPO, feed_tag=FEED_TAG)
+
+    def test_without_a_current_feed_it_is_the_per_release_feed(self):
+        man, b, feed = self.generate()
+        self.assertEqual(pr.catalog_feed(self.cfg, man, b, "https://x.example.org/m.json", None),
+                         pr.catalog_feed(self.cfg, man, b, "https://x.example.org/m.json"))
+        self.assertEqual([p["product_id"] for p in feed["products"]], ["mymod", "project-09"])
+
+    def test_merge_keeps_every_other_product(self):
+        man, b, _ = self.generate()
+        url = pr.asset_url(self.cfg, "1.2.3-alpha", pr.CATALOG_MANIFEST)
+        feed = pr.catalog_feed(self.cfg, man, b, url, shared_feed_now())
+        self.assertEqual([p["product_id"] for p in feed["products"]], ["other", "mymod", "project-09"])
+        self.assertEqual(feed["products"][0], other_product())
+        self.assertEqual(pr.catalog_problems(man, feed, b, None, pr.json_bytes(feed)), [])
+        # an older release of this product is replaced where it stood
+        old = {**other_product("mymod-1.0.0"), "product_id": "mymod"}
+        feed = pr.catalog_feed(self.cfg, man, b, url, {"schema_version": 3, "products": [old, other_product()]})
+        self.assertEqual([p["product_id"] for p in feed["products"]], ["mymod", "other", "project-09"])
+        self.assertEqual(feed["products"][0]["recommended"]["release_id"], "mymod-1.2.3-alpha")
+        # an upcoming product becomes available in its place; upcoming is not listed twice
+        self.cfg["catalog"]["upcoming"] = ["project-09", "other"]
+        feed = pr.catalog_feed(self.cfg, man, b, url, {"schema_version": 3, "products": [
+            {"product_id": "mymod", "availability": "upcoming"}, {"product_id": "project-09", "availability": "upcoming"}]})
+        self.assertEqual([(p["product_id"], p["availability"]) for p in feed["products"]],
+                         [("mymod", "available"), ("project-09", "upcoming"), ("other", "upcoming")])
+
+    def test_read_feed(self):
+        self.assertEqual(pr.read_feed(self.tmp / "none.json"), (None, None))
+        good = self.tmp / "feed.json"
+        good.write_bytes(pr.json_bytes(shared_feed_now()))
+        self.assertEqual(pr.read_feed(good), (shared_feed_now(), good.read_bytes()))
+        for bad in (b"not json", b'{"schema_version": 3, "products": "x"}',
+                    pr.json_bytes({"schema_version": 3, "products": [{"product_id": "a", "availability": "upcoming",
+                                                                     "recommended": {}}]})):
+            good.write_bytes(bad)
+            with self.assertRaises(ValueError):
+                pr.read_feed(good)
+        import urllib.error
+
+        def gone(req, timeout):
+            raise urllib.error.HTTPError(req.full_url, 404, "Not Found", {}, None)
+        self.assertEqual(pr.read_feed(FEED_URL, opener=gone), (None, None))
+
+    def test_config_needs_the_feed_release_with_the_url(self):
+        for cat, ok in (({"feed_url": FEED_URL, "feed_repo": FEED_REPO, "feed_tag": FEED_TAG}, True),
+                        ({"feed_url": FEED_URL}, False), ({"feed_repo": FEED_REPO, "feed_tag": FEED_TAG}, False),
+                        ({"feed_url": "http://x.example.org/feed.json", "feed_repo": FEED_REPO, "feed_tag": FEED_TAG}, False)):
+            cfg = release_config.defaults()
+            cfg["catalog"].update(cat)
+            if ok:
+                release_config.validate(cfg)
+            else:
+                with self.assertRaises(release_config.ConfigError):
+                    release_config.validate(cfg)
+
+
+class SharedFeedPackageTests(CatalogBase):
+    write_config, run_main = PackageTests.write_config, PackageTests.run_main
+
+    def test_main_merges_into_the_shared_feed_and_sums_only_the_release_assets(self):
+        out, now = self.tmp / "dist", self.tmp / "now.json"
+        now.write_bytes(pr.json_bytes(shared_feed_now()))
+        args = self.write_config(feed_url=FEED_URL, feed_repo=FEED_REPO, feed_tag=FEED_TAG)
+        r = self.run_main(*args, "--mod-dir", str(self.src), "--version", "1.2.3", "--out", str(out), "--feed-in", str(now))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        feed = json.loads((out / "feed.json").read_bytes())
+        self.assertEqual([p["product_id"] for p in feed["products"]], ["other", "mymod", "project-09"])
+        self.assertEqual(set(gr.read_sums(out / "SHA256SUMS")), {"MyMod-1.2.3.7z", "release-manifest.json"})
+
+    def test_a_bad_current_feed_stops_before_packaging(self):
+        out, now = self.tmp / "dist", self.tmp / "now.json"
+        now.write_bytes(b"{}")
+        args = self.write_config(feed_url=FEED_URL, feed_repo=FEED_REPO, feed_tag=FEED_TAG)
+        r = self.run_main(*args, "--mod-dir", str(self.src), "--version", "1.2.3", "--out", str(out), "--feed-in", str(now))
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("the shared feed", r.stdout)
+        self.assertFalse(out.exists() and any(out.iterdir()))
+
+
+class SharedGh(FakeGh):
+    """FakeGh for two repositories: the product's (someone/my-mod) and the one whose `catalog` release holds the feed."""
+
+    def __init__(self, feed=None, home="false true", **kw):
+        super().__init__(**kw)
+        self.feed, self.home, self.public = feed, home, False
+
+    def __call__(self, args):
+        repo = args[args.index("-R") + 1]
+        verb = " ".join(args[:2])
+        if repo != FEED_REPO:
+            if verb == "release edit":
+                self.public = True
+            if verb == "release view" and args[2] != "-R" and self.public:
+                self.calls.append(args)
+                return subprocess.CompletedProcess(args, 0, "false", "")
+            return super().__call__(args)
+        self.calls.append(args)
+        ok = lambda out="": subprocess.CompletedProcess(args, 0, out, "")  # noqa: E731
+        if verb == "release view":
+            return ok(self.home) if self.home else subprocess.CompletedProcess(args, 1, "", "release not found")
+        if verb == "release download":
+            if self.feed is None:
+                return subprocess.CompletedProcess(args, 1, "", "no assets match the file pattern")
+            dest = Path(args[args.index("-D") + 1])
+            dest.mkdir(parents=True, exist_ok=True)
+            (dest / "feed.json").write_bytes(self.feed)
+        if verb == "release upload":
+            self.feed = Path(args[3]).read_bytes()
+        return ok()
+
+    def feed_calls(self):
+        return [" ".join(c[:2]) for c in self.calls if c[c.index("-R") + 1] == FEED_REPO]
+
+
+@needs_7z
+class SharedFeedPublishTests(PublishBase):
+    def setUp(self):
+        super().setUp()
+        self.cfg["catalog"].update(feed_url=FEED_URL, feed_repo=FEED_REPO, feed_tag=FEED_TAG)
+        self.rewrite(lambda m: None)
+        (self.dist / "SHA256SUMS").write_text("".join(f"{pr.sha256(self.dist / n)}  {n}\n" for n in
+                                                      ("MyMod-1.2.3.7z", "release-manifest.json")), encoding="utf-8")
+
+    def rewrite(self, change):
+        super().rewrite(change)
+        sums = self.dist / "SHA256SUMS"
+        sums.write_text("".join(line + "\n" for line in sums.read_text("utf-8").splitlines() if "feed.json" not in line),
+                        encoding="utf-8")
+
+    def test_product_release_first_then_the_shared_feed(self):
+        gh = SharedGh(feed=pr.json_bytes(shared_feed_now()))
+        self.publish(gh)
+        self.assertEqual(set(gh.uploaded), {"MyMod-1.2.3.7z", "release-manifest.json", "SHA256SUMS"})  # no feed.json
+        verbs = [" ".join(c[:2]) + " " + c[c.index("-R") + 1] for c in gh.calls]
+        self.assertLess(verbs.index("release edit someone/my-mod"), verbs.index(f"release upload {FEED_REPO}"))
+        feed = json.loads(gh.feed)
+        self.assertEqual([p["product_id"] for p in feed["products"]], ["other", "mymod", "project-09"])
+        self.assertEqual(feed["products"][0], other_product())
+        b = (self.dist / "release-manifest.json").read_bytes()
+        self.assertEqual(feed["products"][1]["recommended"]["manifest_sha256"], hashlib.sha256(b).hexdigest())
+        upload = next(c for c in gh.calls if c[:2] == ["release", "upload"] and FEED_REPO in c)
+        self.assertIn("--clobber", upload)
+
+    def test_the_first_product_starts_the_feed(self):
+        gh = SharedGh(feed=None)
+        self.publish(gh)
+        self.assertEqual([p["product_id"] for p in json.loads(gh.feed)["products"]], ["mymod", "project-09"])
+
+    def test_the_feed_release_must_exist_and_never_be_latest(self):
+        for home, why in (("", "create it once"), ("false false", "pre-release"), ("true true", "pre-release")):
+            gh = SharedGh(feed=None, home=home)
+            with self.assertRaises(gr.PublishFailed) as e:
+                gr.publish_feed(self.cfg, "1.2.3", self.dist, gh=gh, log=self.log.append, release_public=False)
+            self.assertIn(why, str(e.exception))
+            self.assertNotIn("release upload", gh.feed_calls())
+
+    def test_the_feed_never_points_at_a_draft(self):
+        gh = SharedGh(feed=None)
+        with self.assertRaises(gr.PublishFailed) as e:
+            gr.publish_feed(self.cfg, "1.2.3", self.dist, gh=gh, log=self.log.append)
+        self.assertIn("is not public", str(e.exception))
+        self.assertEqual(gh.feed_calls(), [])
+
+    def test_a_published_release_id_never_changes_in_the_feed(self):
+        mine = {**other_product("mymod-1.2.3"), "product_id": "mymod"}
+        gh = SharedGh(feed=pr.json_bytes(shared_feed_now(mine)))
+        with self.assertRaises(gr.PublishFailed) as e:
+            gr.publish_feed(self.cfg, "1.2.3", self.dist, gh=gh, log=self.log.append, release_public=False)
+        self.assertIn("never changes", str(e.exception))
+        self.assertNotIn("release upload", gh.feed_calls())
+
+    def test_an_older_release_does_not_replace_a_newer_one(self):
+        newer = {**other_product("mymod-1.3.0"), "product_id": "mymod"}
+        gh = SharedGh(feed=pr.json_bytes(shared_feed_now(newer)))
+        with self.assertRaises(gr.PublishFailed) as e:
+            gr.publish_feed(self.cfg, "1.2.3", self.dist, gh=gh, log=self.log.append, release_public=False)
+        self.assertIn("newer than 1.2.3", str(e.exception))
+        self.assertTrue(gr.publish_feed(self.cfg, "1.2.3", self.dist, gh=gh, log=self.log.append, release_public=False, allow_older=True))
+
+    def test_publishing_the_same_feed_again_changes_nothing(self):
+        gh = SharedGh(feed=pr.json_bytes(shared_feed_now()))
+        self.assertTrue(gr.publish_feed(self.cfg, "1.2.3", self.dist, gh=gh, log=self.log.append, release_public=False))
+        self.assertFalse(gr.publish_feed(self.cfg, "1.2.3", self.dist, gh=gh, log=self.log.append, release_public=False))
+        self.assertEqual(gh.feed_calls().count("release upload"), 1)
+
+    def test_dry_run_checks_but_sends_nothing(self):
+        gh = SharedGh(feed=pr.json_bytes(shared_feed_now()))
+        self.publish(gh, dry_run=True, skip_launcher_validation=False)
+        self.assertNotIn("release upload", [" ".join(c[:2]) for c in gh.calls])
+        self.assertTrue(any("kept: other, project-09" in line for line in self.log), self.log)
+        self.assertTrue(any(line.startswith(f"would run: gh release upload {FEED_TAG}") for line in self.log), self.log)
 
 
 if __name__ == "__main__":

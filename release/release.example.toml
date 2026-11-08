@@ -107,4 +107,9 @@ save_breaking = false                      # true when characters of the previou
 incompatibility_notice = ""                # ... and then this text, shown before updating
 upcoming = []                              # other product IDs the feed lists as upcoming, e.g. ["project-09"]
 game_exe = ""                              # the real D2R.exe the release was tested with (or --game-exe)
+# One shared catalog feed for every product (docs/release.md "Shared catalog feed"). Empty: feed.json rides on this
+# product's release and the launcher reads https://github.com/<repos.github>/releases/latest/download/feed.json.
+feed_url = ""                              # the feed URL launchers read, e.g. "https://github.com/<owner>/<catalog-repo>/releases/download/<feed_tag>/feed.json"
+feed_repo = ""                             # the GitHub repository whose release holds the shared feed.json ...
+feed_tag = ""                              # ... and that release's tag (created once, by hand)
 # loader_save_format = {file = "d2rloader/config/d2rloader.toml", key = "...", value = "..."}   # optional

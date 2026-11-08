@@ -70,6 +70,9 @@ DEFAULTS = {
         "incompatibility_notice": "",  # ... and this text says so (required exactly then)
         "upcoming": [],               # other product IDs feed.json lists as upcoming
         "game_exe": "",               # the real D2R.exe the release was tested with (--game-exe beats it)
+        "feed_url": "",               # the shared catalog feed every product's releases update ("" = feed.json on this release)
+        "feed_repo": "",              # with feed_url: the GitHub repository whose release holds the shared feed.json ...
+        "feed_tag": "",               # ... and that release's tag
     },
     "site": {
         "url": "https://files.example.com/mymod/",   # what players' downloaders read (HTTPS, ends in '/')
@@ -164,6 +167,15 @@ def validate(cfg: dict, where="config"):
     pid = str(cfg["catalog"]["product_id"])
     if pid and not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,63}", pid):
         raise ConfigError(f"{where}: catalog.product_id {pid!r} must be 1-64 of a-z 0-9 . _ - (a machine ID, not a name)")
+    cat = cfg["catalog"]
+    if cat["feed_url"]:
+        if not str(cat["feed_url"]).startswith("https://"):
+            raise ConfigError(f"{where}: catalog.feed_url {cat['feed_url']!r} must be an https:// URL")
+        if not re.fullmatch(r"[\w.-]+/[\w.-]+", str(cat["feed_repo"])) or not str(cat["feed_tag"]).strip():
+            raise ConfigError(f"{where}: catalog.feed_url needs catalog.feed_repo (owner/repo) and catalog.feed_tag: "
+                              "the GitHub release that holds the shared feed.json")
+    elif cat["feed_repo"] or cat["feed_tag"]:
+        raise ConfigError(f"{where}: catalog.feed_repo and catalog.feed_tag need catalog.feed_url (the launchers' feed URL)")
     for pat in cfg["package"]["forbidden"]:
         try:
             re.compile(pat)

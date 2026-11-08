@@ -37,6 +37,9 @@ archive URL is https://github.com/<repos.github>/releases/download/v<version>/<7
 `github_release.py --assets dist` (draft first, verified, then public). Inputs: the [catalog] config, --game-exe (the
 real D2R.exe the release was tested with: its size and sha256 go in compatibility.game_builds) and --notes (the patch
 notes text; default: the version's section of repos.changelog). An --incomplete build writes neither file.
+With catalog.feed_url (one catalog feed shared by several products) feed.json is the shared feed as it is now
+(catalog.feed_url, or --feed-in FILE) with this release merged in, every other product kept, and SHA256SUMS covers only
+the 7z and the manifest; github_release.py --assets merges it again into the live feed once the release is public.
 
 Nothing else goes in: no test harness files, saves or logs (the run stops if one is in the folder; the patterns are
 package.forbidden in the config). The folder you give is never changed: it is copied to dist/stage/ first.
@@ -54,6 +57,7 @@ package.forbidden in the config). The folder you give is never changed: it is co
 --nexus             also write <Folder>-<version>-nexus.7z: players extract it into <D2R>\\mods\\ and read INSTALL.txt
 """
 import argparse
+import copy
 import datetime
 import hashlib
 import json
@@ -302,13 +306,65 @@ def catalog_manifest(cfg: dict, version: str, files: list, archive_path: Path, d
     }
 
 
-def catalog_feed(cfg: dict, man: dict, man_bytes: bytes, manifest_url: str) -> dict:
-    """feed.json, schema 3: this product recommends this release; catalog.upcoming are listed without artifacts."""
-    products = [{"product_id": man["product_id"], "availability": "available",
-                 "recommended": {"release_id": man["release_id"], "manifest_url": manifest_url, "manifest_size": len(man_bytes),
-                                 "manifest_sha256": hashlib.sha256(man_bytes).hexdigest()}}]
-    products += [{"product_id": p, "availability": "upcoming"} for p in cfg["catalog"]["upcoming"]]
+def catalog_feed(cfg: dict, man: dict, man_bytes: bytes, manifest_url: str, current: dict = None) -> dict:
+    """feed.json, schema 3: this product recommends this release; catalog.upcoming are listed without artifacts.
+
+    `current`: the shared catalog feed as it is now (catalog.feed_url). Every other product keeps its entry and its
+    place; this product's entry is replaced where it was (an upcoming product becomes available) or added at the end;
+    catalog.upcoming adds the IDs the feed does not list yet. Without it the feed lists only this product and
+    catalog.upcoming."""
+    mine = {"product_id": man["product_id"], "availability": "available",
+            "recommended": {"release_id": man["release_id"], "manifest_url": manifest_url, "manifest_size": len(man_bytes),
+                            "manifest_sha256": hashlib.sha256(man_bytes).hexdigest()}}
+    products = [copy.deepcopy(p) for p in (current or {}).get("products") or []]
+    at = next((i for i, p in enumerate(products) if p.get("product_id") == mine["product_id"]), None)
+    if at is None:
+        products.insert(next((i for i, p in enumerate(products) if p.get("availability") == "upcoming"), len(products))
+                        if current else 0, mine)
+    else:
+        products[at] = mine
+    listed = {p.get("product_id") for p in products}
+    products += [{"product_id": p, "availability": "upcoming"} for p in cfg["catalog"]["upcoming"] if p not in listed]
     return {"schema_version": CATALOG_SCHEMA, "products": products}
+
+
+def shared_feed(cfg: dict) -> bool:
+    """True when the products share one catalog feed (catalog.feed_url) instead of a feed.json on each release."""
+    return bool(cfg["catalog"].get("feed_url"))
+
+
+def read_feed(src, opener=None):
+    """The shared catalog feed now: (feed dict, its bytes), or (None, None) when it does not exist yet (HTTP 404, or no
+    such file). `src`: a local file or an https:// URL. Raises ValueError for a feed the launcher would refuse."""
+    src = str(src)
+    if src.startswith("https://"):
+        import urllib.error
+        import urllib.request
+        try:
+            with (opener or urllib.request.urlopen)(urllib.request.Request(src, headers={"User-Agent": "d2r-modkit"}),
+                                                    timeout=60) as r:
+                data = r.read(MAX_FEED + 1)
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return None, None
+            raise ValueError(f"{src}: HTTP {e.code}")
+        except OSError as e:
+            raise ValueError(f"{src}: {e}")
+    else:
+        p = Path(src)
+        if not p.is_file():
+            return None, None
+        data = p.read_bytes()
+    if len(data) > MAX_FEED:
+        raise ValueError(f"{src}: over the launcher's {MAX_FEED} B")
+    try:
+        feed = json.loads(data)
+    except ValueError as e:
+        raise ValueError(f"{src}: not JSON: {e}")
+    bad = feed_problems(feed) if isinstance(feed, dict) else ["not a JSON object"]
+    if bad:
+        raise ValueError(f"{src}: the current feed is not valid: " + "; ".join(bad[:10]))
+    return feed, data
 
 
 def json_bytes(obj) -> bytes:
@@ -476,10 +532,17 @@ def _archive_listing_problems(entries, files, dirs, folder) -> list:
     return bad
 
 
+def feed_problems(feed) -> list:
+    """Everything the launcher would refuse in a feed on its own, whatever product recommends what. [] = good."""
+    return _feed_problems(feed, None, None)
+
+
 def _feed_problems(feed, man, man_bytes) -> list:
     bad = []
     if set(feed) != {"schema_version", "products"} or feed.get("schema_version") != CATALOG_SCHEMA:
         bad.append(f"feed: must be {{schema_version: {CATALOG_SCHEMA}, products}}")
+    if not isinstance(feed.get("products"), list) or not all(isinstance(p, dict) for p in feed["products"]):
+        return bad + ["feed: products must be a list of objects"]
     ids = [p.get("product_id") for p in feed.get("products") or []]
     bad += [f"feed: product_id {i!r} is duplicated or not a machine ID" for i in ids
             if ids.count(i) > 1 or not IDENT_RE.fullmatch(str(i))]
@@ -497,10 +560,12 @@ def _feed_problems(feed, man, man_bytes) -> list:
             v = verification_problem("feed manifest", r.get("manifest_size"), r.get("manifest_sha256"))
             if v:
                 bad.append(v)
-            if p.get("product_id") == man.get("product_id"):
+            if man is not None and p.get("product_id") == man.get("product_id"):
                 mine = r
         else:
             bad.append(f"feed: product {p.get('product_id')!r} is neither upcoming nor available with a recommended release")
+    if man is None:
+        return bad
     if mine is None:
         bad.append(f"feed: does not recommend a release of {man.get('product_id')!r}")
     elif mine.get("release_id") != man.get("release_id"):
@@ -775,6 +840,8 @@ def main(argv=None) -> int:
     ap.add_argument("--out", type=Path, help=f"output folder (default package.dist = {cfg['package']['dist']})")
     ap.add_argument("--game-exe", type=Path, help="schema 3: the real D2R.exe the release was tested with (catalog.game_exe)")
     ap.add_argument("--notes", type=Path, help="schema 3: the patch notes text (default: the version's changelog section)")
+    ap.add_argument("--feed-in", help="schema 3 with catalog.feed_url: the shared feed as it is now, a file or an https:// "
+                                      "URL (default catalog.feed_url); this release is merged into it")
     a = ap.parse_args(argv)
 
     version = a.version.lstrip("v")
@@ -802,6 +869,14 @@ def main(argv=None) -> int:
     catalog = bool(cfg["catalog"]["product_id"]) and not a.incomplete  # an --incomplete build is never recommended
     if catalog:
         builds, catalog_notes, problems = catalog_inputs(cfg, version, a.game_exe, a.notes)
+        current = None
+        if shared_feed(cfg):  # the shared feed now, before the long part of the run
+            try:
+                current, _ = read_feed(a.feed_in or cfg["catalog"]["feed_url"])
+            except ValueError as e:
+                problems.append(f"the shared feed: {e} (--feed-in FILE reads a saved copy)")
+            if current is None and not problems:
+                print(f"note: no shared feed at {a.feed_in or cfg['catalog']['feed_url']} yet: feed.json starts with this product")
         if problems:
             print("error: schema 3 (catalog):\n  " + "\n  ".join(problems))
             return 1
@@ -839,7 +914,7 @@ def main(argv=None) -> int:
     if catalog:  # every launcher rule, the 7z's own listing included, before anything else is written
         cman = catalog_manifest(cfg, version, files, seven_path, dirs, builds, catalog_notes)
         cman_bytes = json_bytes(cman)
-        cfeed = catalog_feed(cfg, cman, cman_bytes, asset_url(cfg, version, CATALOG_MANIFEST))
+        cfeed = catalog_feed(cfg, cman, cman_bytes, asset_url(cfg, version, CATALOG_MANIFEST), current)
         problems = catalog_problems(cman, cfeed, cman_bytes, seven_path, json_bytes(cfeed), sevenzip)
         if problems:
             print("error: the launcher would refuse this release; nothing written:\n  " + "\n  ".join(problems[:40]))
@@ -864,8 +939,10 @@ def main(argv=None) -> int:
                                    indent=1) + "\n", encoding="utf-8", newline="\n")
     notes = out / f"RELEASE_NOTES-{version}.md"
     notes.write_text(release_notes(cfg, version, seven_path.name), encoding="utf-8", newline="\n")
-    # with [catalog], SHA256SUMS covers exactly the GitHub release assets (github_release.py --assets uploads those)
-    summed = [seven_path, *written] if catalog else [*sums, man_path, notes]
+    # with [catalog], SHA256SUMS covers exactly the GitHub release assets (github_release.py --assets uploads those);
+    # a shared feed (catalog.feed_url) is not one of them: it lives on its own release and changes with every product
+    assets = [seven_path, *written[:1]] if shared_feed(cfg) else [seven_path, *written]
+    summed = assets if catalog else [*sums, man_path, notes]
     (out / "SHA256SUMS").write_text("".join(f"{sha256(p)}  {p.name}\n" for p in summed),
                                     encoding="utf-8", newline="\n")
     shutil.rmtree(out / "stage")
