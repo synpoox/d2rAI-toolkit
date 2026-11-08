@@ -10,6 +10,7 @@ the project.
 | `mpq.py` | Read-only classic (v1) MPQ reader: `Archive(path).read(name)`, encrypted tables, zlib, bzip2 and PKWARE implode. No dependencies |
 | `extract.py` | `extract(install, out, baseline_file)`: checks every archive against the baseline file's SHA-256s, then extracts the files its `extract` patterns name (format in the module docstring). Skips a current extract |
 | `merge.py` | The merge driver: `check_extract(out, baseline_file)` refuses a stale extract; `merge(rules, rules_dir, data, d2r, generated)` applies each rule file by its rule kind and leaves no `generated/` when a rule fails |
+| `ids.py` | Append-only id lists (`merge/ids-<table>.tsv`) for the tables a save or D2R's code reads by row number: `read_list`, `seed` (same id below the project's vanilla count, then same name, then append), `check`, `renames`, `follow`; and the D2R schema facts a merge onto D2R needs (key columns, `COLUMN_MAP` of 1.13c column names, `REFS`, `NUM_REFS`, `FORMULAS`, key limits). Format and rules in the module docstring |
 | `column_map.py` | The column-map stage: `apply(column_map, tables, recode, moved, restructure)` converts classic tables (`modkit.tsv.Table`) from one classic schema to another with the project's column map (format and kinds in the module docstring); `row_name(table, column)` turns references by row number into row names. A column the map doesn't cover, an unknown kind or a missing function fails the run |
 
 ## Use it from a project
