@@ -16,6 +16,7 @@ environment variable named there, else the token file. The token is never printe
 (title, body, the downloader asset) instead of failing. --dry-run prints the tag and the body and touches nothing.
 """
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -199,12 +200,15 @@ def read_sums(path: Path) -> dict:
     return out
 
 
-def check_assets(folder: Path, archive: str, sevenzip=None) -> list:
+def check_assets(folder: Path, archive: str, sevenzip=None, feed_path=None) -> list:
     """Problems of the release assets in `folder`: each must match SHA256SUMS, the manifest and feed must pass every
-    launcher rule (the 7z's listing included), and the launcher's own validator when VALIDATOR_ENV names one."""
+    launcher rule (the 7z's listing included), and the launcher's own validator when VALIDATOR_ENV names one.
+    `feed_path`: a shared catalog feed (catalog.feed_url), which is not one of the release's assets; default
+    folder/feed.json, an asset listed in SHA256SUMS."""
     import package_release as pr
     folder = Path(folder)
-    names = [archive, pr.CATALOG_MANIFEST, pr.FEED]
+    names = [archive, pr.CATALOG_MANIFEST] + ([] if feed_path else [pr.FEED])
+    feed_path = Path(feed_path or folder / pr.FEED)
     if not (folder / "SHA256SUMS").is_file():
         return [f"no SHA256SUMS in {folder}"]
     sums = read_sums(folder / "SHA256SUMS")
@@ -214,22 +218,30 @@ def check_assets(folder: Path, archive: str, sevenzip=None) -> list:
     bad = [f"{n}: sha256 does not match SHA256SUMS" for n in names if sums.get(n) != pr.sha256(folder / n)]
     if set(sums) != set(names):
         bad.append(f"SHA256SUMS lists {sorted(sums)}, the release assets are {sorted(names)}")
-    man_bytes, feed_bytes = (folder / pr.CATALOG_MANIFEST).read_bytes(), (folder / pr.FEED).read_bytes()
+    if not feed_path.is_file():
+        return bad + [f"{feed_path}: missing"]
+    man_bytes, feed_bytes = (folder / pr.CATALOG_MANIFEST).read_bytes(), feed_path.read_bytes()
     try:
         man, feed = json.loads(man_bytes), json.loads(feed_bytes)
     except ValueError as e:
         return bad + [f"not JSON: {e}"]
     bad += pr.catalog_problems(man, feed, man_bytes, folder / archive, feed_bytes, sevenzip)
-    exe = os.environ.get(VALIDATOR_ENV)
-    if exe and not bad:
-        try:
-            r = subprocess.run([exe, str(folder / pr.CATALOG_MANIFEST), str(folder / pr.FEED), str(folder / archive)],
-                               capture_output=True, text=True, errors="replace")
-        except OSError as e:
-            return bad + [f"{VALIDATOR_ENV} ({exe}) does not run: {e}"]
-        if r.returncode != 0:
-            bad.append(f"{VALIDATOR_ENV} ({exe}) refused it: {(r.stdout + r.stderr).strip()[-600:]}")
+    if not bad:
+        bad += launcher_validation(folder / pr.CATALOG_MANIFEST, feed_path, folder / archive)
     return bad
+
+
+def launcher_validation(manifest: Path, feed: Path, archive: Path = None) -> list:
+    """The launcher's own validate-release on these files when VALIDATOR_ENV names it; [] = valid, or not set."""
+    exe = os.environ.get(VALIDATOR_ENV)
+    if not exe:
+        return []
+    try:
+        r = subprocess.run([exe, str(manifest), str(feed), *([str(archive)] if archive else [])],
+                           capture_output=True, text=True, errors="replace")
+    except OSError as e:
+        return [f"{VALIDATOR_ENV} ({exe}) does not run: {e}"]
+    return [f"{VALIDATOR_ENV} ({exe}) refused it: {(r.stdout + r.stderr).strip()[-600:]}"] if r.returncode else []
 
 
 def assets_body(cfg: dict, man: dict, archive: str) -> str:
@@ -260,10 +272,15 @@ def publish_assets(cfg: dict, version: str, dist, commit=None, dry_run=False, gh
     moves releases/latest/download/feed.json to it. Any failure leaves the draft and raises PublishFailed (exit 1).
     A release that is already public is never touched: a published release ID never changes. A real run needs the
     launcher's validator ($RESURRECTED_VALIDATE_RELEASE) unless skip_launcher_validation, and refuses a version older
-    than the current Latest unless allow_older. The dry run makes the same read-only gh checks."""
+    than the current Latest unless allow_older. The dry run makes the same read-only gh checks.
+    With a shared catalog feed (catalog.feed_url) the release carries no feed.json: once it is public, publish_feed
+    merges it into the shared feed."""
     import package_release as pr
     version, dist, repo = version.lstrip("v"), Path(dist), cfg["repos"]["github"]
     tag = pr.release_tag(version)
+    shared = pr.shared_feed(cfg)
+    names = [n for n in (pr.CATALOG_MANIFEST, pr.FEED, "SHA256SUMS") if not (shared and n == pr.FEED)]
+    feed_path = dist / pr.FEED if shared else None  # the packager's merge: checked here, merged again by publish_feed
     if not (dist / pr.CATALOG_MANIFEST).is_file():
         raise PublishFailed(f"no {dist / pr.CATALOG_MANIFEST}: package with [catalog] set (an --incomplete build has none)")
     man = json.loads((dist / pr.CATALOG_MANIFEST).read_bytes())
@@ -275,7 +292,7 @@ def publish_assets(cfg: dict, version: str, dist, commit=None, dry_run=False, gh
     if not dry_run and not skip_launcher_validation and not os.environ.get(VALIDATOR_ENV):
         raise PublishFailed(f"set {VALIDATOR_ENV} to the launcher's validate-release executable (docs/release.md), or pass "
                             "--skip-launcher-validation")
-    problems = check_assets(dist, archive, sevenzip)
+    problems = check_assets(dist, archive, sevenzip, feed_path)
     if problems:
         raise PublishFailed("refusing to publish:\n  " + "\n  ".join(problems[:40]))
     if not os.environ.get(VALIDATOR_ENV):
@@ -285,25 +302,21 @@ def publish_assets(cfg: dict, version: str, dist, commit=None, dry_run=False, gh
         raise PublishFailed(f"{repo} already has a public release {tag}: a published release never changes; "
                             "package a new version")
     latest = latest_tag(gh, repo)
-    from publish_release import version_key
-    try:
-        older = bool(latest) and version_key(version) < version_key(latest.lstrip("v"))
-    except AttributeError:  # a Latest tag that is not a version
-        older = True
-    if older and not allow_older:
-        raise PublishFailed(f"{tag} is older than the current Latest {latest}; making it Latest moves the launcher's feed "
-                            "back to it. Pass --allow-older if that is meant")
-    assets = [str(dist / n) for n in (archive, pr.CATALOG_MANIFEST, pr.FEED, "SHA256SUMS")]
+    moved = "releases/latest" if shared else "the launcher's feed (releases/latest/download/feed.json)"
+    if latest and older_than(version, latest.lstrip("v")) and not allow_older:
+        raise PublishFailed(f"{tag} is older than the current Latest {latest}; making it Latest moves {moved} back to "
+                            "it. Pass --allow-older if that is meant")
+    assets = [str(dist / n) for n in (archive, *names)]
     with tempfile.TemporaryDirectory() as tmp:
         body = Path(tmp) / "body.md"
         body.write_text(assets_body(cfg, man, archive), encoding="utf-8")
-        # no --prerelease: releases/latest (the launcher's feed URL) skips pre-releases
+        # no --prerelease: releases/latest skips pre-releases; without catalog.feed_url it carries the launcher's feed
         create = ["release", "create", tag, "-R", repo, "--draft", "--title", f"{cfg['mod']['name']} {version}",
                   "--notes-file", str(body)] + (["--target", commit] if commit else [])
         upload = ["release", "upload", tag, *assets, "-R", repo, "--clobber"]
         back = Path(tmp) / "back"
         download = ["release", "download", tag, "-R", repo, "-D", str(back),
-                    *[x for n in (archive, pr.CATALOG_MANIFEST, pr.FEED, "SHA256SUMS") for x in ("-p", n)]]
+                    *[x for n in (archive, *names) for x in ("-p", n)]]
         public = ["release", "edit", tag, "-R", repo, "--draft=false", "--latest"]
         steps = ([] if seen.returncode == 0 else [create]) + [upload, download, public]
         if dry_run:
@@ -312,6 +325,8 @@ def publish_assets(cfg: dict, version: str, dist, commit=None, dry_run=False, gh
             for c in steps:
                 log("would run: gh " + subprocess.list2cmdline(c))
             log(f"dry run: {dist} passes every check; nothing was sent")
+            if shared:
+                publish_feed(cfg, version, dist, dry_run=True, gh=gh, log=log, allow_older=allow_older, release_public=False)
             return ""
 
         def run(args, what):
@@ -329,15 +344,169 @@ def publish_assets(cfg: dict, version: str, dist, commit=None, dry_run=False, gh
         run(upload, "release upload")
         log(f"{tag}: uploaded {len(assets)} assets; downloading them back")
         run(download, "release download")
-        problems = check_assets(back, archive, sevenzip)
+        problems = check_assets(back, archive, sevenzip, feed_path)
         if not problems and (back / "SHA256SUMS").read_bytes() != (dist / "SHA256SUMS").read_bytes():
             problems = ["the downloaded SHA256SUMS is not the one in dist/"]
         if problems:
             raise PublishFailed(f"the uploaded assets of {tag} are wrong; it stays a draft:\n  " + "\n  ".join(problems[:40]))
         run(public, "release edit --draft=false --latest")
     url = f"https://github.com/{repo}/releases/tag/{tag}"
-    log(f"{url} is public and Latest; the feed is https://github.com/{repo}/releases/latest/download/{pr.FEED}")
+    if shared:
+        log(f"{url} is public and Latest; now the shared feed")
+        publish_feed(cfg, version, dist, gh=gh, log=log, allow_older=allow_older)
+    else:
+        log(f"{url} is public and Latest; the feed is https://github.com/{repo}/releases/latest/download/{pr.FEED}")
     return url
+
+
+FEED_LOCK = "feed.lock"  # on the feed release while one publish_feed runs; uploaded without --clobber, so only one wins
+
+
+def older_than(version: str, other: str) -> bool:
+    """True when `version` sorts before `other`, or `other` is not a version at all (so nothing silently goes back)."""
+    from publish_release import version_key
+    try:
+        return version_key(version) < version_key(other)
+    except AttributeError:
+        return True
+
+
+def publish_feed(cfg: dict, version: str, dist, dry_run=False, gh=gh_runner, log=print, allow_older=False,
+                 release_public=True) -> bool:
+    """Merge this product's public release (dist/release-manifest.json) into the shared catalog feed, which is the
+    feed.json asset of the release catalog.feed_tag of catalog.feed_repo (created once, by hand, as a pre-release).
+
+    1. The product release must be public and its release-manifest.json asset byte-equal to dist's: the feed never
+       points at a manifest players cannot download (release_public=False skips this for the dry run of --assets,
+       whose release is not public yet).
+    2. Take the lock: upload feed.lock without --clobber; a second publish at the same time fails here and stops.
+    3. Download feed.json, replace this product's entry (every other product is kept), check the result with every
+       launcher rule and $RESURRECTED_VALIDATE_RELEASE.
+    4. Download feed.json again: it must still be the one merged into, else another publish got in and this one stops.
+    5. Upload it (--clobber), download it back and compare, drop the lock.
+
+    Refuses also when the feed already has another manifest under this release ID (a published release never changes)
+    and when it recommends a newer release of this product unless allow_older. True when the feed changed (or would,
+    in a dry run, which takes no lock and sends nothing)."""
+    import package_release as pr
+    if not pr.shared_feed(cfg):
+        raise PublishFailed("catalog.feed_url is not set: the feed is the release's own feed.json (--assets)")
+    version, dist = version.lstrip("v"), Path(dist)
+    repo, tag, product_repo = cfg["catalog"]["feed_repo"], cfg["catalog"]["feed_tag"], cfg["repos"]["github"]
+    if not (dist / pr.CATALOG_MANIFEST).is_file():
+        raise PublishFailed(f"no {dist / pr.CATALOG_MANIFEST}: package with [catalog] set")
+    man_bytes = (dist / pr.CATALOG_MANIFEST).read_bytes()
+    man = json.loads(man_bytes)
+    rid = man.get("release_id")
+    if rid != f"{man.get('product_id')}-{version}":
+        raise PublishFailed(f"{pr.CATALOG_MANIFEST} is {rid!r}, not version {version}")
+    again = f"run github_release.py {version} --feed {dist} again"
+
+    def fetch(release, owner, name, dest):
+        """Bytes of one asset, None when the release has no such asset; PublishFailed on any other gh error."""
+        r = gh(["release", "download", release, "-R", owner, "-p", name, "-D", str(dest)])
+        if r.returncode != 0:
+            if "no assets match" in (r.stdout + r.stderr).lower():
+                return None
+            raise PublishFailed(f"gh release download {release} -R {owner} -p {name} failed ({r.returncode}): "
+                                f"{(r.stdout + r.stderr).strip()[-600:]}")
+        return (Path(dest) / name).read_bytes() if (Path(dest) / name).is_file() else None
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        if release_public:
+            product_tag = pr.release_tag(version)
+            seen = gh(["release", "view", product_tag, "-R", product_repo, "--json", "isDraft", "-q", ".isDraft"])
+            if seen.returncode != 0 or seen.stdout.strip() != "false":
+                raise PublishFailed(f"{product_repo} {product_tag} is not public: publish it first (--assets)")
+            public = fetch(product_tag, product_repo, pr.CATALOG_MANIFEST, tmp / "public")
+            if public is None:
+                raise PublishFailed(f"{product_repo} {product_tag} has no {pr.CATALOG_MANIFEST}: publish it first (--assets)")
+            if public != man_bytes:
+                raise PublishFailed(f"the public {pr.CATALOG_MANIFEST} of {product_repo} {product_tag} (sha256 "
+                                    f"{hashlib.sha256(public).hexdigest()}, {len(public)} B) is not "
+                                    f"{dist / pr.CATALOG_MANIFEST} (sha256 {hashlib.sha256(man_bytes).hexdigest()}, "
+                                    f"{len(man_bytes)} B): the feed must point at the bytes players download; use the "
+                                    "dist/ that was published")
+        home = gh(["release", "view", tag, "-R", repo, "--json", "isDraft,isPrerelease", "-q",
+                   '"\\(.isDraft) \\(.isPrerelease)"'])
+        if home.returncode != 0:
+            raise PublishFailed(f"{repo} has no release {tag} for the shared feed: create it once, as a pre-release that is "
+                                f"never Latest: gh release create {tag} -R {repo} --prerelease --latest=false "
+                                f"--title \"Catalog feed\" --notes \"The launcher's catalog feed.\"")
+        if home.stdout.split() != ["false", "true"]:
+            raise PublishFailed(f"{repo} {tag} must be a public pre-release, so it never becomes the repository's Latest "
+                                f"release (isDraft isPrerelease: {home.stdout.strip()!r}): gh release edit {tag} -R {repo} "
+                                "--draft=false --prerelease --latest=false")
+        locked = False
+        if not dry_run:
+            lock = tmp / FEED_LOCK
+            lock.write_text(f"{rid}\n", encoding="utf-8")
+            r = gh(["release", "upload", tag, str(lock), "-R", repo])  # no --clobber: fails while another publish holds it
+            if r.returncode != 0:
+                raise PublishFailed(f"cannot take the feed lock ({FEED_LOCK} on {repo} {tag}): another publish is running, "
+                                    f"or one stopped without dropping it: {(r.stdout + r.stderr).strip()[-300:]}\nWhen none "
+                                    f"is running: gh release delete-asset {tag} {FEED_LOCK} -R {repo} -y, then {again}")
+            locked = True
+        try:
+            return _merge_feed(cfg, man, man_bytes, version, dist, repo, tag, tmp, fetch, again, dry_run, gh, log,
+                               allow_older)
+        finally:
+            if locked:
+                r = gh(["release", "delete-asset", tag, FEED_LOCK, "-R", repo, "-y"])
+                if r.returncode != 0:
+                    log(f"warning: could not drop the feed lock: gh release delete-asset {tag} {FEED_LOCK} -R {repo} -y")
+
+
+def _merge_feed(cfg, man, man_bytes, version, dist, repo, tag, tmp, fetch, again, dry_run, gh, log, allow_older):
+    """publish_feed steps 3-5, with the lock held (or in a dry run)."""
+    import package_release as pr
+    pid, rid = man["product_id"], man["release_id"]
+    current_bytes = fetch(tag, repo, pr.FEED, tmp / "now")
+    try:
+        current, _ = pr.read_feed(tmp / "now" / pr.FEED) if current_bytes is not None else (None, None)
+    except ValueError as e:
+        raise PublishFailed(f"the shared feed on {repo} {tag} is refused: {e}")
+    old = next((p for p in (current or {}).get("products", []) if p.get("product_id") == pid), None)
+    rec = (old or {}).get("recommended") or {}
+    if rec.get("release_id") == rid and (rec.get("manifest_size"), rec.get("manifest_sha256")) != \
+            (len(man_bytes), hashlib.sha256(man_bytes).hexdigest()):
+        raise PublishFailed(f"the shared feed already recommends {rid} with another manifest: a published release never "
+                            "changes; package a new version")
+    if rec.get("release_id") and rec["release_id"] != rid:
+        before = rec["release_id"].removeprefix(f"{pid}-") if rec["release_id"].startswith(f"{pid}-") else ""
+        if older_than(version, before) and not allow_older:
+            raise PublishFailed(f"the shared feed recommends {rec['release_id']}, newer than {version}; pass "
+                                "--allow-older if that is meant")
+    feed = pr.catalog_feed(cfg, man, man_bytes, pr.asset_url(cfg, version, pr.CATALOG_MANIFEST), current)
+    feed_bytes = pr.json_bytes(feed)
+    out = tmp / pr.FEED
+    out.write_bytes(feed_bytes)
+    problems = pr.catalog_problems(man, feed, man_bytes, None, feed_bytes)
+    problems += [] if problems else launcher_validation(dist / pr.CATALOG_MANIFEST, out)
+    if problems:
+        raise PublishFailed("refusing to publish the shared feed:\n  " + "\n  ".join(problems[:40]))
+    if feed_bytes == current_bytes:
+        log(f"the shared feed on {repo} {tag} already recommends {rid}")
+        return False
+    upload = ["release", "upload", tag, str(out), "-R", repo, "--clobber"]
+    if dry_run:
+        kept = [p["product_id"] for p in feed["products"] if p["product_id"] != pid]
+        log(f"shared feed {repo} {tag}: {len(current['products']) if current else 'no'} products now; "
+            f"{rid} would be recommended; kept: {', '.join(kept) or 'none'}")
+        log("would run: gh " + subprocess.list2cmdline(upload))
+        return True
+    if fetch(tag, repo, pr.FEED, tmp / "recheck") != current_bytes:
+        raise PublishFailed(f"the shared feed on {repo} {tag} changed while this release was merged into it (another "
+                            f"publish?); nothing was uploaded; {again}")
+    r = gh(upload)
+    if r.returncode != 0:
+        raise PublishFailed(f"gh release upload of the shared feed failed ({r.returncode}): "
+                            f"{(r.stdout + r.stderr).strip()[-600:]}\n{again}")
+    if fetch(tag, repo, pr.FEED, tmp / "back") != feed_bytes:
+        raise PublishFailed(f"the shared feed on {repo} {tag} is not the one just uploaded; {again}")
+    log(f"the shared feed {cfg['catalog']['feed_url']} recommends {rid}")
+    return True
 
 
 def main(argv=None) -> int:
@@ -356,7 +525,17 @@ def main(argv=None) -> int:
     ap.add_argument("--skip-launcher-validation", action="store_true",
                     help=f"--assets without the launcher's validate-release (${VALIDATOR_ENV})")
     ap.add_argument("--allow-older", action="store_true", help="--assets: allow a version older than the current Latest to become Latest")
+    ap.add_argument("--feed", type=Path, metavar="DIST",
+                    help="only merge DIST's public release into the shared catalog feed (catalog.feed_url), for example "
+                         "after a failed feed step of --assets")
     a = ap.parse_args(argv)
+    if a.feed:
+        try:
+            publish_feed(cfg, a.version, a.feed, a.dry_run, gh=gh_runner, allow_older=a.allow_older)
+        except PublishFailed as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+        return 0
     if a.assets:
         if a.service != "github":
             print("error: --assets publishes to GitHub only", file=sys.stderr)

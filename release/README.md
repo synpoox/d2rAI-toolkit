@@ -12,6 +12,7 @@ dl_ingest.py           Runs ON the download host. Checks an upload, builds the p
 dl_sync.py             Runs ON the download host. Mirrors the site to an S3-compatible bucket with rclone.
 github_release.py      Creates or updates a GitHub / Forgejo release page from the changelog (REST, token from env or file).
                        --assets dist: publishes the schema 3 release with gh, draft first, verified, then public.
+                       With catalog.feed_url: then merges it into the shared catalog feed (--feed dist: only that).
 release.sh             The whole release in one go: package, publish to test, verify over HTTPS, promote, release pages.
 cloudflare-worker.js   Serves the bucket under your own domain. See CDN.md.
 CDN.md                 Setting up the bucket, rclone, the sync units and the Worker.
