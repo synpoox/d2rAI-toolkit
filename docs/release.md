@@ -229,14 +229,45 @@ the tag and body and needs no token. Repositories and tokens come from `[repos]`
 ### Launcher release (schema 3)
 
 The Resurrected launcher reads a schema 3 `release-manifest.json` and a `feed.json` from GitHub release assets (wire
-format: the launcher's `docs/specs/release-manifest.md`). Set `[catalog]` in the config (`product_id` turns it on) and
-package with the real `D2R.exe` the release was tested with:
+format: the launcher's `docs/specs/release-manifest.md`).
 
-```sh
-python release/package_release.py --mod-dir path/to/MyMod --version 0.2.0-alpha --game-exe "<D2R folder>/D2R.exe" --notes notes.md
-python release/github_release.py 0.2.0-alpha --assets dist --dry-run
-python release/github_release.py 0.2.0-alpha --assets dist
+**Once per project**, in `release.toml` (`product_id` turns schema 3 on):
+
+```toml
+[repos]
+github = "your-name/your-mod"      # the GitHub repository the releases go to
+[package]
+preserve = ["d2rloader/config/d2rloader.toml", "d2rloader/config/filter.json"]   # become shipped_default
+[catalog]
+product_id = "mymod"               # stable machine ID, never changes
+upcoming = []                      # other product IDs the feed lists as upcoming
+required_settings = [{file = "d2rloader/config/d2rloader.toml", key = "d2rcore.save_format.mode", value = "extended"}]
 ```
+
+The launcher's feed URL is then `https://github.com/<repos.github>/releases/latest/download/feed.json`.
+
+**Every release**, with the game closed and `gh` signed in to an account that can create releases there:
+
+1. Write the patch notes for players into a file (or a `### <version>` section in `repos.changelog`, the default).
+2. Package, with the real `D2R.exe` the release was tested with:
+   ```sh
+   python release/package_release.py --mod-dir path/to/MyMod --version 0.2.0-alpha --game-exe "<D2R folder>/D2R.exe" --notes notes.md
+   ```
+   It prints every problem and writes nothing if the launcher would refuse the release.
+3. Dry run: all checks, the gh commands printed, nothing sent.
+   ```sh
+   python release/github_release.py 0.2.0-alpha --assets dist --dry-run
+   ```
+4. Publish:
+   ```sh
+   python release/github_release.py 0.2.0-alpha --assets dist
+   ```
+   On success the release is public and Latest, and the launcher offers it. On failure it stays a draft that only you
+   can see: fix the cause and run step 4 again (the draft is reused), or delete the draft on GitHub.
+5. Optional, once the launcher ships its validator: set `RESURRECTED_VALIDATE_RELEASE` to the `validate-release`
+   executable before step 4, and it runs on the downloaded assets too.
+
+A version that is public never changes. To fix a published release, package a new version.
 
 - The manifest: every file of the 7z is `managed`, except `package.preserve`, which are `shipped_default`;
   `install_root` is `mods/<folder>`; `compatibility.game_builds` holds the exe's size and sha256; `required_settings`
