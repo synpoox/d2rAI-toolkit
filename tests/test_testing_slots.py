@@ -153,6 +153,67 @@ class SlotPathTests(unittest.TestCase):
         self.assertEqual(c2.harness_words(3), ["tag=s3", "x"])
 
 
+class OwnerNameTests(unittest.TestCase):
+    """The lock owner in the game's window title and loader process name."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.cfg = make_cfg(self.tmp.name, game={"slot_count": 10})
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_issue_number_and_tag(self):
+        self.assertEqual(gs.issue_number("agent-492-uberdiab"), "492")
+        self.assertEqual(gs.issue_number("mymod2-lane-9"), "9")
+        self.assertIsNone(gs.issue_number("r09-slot10"))  # digits inside a word are not an issue
+        self.assertIsNone(gs.issue_number("manual"))
+        self.assertIsNone(gs.issue_number("run-12345"))  # game_ctl's default owner is a pid, not an issue
+        self.assertIsNone(gs.issue_number(None))
+        self.assertEqual(gs.slot_tag(8, "agent-492-uberdiab"), "[S8 #492 agent-492-uberdiab]")
+        self.assertEqual(gs.slot_tag(3, "manual"), "[S3 manual]")
+        self.assertEqual(gs.slot_tag(3, None), "[S3]")
+
+    def test_tagged_title_replaces_an_old_tag(self):
+        t = gs.tagged_title("Diablo II: Resurrected", 8, "agent-492-uberdiab")
+        self.assertEqual(t, "[S8 #492 agent-492-uberdiab] Diablo II: Resurrected")
+        self.assertEqual(gs.tagged_title(t, 8, "lane-b"), "[S8 lane-b] Diablo II: Resurrected")
+        self.assertEqual(gs.strip_slot_tag(t), "Diablo II: Resurrected")
+        self.assertEqual(gs.strip_slot_tag("[Something] else"), "[Something] else")
+
+    def test_owner_loader_name_and_matching(self):
+        c = self.cfg
+        self.assertEqual(c.owner_loader_name(8, "agent-492-uberdiab"), "D2RLoader-s8-agent-492-uberdiab.exe")
+        self.assertEqual(c.owner_loader_name(8, None), "D2RLoader-s8.exe")
+        self.assertEqual(c.owner_loader_name(1, "x"), "D2RLoader.exe")
+        self.assertTrue(c.is_process_name(8, "D2RLoader-s8-agent-492-uberdiab.exe"))
+        self.assertTrue(c.is_process_name(8, "D2RLoader-s8.exe"))
+        self.assertTrue(c.is_process_name(8, "D2R.exe"))
+        self.assertFalse(c.is_process_name(1, "D2RLoader-s1-x.exe"))
+        self.assertFalse(c.is_process_name(1, "D2RLoader-s10-x.exe"))
+        self.assertFalse(c.is_process_name(10, "D2RLoader-s1-x.exe"))
+        self.assertFalse(c.is_process_name(8, "D2RLoader-s8-.exe"))
+        self.assertEqual(c.process_pattern(8), "D2RLoader-s8-*.exe")
+        self.assertEqual(c.process_pattern(1), "")
+
+    def test_owner_loader_links_and_cleans_old_copies(self):
+        import game_ctl
+        c = self.cfg
+        d = Path(c.slot_dir(8))
+        d.mkdir(parents=True)
+        (d / "D2RLoader.exe").write_bytes(b"loader")
+        (d / "D2RLoader-s8.exe").write_bytes(b"loader")
+        (d / "D2RLoader-s8-old-owner.exe").write_bytes(b"loader")
+        gs.acquire(c, 8, "agent-492-uberdiab", pid=0)
+        g = game_ctl.Game(c, 8, owner="agent-492-uberdiab", log=lambda _m: None)
+        p = g.owner_loader()
+        self.assertEqual(os.path.basename(p), "D2RLoader-s8-agent-492-uberdiab.exe")
+        self.assertEqual(Path(p).read_bytes(), b"loader")
+        self.assertFalse((d / "D2RLoader-s8-old-owner.exe").exists())
+        self.assertTrue((d / "D2RLoader-s8.exe").exists())
+        self.assertEqual(g.owner_loader(), p)  # second start: reused
+
+
 class OwnerTextTests(unittest.TestCase):
     def test_parse_and_format(self):
         txt = gs.format_owner("lane-a", 1234)
@@ -484,6 +545,7 @@ class StatusAndCliTests(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn("your own game", out)
         self.assertIn("lane-a", out)
+        self.assertIn("matches D2RLoader-s2.exe, D2RLoader-s2-*.exe, D2RLoader.exe, D2R.exe", out)
         rc, out, _ = self.cli("list")
         rows = [ln.split("\t") for ln in out.splitlines()]
         self.assertEqual([r[:2] for r in rows], [["1", "own"], ["2", "locked"], ["3", "free"]])

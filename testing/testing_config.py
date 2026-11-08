@@ -282,9 +282,35 @@ class Config:
     def base_loader_path(self, n: int) -> str:
         return os.path.join(self.slot_dir(n), self.data["game"]["loader_exe"])
 
+    def owner_loader_name(self, n: int, owner: str | None) -> str:
+        """The loader copy a game of slot N runs as while OWNER holds the lock: <stem>-sN-<owner><ext>, so Task
+        Manager shows whose game it is. No owner: the plain slot copy."""
+        if int(n) == 1 or not owner:
+            return self.loader_name(n)
+        stem, ext = os.path.splitext(self.loader_name(n))
+        return f"{stem}-{owner}{ext}"
+
     def process_names(self, n: int) -> tuple[str, ...]:
+        """Exact image names of slot N's processes. Owner copies (owner_loader_name) match process_pattern too."""
         g = self.data["game"]
         return tuple(sorted({g["loader_exe"].lower(), self.loader_name(n).lower(), g["game_exe"].lower()}))
+
+    def process_pattern(self, n: int) -> str:
+        """The image name of slot N's owner copies, as a glob: <stem>-sN-*<ext> ("" for slot 1: it has none)."""
+        if int(n) == 1:
+            return ""
+        stem, ext = os.path.splitext(self.loader_name(n))
+        return f"{stem}-*{ext}"
+
+    def is_process_name(self, n: int, name: str) -> bool:
+        """True for an image name slot N's game may run as (its path must still be checked: slots share names)."""
+        nm = name.lower()
+        if nm in self.process_names(n):
+            return True
+        if int(n) == 1:
+            return False
+        stem, ext = os.path.splitext(self.loader_name(n).lower())
+        return nm.startswith(stem + "-") and nm.endswith(ext) and len(nm) > len(stem) + 1 + len(ext)
 
     def loader_config_path(self, n: int) -> str:
         return os.path.join(self.slot_dir(n), *self.data["loader"]["config_file"].split("/"))

@@ -75,6 +75,10 @@ What makes a slot independent:
 - **Own loader.** Slot N copies `D2RLoader.exe` to `D2RLoader-sN.exe`, so its process can be told apart. The tools
   also match a process by the folder its program file lives in, never by name alone, because every slot's game is
   called `D2R.exe`.
+- **Owner on screen.** `game_ctl.py start` launches a hard link of the loader named after the slot's lock owner
+  (`D2RLoader-s8-agent-492-uberdiab.exe` in Task Manager) and puts the owner in front of the window title
+  (`[S8 #492 agent-492-uberdiab] Diablo II: Resurrected` on the taskbar and in alt-tab). `#492` is the owner's first
+  all-digit part. `game_slots.py status` prints the names it matches.
 - **Own loader config.** `setup` writes `default_mod = <mod.folder>` into the slot's copy of the loader config. A later
   `setup` does not overwrite that file, so edits you make in a slot stay.
 - **Straight to character select.** `setup` (and `slot_install.py`, `release_install.py`) writes `"First Time": 1`
