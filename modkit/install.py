@@ -8,7 +8,8 @@
       d2rloader/config/d2rloader.toml [d2rcore.save_format] mode = "extended" when mod.json extendedSaves
       d2rloader/plugins/*.dll         mod.json "plugins" (built D2RLoader plugins; mod-scoped)
 
-Only <Name>.mpq/data is replaced on reinstall. Saves live in Saved Games and are never touched. Install only while
+On reinstall <Name>.mpq/data is made a copy of out/data writing only the files that changed (sync), so swapping a
+test slot between builds takes seconds. Saves live in Saved Games and are never touched. Install only while
 the game is closed, and restart the game fully afterwards. Without plugins or extended saves the mod also runs
 on plain D2R: D2R.exe -mod <Name> -txt.
 """
@@ -23,6 +24,27 @@ from pathlib import Path
 def game_running() -> bool:
     out = subprocess.run(["tasklist"], capture_output=True, text=True).stdout.lower()
     return "d2r.exe" in out or "d2rloader.exe" in out
+
+
+def sync(src: Path, dest: Path) -> int:
+    """Make dest a copy of src, writing only the files whose size or modified time differ (robocopy's rule: reading
+    both copies to compare costs more than copying) and removing the rest. Returns the files written."""
+    want = {p.relative_to(src) for p in src.rglob("*") if p.is_file()}
+    dest.mkdir(parents=True, exist_ok=True)
+    for p in sorted(dest.rglob("*"), reverse=True):  # deepest first, so a folder is empty once its files are gone
+        if p.is_file() and p.relative_to(dest) not in want:
+            p.unlink()
+        elif p.is_dir() and not any(p.iterdir()):
+            p.rmdir()
+    written = 0
+    for rel in sorted(want):
+        s, d = src / rel, dest / rel
+        if d.is_file() and (d.stat().st_size, d.stat().st_mtime_ns) == (s.stat().st_size, s.stat().st_mtime_ns):
+            continue  # copy2 keeps the time, and modkit build keeps it for the files it copies
+        d.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(s, d)
+        written += 1
+    return written
 
 
 def configured_slot(game: Path) -> int | None:
@@ -60,9 +82,7 @@ def install(project: Path, game: Path, savepath: str | None = None, check_runnin
         raise RuntimeError("D2R / D2RLoader is running: close the game before installing")
     root = game / "mods" / name
     mpq = root / f"{name}.mpq"
-    if (mpq / "data").exists():
-        shutil.rmtree(mpq / "data")
-    shutil.copytree(src, mpq / "data")
+    written = sync(src, mpq / "data")
     modinfo = json.dumps({"name": name, "savepath": savepath or mod.get("savepath", f"{name}/")}, indent=2)
     for target in (mpq / "modinfo.json", root / "modinfo.json"):
         target.write_text(modinfo, encoding="utf-8")
@@ -86,4 +106,5 @@ def install(project: Path, game: Path, savepath: str | None = None, check_runnin
     if mod.get("extendedSaves") and not toml.exists():  # never overwrite a config someone edited
         toml.write_text('[d2rcore.save_format]\nmode = "extended"\n', encoding="utf-8")
     files = sum(1 for p in (mpq / "data").rglob("*") if p.is_file())
-    return f"installed {files} files -> {root}" + (f"; plugins: {', '.join(plugins)}" if plugins else "")
+    return (f"installed {files} files -> {root} ({written} written, the rest unchanged)"
+            + (f"; plugins: {', '.join(plugins)}" if plugins else ""))
