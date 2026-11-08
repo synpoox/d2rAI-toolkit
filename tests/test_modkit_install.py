@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import sys
 import tempfile
@@ -29,6 +30,8 @@ class SyncTests(unittest.TestCase):
             dest.mkdir()
             shutil.copy2(src / "a.txt", dest / "a.txt")  # same size and time: kept
             write(dest / "sub" / "b.txt", "old")  # same size, other time: rewritten
+            st = (src / "sub" / "b.txt").stat()  # back-to-back writes can share a timestamp (#574): set it apart
+            os.utime(dest / "sub" / "b.txt", ns=(st.st_atime_ns, st.st_mtime_ns - 1_000_000_000))
             write(dest / "gone" / "c.txt", "stale")
             self.assertEqual(mi.sync(src, dest), 1)
             self.assertEqual((dest / "sub" / "b.txt").read_text(), "new")
