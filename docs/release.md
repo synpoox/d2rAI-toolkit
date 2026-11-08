@@ -138,7 +138,7 @@ subcommand (`publish_release.py --config FILE publish ...`).
 
 ```sh
 python release/package_release.py --mod-dir path/to/MyMod --version 1.0.1 [--plugin DLL [--plugin-version V]] \
-    [--game-extract DIR] [--incomplete] [--nexus] [--out dist]
+    [--game-extract DIR] [--incomplete] [--nexus] [--out dist] [--game-exe D2R.exe] [--notes notes.md]
 ```
 
 Writes into `dist/` (`package.dist`):
@@ -146,9 +146,10 @@ Writes into `dist/` (`package.dist`):
 | File | Content |
 |---|---|
 | `<Folder>-<version>.7z` (for example `MyMod-1.0.1-rc1.7z` for a pre-release) | The manual download. Solid LZMA2 7z (`-mx7`) with the mod folder at the top. Time stamps are left out and file times are fixed, so one 7-Zip build always makes the same archive from the same folder. |
-| `release-manifest.json` | The manifest ([schema below](#release-manifest)) with every file's size and sha256. |
+| `downloader-manifest.json` | The self-hosted downloader's manifest ([schema below](#release-manifest)) with every file's size and sha256. `publish_release.py` uploads it to the host as `releases/<v>/release-manifest.json`. |
+| `release-manifest.json`, `feed.json` | Only with `[catalog]` set: schema 3 for the Resurrected launcher ([below](#launcher-release-schema-3)). |
 | `RELEASE_NOTES-1.0.1.md` | A skeleton: requirements and install steps. Fill in the `TODO` parts if you ship it. |
-| `SHA256SUMS` | sha256 of the three files above (`sha256sum -c` format). |
+| `SHA256SUMS` | sha256 of the files above (`sha256sum -c` format). |
 
 It copies the folder to `dist/stage/` first and works on the copy. It **refuses** to package files that match
 `package.forbidden`: test-harness files, `imgui.ini`, `debugsettings.json`, `input-bindings.toml`, saves and their
@@ -224,6 +225,33 @@ Creates or updates the release `v<version>` from the changelog section ([next se
 install links to the downloader and the 7z on your site. The 7z is **not** attached; players get it from the download host.
 `--downloader` attaches the small exe. A version with `-` in it (`1.0.1-rc1`) becomes a pre-release. `--dry-run` prints
 the tag and body and needs no token. Repositories and tokens come from `[repos]`; the token is never printed.
+
+### Launcher release (schema 3)
+
+The Resurrected launcher reads a schema 3 `release-manifest.json` and a `feed.json` from GitHub release assets (wire
+format: the launcher's `docs/specs/release-manifest.md`). Set `[catalog]` in the config (`product_id` turns it on) and
+package with the real `D2R.exe` the release was tested with:
+
+```sh
+python release/package_release.py --mod-dir path/to/MyMod --version 0.2.0-alpha --game-exe "<D2R folder>/D2R.exe" --notes notes.md
+python release/github_release.py 0.2.0-alpha --assets dist --dry-run
+python release/github_release.py 0.2.0-alpha --assets dist
+```
+
+- The manifest: every file of the 7z is `managed`, except `package.preserve`, which are `shipped_default`;
+  `install_root` is `mods/<folder>`; `compatibility.game_builds` holds the exe's size and sha256; `required_settings`
+  and `saves` come from `[catalog]`. There is no loader installer pin: the launcher links to the D2RLoader download page.
+- The archive URL is `https://github.com/<repos.github>/releases/download/v<version>/<7z>`; the feed's `recommended`
+  points at the `release-manifest.json` asset next to it, with its exact size and sha256.
+- The packager checks everything the launcher would refuse before it writes anything: placeholder or zero hashes,
+  non-HTTPS URLs, unsafe or case-duplicate paths, counts, command keys, and the 7z's own entry list against
+  `files` + `empty_dirs`. One problem and nothing is written. An `--incomplete` build gets no schema 3 files.
+- `--assets` (needs `gh`, signed in): creates `v<version>` as a **draft**, uploads the 7z, `release-manifest.json`,
+  `feed.json` and `SHA256SUMS`, downloads them back and checks them again (and runs the launcher's
+  `validate-release <manifest> <feed> <archive>` when `RESURRECTED_VALIDATE_RELEASE` names it). Only then is the
+  release made public and Latest, which moves `releases/latest/download/feed.json`, the launcher's feed URL, to it.
+  Any failure leaves the draft (a rerun reuses it) and exits 1. A public release is never changed: a new release ID
+  needs a new version. The release is not marked pre-release, since GitHub's Latest skips pre-releases.
 
 ## Release notes
 

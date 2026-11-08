@@ -60,6 +60,17 @@ DEFAULTS = {
         "exe": "",                    # default path of the built exe for `publish --downloader` (release.sh)
         "min_version": "",            # optional: manifest "launcherMin", the oldest downloader that can install the release
     },
+    "catalog": {                      # schema 3 for the Resurrected launcher (package_release.py); off while product_id is ""
+        "product_id": "",             # stable machine ID, e.g. "pd2r"; release_id is <product_id>-<version>
+        "min_launcher_version": "0.1.0",
+        "loader_versions": [],        # allowed D2RLoader versions; [] = [d2rloader.version]
+        "required_settings": [],      # [{file, key, value}]; file must be in package.preserve (shipped_default)
+        "loader_save_format": {},     # optional {file, key, value}, same rule
+        "save_breaking": False,       # true: characters of the previous release may not load ...
+        "incompatibility_notice": "",  # ... and this text says so (required exactly then)
+        "upcoming": [],               # other product IDs feed.json lists as upcoming
+        "game_exe": "",               # the real D2R.exe the release was tested with (--game-exe beats it)
+    },
     "site": {
         "url": "https://files.example.com/mymod/",   # what players' downloaders read (HTTPS, ends in '/')
         "target": "sftp://modrelease@<your-server>/mymod",  # where publish uploads (or dir:<path> for a local test)
@@ -150,6 +161,9 @@ def validate(cfg: dict, where="config"):
     inc = str(cfg["site"]["incoming"])
     if inc.startswith("/") or not inc:
         raise ConfigError(f"{where}: site.incoming must be a path relative to the site root, like \"../incoming\"")
+    pid = str(cfg["catalog"]["product_id"])
+    if pid and not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,63}", pid):
+        raise ConfigError(f"{where}: catalog.product_id {pid!r} must be 1-64 of a-z 0-9 . _ - (a machine ID, not a name)")
     for pat in cfg["package"]["forbidden"]:
         try:
             re.compile(pat)

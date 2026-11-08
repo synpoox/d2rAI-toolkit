@@ -276,19 +276,19 @@ class PublishDirTests(ReleaseBase):
             pub.publish(target, dist, "1.0.1", "test", log=QUIET)  # the manifest is 1.0.0
         with self.assertRaises(pub.PublishError):
             pub.publish(target, self.tmp / "nowhere", "1.0.0", "test", log=QUIET)
-        man = json.loads((dist / "release-manifest.json").read_text())
+        man = json.loads((dist / "downloader-manifest.json").read_text())
         man["schemaVersion"] = 1
-        (dist / "release-manifest.json").write_text(json.dumps(man))
+        (dist / "downloader-manifest.json").write_text(json.dumps(man))
         with self.assertRaises(pub.PublishError) as e:
             pub.publish(target, dist, "1.0.0", "test", log=QUIET)
         self.assertIn("schemaVersion", str(e.exception))
         man["schemaVersion"] = 2
         man["files"][0]["path"] = "../escape.txt"
-        (dist / "release-manifest.json").write_text(json.dumps(man))
+        (dist / "downloader-manifest.json").write_text(json.dumps(man))
         with self.assertRaises(pub.PublishError):
             pub.publish(target, dist, "1.0.0", "test", log=QUIET)
         man["files"][0]["path"] = "ok.txt"
-        (dist / "release-manifest.json").write_text(json.dumps(man))
+        (dist / "downloader-manifest.json").write_text(json.dumps(man))
         (dist / "MyMod-1.0.0.7z").write_bytes(b"not the archive")
         with self.assertRaises(pub.PublishError) as e:
             pub.publish(target, dist, "1.0.0", "test", log=QUIET)

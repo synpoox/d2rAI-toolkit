@@ -94,3 +94,17 @@ forgejo_url = "https://forge.example.com"
 forgejo = "your-name/your-mod"
 forgejo_token_env = "MODKIT_FORGEJO_TOKEN"
 forgejo_token_file = "~/.d2r-modkit/forgejo_token"
+
+# Schema 3 for the Resurrected launcher: with product_id set, package_release.py also writes release-manifest.json and
+# feed.json (validated against the launcher's rules), and `github_release.py --assets dist` publishes them to
+# repos.github as a draft first, then public. Files in package.preserve are shipped_default, every other file is managed.
+[catalog]
+product_id = ""                            # e.g. "pd2r": a stable machine ID, never a display name
+min_launcher_version = "0.1.0"
+loader_versions = []                       # allowed D2RLoader versions; [] = [d2rloader.version]
+required_settings = []                     # e.g. [{file = "d2rloader/config/d2rloader.toml", key = "d2rcore.save_format.mode", value = "extended"}]
+save_breaking = false                      # true when characters of the previous release may not load ...
+incompatibility_notice = ""                # ... and then this text, shown before updating
+upcoming = []                              # other product IDs the feed lists as upcoming, e.g. ["project-09"]
+game_exe = ""                              # the real D2R.exe the release was tested with (or --game-exe)
+# loader_save_format = {file = "d2rloader/config/d2rloader.toml", key = "...", value = "..."}   # optional

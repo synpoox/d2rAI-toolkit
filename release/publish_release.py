@@ -79,7 +79,8 @@ OBJECTS_BASE = "objects/"
 INCOMING = release_config.DEFAULTS["site"]["incoming"]  # relative to the site root, next to it, not served
 LAUNCHER_NAME = release_config.DEFAULTS["downloader"]["exe_name"]  # the downloader's file name (downloader.exe_name)
 LAUNCHER_DIR = "downloader"  # <site>/downloader/<v>/<exe>
-MANIFEST_NAME = "release-manifest.json"
+MANIFEST_NAME = "release-manifest.json"  # on the host
+LOCAL_MANIFEST_NAME = "downloader-manifest.json"  # in dist/; release-manifest.json there is the launcher's schema 3
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$")
 SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 PACK_RE = re.compile(r"^objects-[0-9a-f]{16}\.7z$")
@@ -532,7 +533,7 @@ def link_or_copy(src: Path, dest: Path) -> str:
 
 # ------------------------------------------------------------------------------------------------------------- publishing
 def load_manifest(dist: Path, version: str, allow_incomplete: bool, channel):
-    man_path = dist / MANIFEST_NAME
+    man_path = dist / LOCAL_MANIFEST_NAME
     if not man_path.is_file():
         raise PublishError(f"{man_path} not found: run release/package_release.py first")
     man = json.loads(man_path.read_text("utf-8"))
