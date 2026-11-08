@@ -61,7 +61,7 @@ class NexusTests(unittest.TestCase):
                             "--plugin", str(self.dll), "--nexus", "--out", str(out)], capture_output=True, text=True, cwd=self.tmp)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertEqual(sorted(p.name for p in out.iterdir()),
-                         ["MyMod-1.2.3-nexus.7z", "MyMod-1.2.3.7z", "RELEASE_NOTES-1.2.3.md", "SHA256SUMS", "release-manifest.json"])
+                         ["MyMod-1.2.3-nexus.7z", "MyMod-1.2.3.7z", "RELEASE_NOTES-1.2.3.md", "SHA256SUMS", "downloader-manifest.json"])
         nexus = out / "MyMod-1.2.3-nexus.7z"
         listing = subprocess.run([SEVEN, "l", "-slt", str(nexus)], capture_output=True, text=True).stdout
         paths = [line[7:].replace("\\", "/") for line in listing.splitlines() if line.startswith("Path = ")][1:]  # [0]: the 7z
@@ -69,7 +69,7 @@ class NexusTests(unittest.TestCase):
         self.assertTrue(all(p.split("/")[0] == "MyMod" for p in paths), paths)
         main = subprocess.run([SEVEN, "l", "-slt", str(out / "MyMod-1.2.3.7z")], capture_output=True, text=True).stdout
         self.assertNotIn("INSTALL.txt", main)
-        man = json.loads((out / "release-manifest.json").read_text())
+        man = json.loads((out / "downloader-manifest.json").read_text())
         self.assertNotIn("INSTALL.txt", [f["path"] for f in man["files"]])
         sums = (out / "SHA256SUMS").read_text().splitlines()
         self.assertIn(f"{pr.sha256(nexus)}  {nexus.name}", sums)

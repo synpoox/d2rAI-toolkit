@@ -225,8 +225,8 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         seven = out / "MyMod-1.2.3.7z"
         self.assertEqual(sorted(p.name for p in out.iterdir()),
-                         ["MyMod-1.2.3.7z", "RELEASE_NOTES-1.2.3.md", "SHA256SUMS", "release-manifest.json"])
-        man = json.loads((out / "release-manifest.json").read_text())
+                         ["MyMod-1.2.3.7z", "RELEASE_NOTES-1.2.3.md", "SHA256SUMS", "downloader-manifest.json"])
+        man = json.loads((out / "downloader-manifest.json").read_text())
         self.assertEqual(man["schemaVersion"], 2)
         self.assertEqual(man["pluginVersion"], "1.2.3")
         self.assertEqual(man["archive"], {"format": "7z", "name": seven.name, "size": seven.stat().st_size, "sha256": pr.sha256(seven)})
@@ -236,7 +236,7 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(len(sums), 3)
         self.assertFalse((out / "stage").exists())
         self.assertIn("as 7z", r.stdout)
-        self.assertNotIn(b"\r", (out / "release-manifest.json").read_bytes(), "LF line endings")
+        self.assertNotIn(b"\r", (out / "downloader-manifest.json").read_bytes(), "LF line endings")
 
     @needs_7z
     def test_main_refuses_bad_input_before_writing(self):
@@ -263,7 +263,7 @@ class PackageTests(unittest.TestCase):
         r = self.run_main("--mod-dir", str(self.mod()), "--version", "1.2.3-rc1", "--incomplete", "--out", str(out))
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertEqual([p.name for p in out.glob("*.7z")], ["MyMod-1.2.3-rc1-incomplete.7z"])
-        man = json.loads((out / "release-manifest.json").read_text())
+        man = json.loads((out / "downloader-manifest.json").read_text())
         self.assertFalse(man["complete"])
         self.assertEqual(man["archive"]["name"], "MyMod-1.2.3-rc1-incomplete.7z")
 
@@ -281,7 +281,7 @@ class PackageTests(unittest.TestCase):
         (mod / "x.secret").unlink()
         r = self.run_main("--config", str(conf), "--mod-dir", str(mod), "--version", "2.0.0", "--out", str(out))
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        man = json.loads((out / "release-manifest.json").read_text())
+        man = json.loads((out / "downloader-manifest.json").read_text())
         self.assertEqual((man["name"], man["modFolder"], man["archive"]["name"]), ("Other Mod", "OtherMod", "OtherMod-2.0.0.7z"))
 
 

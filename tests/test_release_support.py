@@ -83,7 +83,7 @@ class ReleaseBase(unittest.TestCase):
         seven = out / pr.archive_name(self.cfg, version, complete)
         pr.write_7z(mod, seven, self.seven)
         man = pr.manifest(self.cfg, version, pr.file_list(mod), seven, complete, pr.empty_dirs(mod))
-        (out / "release-manifest.json").write_text(json.dumps(man, indent=1) + "\n", encoding="utf-8")
+        (out / "downloader-manifest.json").write_text(json.dumps(man, indent=1) + "\n", encoding="utf-8")
         (out / f"RELEASE_NOTES-{version}.md").write_bytes(f"notes {version}\n".encode())
         shutil.rmtree(out / "stage")
         return out

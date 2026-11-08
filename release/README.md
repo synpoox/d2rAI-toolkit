@@ -4,12 +4,14 @@ What each file is
 -----------------
 release.example.toml   The one config every script reads. Copy it to release.toml and edit it. Every key is documented in it.
 release_config.py      Loads the config. `py -3 release/release_config.py get site.url`, `... check`.
-package_release.py     Mod folder -> dist/: <Folder>-<v>.7z, release-manifest.json (schema 2), notes, SHA256SUMS.
+package_release.py     Mod folder -> dist/: <Folder>-<v>.7z, downloader-manifest.json (schema 2), notes, SHA256SUMS;
+                       with [catalog] also release-manifest.json + feed.json (schema 3, the Resurrected launcher).
                        Also importable: find_7z, write_7z, file_list, empty_dirs, forbidden_files, sha256.
 publish_release.py     publish | promote | list | gc | verify. Uploads only what the host lacks, to a dir: or sftp:// target.
 dl_ingest.py           Runs ON the download host. Checks an upload, builds the player 7z, writes the channel file last.
 dl_sync.py             Runs ON the download host. Mirrors the site to an S3-compatible bucket with rclone.
 github_release.py      Creates or updates a GitHub / Forgejo release page from the changelog (REST, token from env or file).
+                       --assets dist: publishes the schema 3 release with gh, draft first, verified, then public.
 release.sh             The whole release in one go: package, publish to test, verify over HTTPS, promote, release pages.
 cloudflare-worker.js   Serves the bucket under your own domain. See CDN.md.
 CDN.md                 Setting up the bucket, rclone, the sync units and the Worker.

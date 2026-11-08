@@ -21,6 +21,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -180,6 +181,165 @@ def run(cfg, version, service="github", commit=None, downloader=None, downloader
     return url
 
 
+# ------------------------------------------------------------------- --assets: the launcher's release (schema 3, via gh)
+VALIDATOR_ENV = "RESURRECTED_VALIDATE_RELEASE"  # optional: the launcher's validate-release <manifest> <feed> [<archive>]
+
+
+class PublishFailed(SystemExit):
+    pass
+
+
+def read_sums(path: Path) -> dict:
+    """SHA256SUMS (sha256sum format) -> {name: sha256}."""
+    out = {}
+    for line in path.read_text("utf-8").splitlines():
+        sha, _, name = line.partition("  ")
+        if name:
+            out[name.lstrip("*")] = sha
+    return out
+
+
+def check_assets(folder: Path, archive: str, sevenzip=None) -> list:
+    """Problems of the release assets in `folder`: each must match SHA256SUMS, the manifest and feed must pass every
+    launcher rule (the 7z's listing included), and the launcher's own validator when VALIDATOR_ENV names one."""
+    import package_release as pr
+    folder = Path(folder)
+    names = [archive, pr.CATALOG_MANIFEST, pr.FEED]
+    if not (folder / "SHA256SUMS").is_file():
+        return [f"no SHA256SUMS in {folder}"]
+    sums = read_sums(folder / "SHA256SUMS")
+    bad = [f"{n}: missing" for n in names if not (folder / n).is_file()]
+    if bad:
+        return bad
+    bad = [f"{n}: sha256 does not match SHA256SUMS" for n in names if sums.get(n) != pr.sha256(folder / n)]
+    if set(sums) != set(names):
+        bad.append(f"SHA256SUMS lists {sorted(sums)}, the release assets are {sorted(names)}")
+    man_bytes, feed_bytes = (folder / pr.CATALOG_MANIFEST).read_bytes(), (folder / pr.FEED).read_bytes()
+    try:
+        man, feed = json.loads(man_bytes), json.loads(feed_bytes)
+    except ValueError as e:
+        return bad + [f"not JSON: {e}"]
+    bad += pr.catalog_problems(man, feed, man_bytes, folder / archive, feed_bytes, sevenzip)
+    exe = os.environ.get(VALIDATOR_ENV)
+    if exe and not bad:
+        try:
+            r = subprocess.run([exe, str(folder / pr.CATALOG_MANIFEST), str(folder / pr.FEED), str(folder / archive)],
+                               capture_output=True, text=True, errors="replace")
+        except OSError as e:
+            return bad + [f"{VALIDATOR_ENV} ({exe}) does not run: {e}"]
+        if r.returncode != 0:
+            bad.append(f"{VALIDATOR_ENV} ({exe}) refused it: {(r.stdout + r.stderr).strip()[-600:]}")
+    return bad
+
+
+def assets_body(cfg: dict, man: dict, archive: str) -> str:
+    builds = ", ".join(g["build"] for g in man["compatibility"]["game_builds"])
+    return (f"{man['release_notes'].strip()}\n\n**Install or update:** in the Resurrected launcher, or unpack `{archive}` into your "
+            f"D2R `mods` folder.\n\nNeeds Diablo II: Resurrected {builds} and D2RLoader "
+            f"{', '.join(man['compatibility']['loader_versions'])} (https://d2rloader.net/download.html).\n")
+
+
+def gh_runner(args):
+    try:
+        return subprocess.run(["gh", *args], capture_output=True, text=True, errors="replace")
+    except OSError as e:
+        raise PublishFailed(f"cannot run gh (GitHub CLI, https://cli.github.com): {e}")
+
+
+def latest_tag(gh, repo):
+    """The tag of the repository's current Latest release, "" when it has none."""
+    r = gh(["release", "view", "-R", repo, "--json", "tagName", "-q", ".tagName"])
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def publish_assets(cfg: dict, version: str, dist, commit=None, dry_run=False, gh=gh_runner, sevenzip=None, log=print,
+                   skip_launcher_validation=False, allow_older=False) -> str:
+    """Publish dist/ (package_release.py with [catalog]) as the GitHub release v<version>, draft first:
+    create the draft, upload the 7z, release-manifest.json, feed.json and SHA256SUMS, download them back and check them
+    (SHA256SUMS, every launcher rule, $RESURRECTED_VALIDATE_RELEASE), and only then make it public and Latest, which
+    moves releases/latest/download/feed.json to it. Any failure leaves the draft and raises PublishFailed (exit 1).
+    A release that is already public is never touched: a published release ID never changes. A real run needs the
+    launcher's validator ($RESURRECTED_VALIDATE_RELEASE) unless skip_launcher_validation, and refuses a version older
+    than the current Latest unless allow_older. The dry run makes the same read-only gh checks."""
+    import package_release as pr
+    version, dist, repo = version.lstrip("v"), Path(dist), cfg["repos"]["github"]
+    tag = pr.release_tag(version)
+    if not (dist / pr.CATALOG_MANIFEST).is_file():
+        raise PublishFailed(f"no {dist / pr.CATALOG_MANIFEST}: package with [catalog] set (an --incomplete build has none)")
+    man = json.loads((dist / pr.CATALOG_MANIFEST).read_bytes())
+    archive = str(man.get("archive", {}).get("url", "")).rsplit("/", 1)[-1]
+    if man.get("archive", {}).get("url") != pr.asset_url(cfg, version, archive):
+        raise PublishFailed(f"archive.url {man.get('archive', {}).get('url')!r} is not an asset of {repo} {tag}")
+    if man.get("release_id") != f"{man.get('product_id')}-{version}":
+        raise PublishFailed(f"{pr.CATALOG_MANIFEST} is {man.get('release_id')!r}, not version {version}")
+    if not dry_run and not skip_launcher_validation and not os.environ.get(VALIDATOR_ENV):
+        raise PublishFailed(f"set {VALIDATOR_ENV} to the launcher's validate-release executable (docs/release.md), or pass "
+                            "--skip-launcher-validation")
+    problems = check_assets(dist, archive, sevenzip)
+    if problems:
+        raise PublishFailed("refusing to publish:\n  " + "\n  ".join(problems[:40]))
+    if not os.environ.get(VALIDATOR_ENV):
+        log(f"note: {VALIDATOR_ENV} is not set: the launcher's own validator did not run")
+    seen = gh(["release", "view", tag, "-R", repo, "--json", "isDraft", "-q", ".isDraft"])
+    if seen.returncode == 0 and seen.stdout.strip() != "true":
+        raise PublishFailed(f"{repo} already has a public release {tag}: a published release never changes; "
+                            "package a new version")
+    latest = latest_tag(gh, repo)
+    from publish_release import version_key
+    try:
+        older = bool(latest) and version_key(version) < version_key(latest.lstrip("v"))
+    except AttributeError:  # a Latest tag that is not a version
+        older = True
+    if older and not allow_older:
+        raise PublishFailed(f"{tag} is older than the current Latest {latest}; making it Latest moves the launcher's feed "
+                            "back to it. Pass --allow-older if that is meant")
+    assets = [str(dist / n) for n in (archive, pr.CATALOG_MANIFEST, pr.FEED, "SHA256SUMS")]
+    with tempfile.TemporaryDirectory() as tmp:
+        body = Path(tmp) / "body.md"
+        body.write_text(assets_body(cfg, man, archive), encoding="utf-8")
+        # no --prerelease: releases/latest (the launcher's feed URL) skips pre-releases
+        create = ["release", "create", tag, "-R", repo, "--draft", "--title", f"{cfg['mod']['name']} {version}",
+                  "--notes-file", str(body)] + (["--target", commit] if commit else [])
+        upload = ["release", "upload", tag, *assets, "-R", repo, "--clobber"]
+        back = Path(tmp) / "back"
+        download = ["release", "download", tag, "-R", repo, "-D", str(back),
+                    *[x for n in (archive, pr.CATALOG_MANIFEST, pr.FEED, "SHA256SUMS") for x in ("-p", n)]]
+        public = ["release", "edit", tag, "-R", repo, "--draft=false", "--latest"]
+        steps = ([] if seen.returncode == 0 else [create]) + [upload, download, public]
+        if dry_run:
+            log(f"{tag}: " + ("an existing draft would be reused" if seen.returncode == 0 else "no release yet")
+                + f"; current Latest: {latest or 'none'}")
+            for c in steps:
+                log("would run: gh " + subprocess.list2cmdline(c))
+            log(f"dry run: {dist} passes every check; nothing was sent")
+            return ""
+
+        def run(args, what):
+            r = gh(args)
+            if r.returncode != 0:
+                raise PublishFailed(f"gh {what} failed ({r.returncode}): {(r.stdout + r.stderr).strip()[-600:]}\n"
+                                    f"{tag} stays a draft (if it was created): run again to reuse it, or delete it")
+            return r
+
+        if seen.returncode == 0:
+            log(f"{tag}: reusing the existing draft")
+        else:
+            run(create, "release create")
+            log(f"{tag}: draft created on {repo}")
+        run(upload, "release upload")
+        log(f"{tag}: uploaded {len(assets)} assets; downloading them back")
+        run(download, "release download")
+        problems = check_assets(back, archive, sevenzip)
+        if not problems and (back / "SHA256SUMS").read_bytes() != (dist / "SHA256SUMS").read_bytes():
+            problems = ["the downloaded SHA256SUMS is not the one in dist/"]
+        if problems:
+            raise PublishFailed(f"the uploaded assets of {tag} are wrong; it stays a draft:\n  " + "\n  ".join(problems[:40]))
+        run(public, "release edit --draft=false --latest")
+    url = f"https://github.com/{repo}/releases/tag/{tag}"
+    log(f"{url} is public and Latest; the feed is https://github.com/{repo}/releases/latest/download/{pr.FEED}")
+    return url
+
+
 def main(argv=None) -> int:
     cfg = release_config.early_config(argv)
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -191,7 +351,23 @@ def main(argv=None) -> int:
     ap.add_argument("--downloader-version", default="", help="its version, for the link (default: read from the exe)")
     ap.add_argument("--latest", action="store_true", help="mark as the latest release (GitHub)")
     ap.add_argument("--dry-run", action="store_true", help="print the tag and the body; no token needed, nothing is sent")
+    ap.add_argument("--assets", type=Path, metavar="DIST",
+                    help="publish DIST's schema 3 release for the launcher with gh: draft, upload, verify, then public")
+    ap.add_argument("--skip-launcher-validation", action="store_true",
+                    help=f"--assets without the launcher's validate-release (${VALIDATOR_ENV})")
+    ap.add_argument("--allow-older", action="store_true", help="--assets: allow a version older than the current Latest to become Latest")
     a = ap.parse_args(argv)
+    if a.assets:
+        if a.service != "github":
+            print("error: --assets publishes to GitHub only", file=sys.stderr)
+            return 1
+        try:
+            publish_assets(cfg, a.version, a.assets, a.commit, a.dry_run,
+                           skip_launcher_validation=a.skip_launcher_validation, allow_older=a.allow_older)
+        except PublishFailed as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+        return 0
     commit = a.commit
     if not commit and not a.dry_run:
         r = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True)

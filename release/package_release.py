@@ -6,14 +6,17 @@ and it writes into dist/:
   <Folder>-<version>.7z        the archive for manual installs: solid LZMA2 7z (-mx7) with the mod folder at the top,
                                no time stamps and fixed file times, so it is reproducible with a given 7-Zip build.
                                7-Zip is required; without it the run stops before it changes anything.
-  release-manifest.json        schemaVersion 2: the release's metadata and every file with size and sha256
-                               (docs/release.md "Release manifest")
+  downloader-manifest.json     schemaVersion 2 for the self-hosted downloader: the release's metadata and every file with
+                               size and sha256 (docs/release.md "Release manifest"); publish_release.py uploads it to the
+                               download host as releases/<v>/release-manifest.json
+  release-manifest.json        with [catalog] set: schema 3 for the Resurrected launcher (see "Schema 3" below)
+  feed.json                    with [catalog] set: the schema 3 feed that recommends this release
   RELEASE_NOTES-<version>.md   a skeleton to fill in: requirements and install steps
-  SHA256SUMS                   sha256 of the 7z(s), the manifest and the notes (sha256sum -c format)
+  SHA256SUMS                   sha256 of the 7z(s), the manifest and the notes; with [catalog] only of the GitHub assets (7z, manifest, feed)
   <Folder>-<version>-nexus.7z  with --nexus: the same mod folder plus <Folder>/INSTALL.txt (install steps for players who
                                download by hand or with a mod manager), for an upload to Nexus Mods (docs/distribution.md)
 
-release-manifest.json, schemaVersion 2 (the publisher adds objectsBase and launcher, the server adds archive.path):
+downloader-manifest.json, schemaVersion 2 (the publisher adds objectsBase and launcher, the server adds archive.path):
 
   schemaVersion  2                         name         mod.name              version   as given
   pluginVersion  --plugin-version (opt.)   released     date, SOURCE_DATE_EPOCH honoured
@@ -27,11 +30,20 @@ release-manifest.json, schemaVersion 2 (the publisher adds objectsBase and launc
   files          [{path, size, sha256}] sorted by path   path is relative to the mod folder, "/" separators
   launcherMin    downloader.min_version (opt.)           older downloaders are told to update first
 
+Schema 3 (release-manifest.json and feed.json, written only when catalog.product_id is set; the wire format is the
+launcher's docs/specs/release-manifest.md). Everything is checked against the launcher's rules before a file is written,
+including the 7z's own entry list against files + empty_dirs; one problem and the run stops with nothing written. The
+archive URL is https://github.com/<repos.github>/releases/download/v<version>/<7z>, so publish with
+`github_release.py --assets dist` (draft first, verified, then public). Inputs: the [catalog] config, --game-exe (the
+real D2R.exe the release was tested with: its size and sha256 go in compatibility.game_builds) and --notes (the patch
+notes text; default: the version's section of repos.changelog). An --incomplete build writes neither file.
+
 Nothing else goes in: no test harness files, saves or logs (the run stops if one is in the folder; the patterns are
 package.forbidden in the config). The folder you give is never changed: it is copied to dist/stage/ first.
 
   py -3 release/package_release.py --mod-dir path/to/MyMod --version 1.0.0 [--config release.toml]
         [--plugin build/mymod-core.dll [--plugin-version 1.0.0]] [--game-extract DIR] [--incomplete] [--nexus] [--out dist]
+        [--game-exe "C:/Program Files (x86)/Diablo II Resurrected/D2R.exe"] [--notes notes.md]
 
 --plugin DLL        copy a plugin DLL into <mod>/<package.plugin_dir>/ (it is checked: a DLL that contains one of
                     package.plugin_forbidden_strings is refused, and with --plugin-version it must carry that version text)
@@ -64,6 +76,13 @@ SEVENZ_ARGS = ["a", "-t7z", "-m0=lzma2", "-mx=7", "-ms=on", "-mmt=on", "-mtm=off
 SEVENZ_NAMES = ("7z", "7zz", "7za", "7zr")
 NO_7Z = ("no 7-Zip found (Program Files\\7-Zip\\7z.exe, or 7z / 7zz / 7za / 7zr on PATH). A release is a .7z only: install "
          "7-Zip (https://www.7-zip.org; Debian / Ubuntu: apt install 7zip) and run again")
+
+DOWNLOADER_MANIFEST = "downloader-manifest.json"  # schema 2; the host's name for it stays release-manifest.json
+CATALOG_MANIFEST = "release-manifest.json"  # schema 3, the launcher's asset name
+FEED = "feed.json"
+CATALOG_SCHEMA = 3
+EMPTY_SHA256 = hashlib.sha256(b"").hexdigest()
+LOADER_PAGE = "https://d2rloader.net/download.html"  # the launcher links here; schema 3 carries no installer pin
 
 FORBIDDEN = re.compile("|".join(f"(?:{p})" for p in release_config.DEFAULT_FORBIDDEN), re.I)
 
@@ -182,6 +201,13 @@ def archive_name(cfg: dict, version: str, complete=True) -> str:
     return f"{cfg['mod']['folder']}-{version}{'' if complete else '-incomplete'}.7z"
 
 
+def released() -> str:
+    """The packaging date, YYYY-MM-DD; SOURCE_DATE_EPOCH honoured."""
+    epoch = os.environ.get("SOURCE_DATE_EPOCH")
+    day = datetime.datetime.fromtimestamp(int(epoch), datetime.timezone.utc).date() if epoch else datetime.date.today()
+    return day.isoformat()
+
+
 def manifest(cfg: dict, version: str, files: list, archive_path: Path, complete: bool, dirs=(), plugin_version="") -> dict:
     """The release manifest, schemaVersion 2. archive_path: the .7z. The downloader installs from the objects
     (docs/release.md), the 7z is the manual download. publish_release.py adds objectsBase and launcher; the server's
@@ -190,13 +216,11 @@ def manifest(cfg: dict, version: str, files: list, archive_path: Path, complete:
     d2r = {"build": str(game["build"]), "version": game["version"]}
     if game.get("image_timestamp"):
         d2r["imageTimestamp"] = game["image_timestamp"]
-    epoch = os.environ.get("SOURCE_DATE_EPOCH")
-    released = (datetime.datetime.fromtimestamp(int(epoch), datetime.timezone.utc).date() if epoch else datetime.date.today())
     man = {
         "schemaVersion": SCHEMA,
         "name": mod["name"],
         "version": version,
-        "released": released.isoformat(),
+        "released": released(),
         "complete": complete,  # false: an --incomplete build (no game data); not for players
         "d2r": d2r,
         "d2rloader": dict(cfg["d2rloader"]),
@@ -216,6 +240,408 @@ def manifest(cfg: dict, version: str, files: list, archive_path: Path, complete:
     if cfg["downloader"].get("min_version"):
         man["launcherMin"] = cfg["downloader"]["min_version"]
     return man
+
+
+# ------------------------------------------------------------------------------------- schema 3 (the Resurrected launcher)
+def release_tag(version: str) -> str:
+    return f"v{version}"
+
+
+def asset_url(cfg: dict, version: str, name: str) -> str:
+    """Where a GitHub release asset of this version is downloaded from."""
+    return f"https://github.com/{cfg['repos']['github']}/releases/download/{release_tag(version)}/{name}"
+
+
+def release_status(version: str) -> str:
+    """alpha for an -alpha version, beta for any other pre-release (-beta, -rc1), release otherwise."""
+    pre = version.partition("-")[2].lower()
+    return "alpha" if "alpha" in pre else "beta" if pre else "release"
+
+
+def game_build(cfg: dict, exe: Path) -> dict:
+    """compatibility.game_builds entry from the real D2R.exe: its bytes identify the build, not the version label."""
+    major_minor = ".".join(str(cfg["game"]["version"]).split(".")[:2])
+    return {"build": f"{major_minor}.{cfg['game']['build']}", "platform": "windows_x64", "executable": exe.name,
+            "size": exe.stat().st_size, "sha256": sha256(exe)}
+
+
+def setting(s: dict) -> dict:
+    return {"file": s.get("file", ""), "key": s.get("key", ""), "value": s.get("value", "")}
+
+
+def catalog_manifest(cfg: dict, version: str, files: list, archive_path: Path, dirs, game_builds: list, notes: str) -> dict:
+    """The release manifest, schema 3 (the launcher's docs/specs/release-manifest.md). Files in package.preserve are
+    shipped_default, every other file is managed. No loader installer pin: the launcher links to LOADER_PAGE."""
+    mod, cat = cfg["mod"], cfg["catalog"]
+    preserve = {p.upper() for p in cfg["package"]["preserve"]}
+    breaking = bool(cat["save_breaking"])
+    saves = {"folder": str(mod["save_folder"]).strip("/"), "save_breaking": breaking,
+             "incompatibility_notice": (cat["incompatibility_notice"] or "") if breaking else None}
+    if cat.get("loader_save_format"):
+        saves["loader_save_format"] = setting(cat["loader_save_format"])
+    return {
+        "schema_version": CATALOG_SCHEMA,
+        "product_id": cat["product_id"],
+        "release_id": f"{cat['product_id']}-{version}",
+        "display_version": version,
+        "release_date": released(),
+        "status": release_status(version),
+        "release_notes": notes,
+        "min_launcher_version": cat["min_launcher_version"],
+        "install_root": f"mods/{mod['folder']}",
+        "archive": {"url": asset_url(cfg, version, archive_path.name), "format": "7z", "size": archive_path.stat().st_size,
+                    "sha256": sha256(archive_path), "file_count": len(files), "total_size": sum(f["size"] for f in files)},
+        "files": [{**f, "ownership": "shipped_default" if f["path"].upper() in preserve else "managed"} for f in files],
+        "empty_dirs": list(dirs),
+        "compatibility": {
+            "game_builds": game_builds,
+            "loader_versions": list(cat["loader_versions"] or [cfg["d2rloader"]["version"]]),
+            "required_settings": [setting(s) for s in cat["required_settings"]],
+        },
+        "saves": saves,
+    }
+
+
+def catalog_feed(cfg: dict, man: dict, man_bytes: bytes, manifest_url: str) -> dict:
+    """feed.json, schema 3: this product recommends this release; catalog.upcoming are listed without artifacts."""
+    products = [{"product_id": man["product_id"], "availability": "available",
+                 "recommended": {"release_id": man["release_id"], "manifest_url": manifest_url, "manifest_size": len(man_bytes),
+                                 "manifest_sha256": hashlib.sha256(man_bytes).hexdigest()}}]
+    products += [{"product_id": p, "availability": "upcoming"} for p in cfg["catalog"]["upcoming"]]
+    return {"schema_version": CATALOG_SCHEMA, "products": products}
+
+
+def json_bytes(obj) -> bytes:
+    return (json.dumps(obj, indent=1, ensure_ascii=False) + "\n").encode("utf-8")
+
+
+def archive_entries(archive: Path, sevenzip=None):
+    """The 7z's entries below its top folder: ({path: size} of the files, {path} of the folders, [entries outside it],
+    the top folder's name). Raises RuntimeError when 7-Zip cannot list it."""
+    exe = sevenzip or find_7z()
+    if not exe:
+        raise RuntimeError(NO_7Z)
+    r = subprocess.run([exe, "l", "-slt", str(archive)], capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if r.returncode != 0 or "\n----------" not in r.stdout.replace("\r", ""):
+        raise RuntimeError(f"7-Zip cannot list {archive} ({r.returncode}): {(r.stdout + r.stderr).strip()[-300:]}")
+    files, folders, top, outside = {}, set(), None, []
+    for block in r.stdout.replace("\r", "").split("\n----------", 1)[1].split("\n\n"):
+        props = dict(ln.split(" = ", 1) for ln in block.splitlines() if " = " in ln)
+        if "Path" not in props:
+            continue
+        path = props["Path"].replace("\\", "/")
+        is_dir = props.get("Folder") == "+" or "D" in props.get("Attributes", "").split(" ")[0]
+        head, _, rel = path.partition("/")
+        top = top or head
+        if head != top:
+            outside.append(path)
+        elif rel and is_dir:
+            folders.add(rel)
+        elif rel:
+            files[rel] = int(props.get("Size") or 0)
+    return files, folders, outside, top
+
+
+# The launcher's rules (src-tauri/src/catalog/ and contract/inventory.rs), so nothing it would reject is written.
+IDENT_RE = re.compile(r"[a-z0-9][a-z0-9._-]{0,63}")
+SHA_RE = re.compile(r"[0-9a-f]{64}")
+VERSION_RE = re.compile(r"\d+\.\d+\.\d+")
+SEMVER_RE = re.compile(r"\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?")
+DATE_RE = re.compile(r"\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])")
+EXECUTABLE_KEYS = ("command", "cmd", "script", "execute", "shell", "hook", "argument")
+RESERVED = {"CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"}
+MAX_MANIFEST = 8 << 20  # the launcher's read limits
+MAX_FEED = 1 << 20
+MANIFEST_KEYS = {"schema_version", "product_id", "release_id", "display_version", "release_date", "status", "release_notes",
+                 "min_launcher_version", "install_root", "archive", "files", "empty_dirs", "compatibility", "saves"}
+
+
+def path_problem(p) -> str:
+    """Why the launcher's RelativePath would refuse `p` ("" when it is fine)."""
+    if not isinstance(p, str) or not p:
+        return "empty"
+    if "\\" in p or p.startswith("/") or ":" in p:
+        return "backslash, absolute or drive path"
+    for c in p.split("/"):
+        if c in ("", ".", ".."):
+            return "empty, . or .. component"
+        if any(ch < " " or ch in '<>"|?*' for ch in c):
+            return "forbidden character"
+        if c[-1] in ". ":
+            return "trailing dot or space"
+        stem = c.split(".")[0].rstrip().upper()
+        if stem in RESERVED or re.fullmatch(r"(COM|LPT)[0-9¹²³]", stem):
+            return "Windows device name"
+        if re.search(r"~\d", c):
+            return "8.3 short-name alias"
+    return ""
+
+
+def url_problem(u) -> str:
+    """Why the launcher's HTTPS check would refuse `u` ("" when it is fine)."""
+    if not isinstance(u, str) or not u.startswith("https://"):
+        return "not https://"
+    rest = u[len("https://"):]
+    m = re.search(r"[/?#]", rest)
+    host, path = (rest[:m.start()], rest[m.start():]) if m else (rest, "")
+    host = host.lower()
+    if (not host or re.search(r"[@:\[\]]", host) or "." not in host or re.fullmatch(r"[\d.]+", host) or host == "localhost"
+            or host.endswith(".localhost") or not re.fullmatch(r"[a-z0-9.-]+", host)):
+        return "not a public DNS host name (no port, IP, user info or localhost)"
+    if any(ch.isspace() or ord(ch) < 32 or 127 <= ord(ch) < 160 for ch in u):
+        return "whitespace or control character"
+    path = re.split(r"[?#]", path)[0]
+    if "%2e" in path.lower() or any(s in (".", "..") for s in path.split("/")):
+        return "dot segment in the path"
+    return ""
+
+
+def executable_keys(v, where="") -> list:
+    if isinstance(v, dict):
+        return [f"{where}{k}" for k in v if any(b in k.lower() for b in EXECUTABLE_KEYS)] + \
+            [x for k, sub in v.items() for x in executable_keys(sub, f"{where}{k}.")]
+    if isinstance(v, list):
+        return [x for i, sub in enumerate(v) for x in executable_keys(sub, f"{where}[{i}].")]
+    return []
+
+
+def verification_problem(field, size, sha, allow_empty=False) -> str:
+    """Sizes and hashes must be real: present, not zero (except an empty file with the empty hash), not all zeros."""
+    if not isinstance(sha, str) or not SHA_RE.fullmatch(sha) or set(sha) == {"0"}:
+        return f"{field}.sha256 {sha!r} is missing, not 64 lower-case hex digits or a placeholder"
+    if not isinstance(size, int) or isinstance(size, bool) or size < 0:
+        return f"{field}.size {size!r} is missing"
+    if size == 0 and not allow_empty:
+        return f"{field}.size is 0"
+    if (size == 0) != (sha == EMPTY_SHA256):
+        return f"{field}: size {size} with sha256 {sha[:12]}... is a placeholder (only an empty file has the empty hash)"
+    return ""
+
+
+def _setting_problems(where, s, shipped) -> list:
+    if not isinstance(s, dict) or set(s) != {"file", "key", "value"}:
+        return [f"{where}: must be {{file, key, value}}"]
+    bad = []
+    if path_problem(s["file"]) or str(s["file"]).upper() not in shipped:
+        bad.append(f"{where}.file {s['file']!r} is not a shipped_default file of this release (package.preserve)")
+    if not str(s["key"]).strip():
+        bad.append(f"{where}.key is empty")
+    if not isinstance(s["value"], str):
+        bad.append(f"{where}.value must be text")
+    return bad
+
+
+def _inventory_problems(files, dirs) -> tuple:
+    """(problems, the shipped_default paths upper-cased) of files[] and empty_dirs."""
+    bad, shipped = [], set()
+    if not files:
+        bad.append("files is empty")
+    for i, f in enumerate(files):
+        where = f"files[{i}] {f.get('path')!r}"
+        if set(f) != {"path", "size", "sha256", "ownership"}:
+            bad.append(f"{where}: keys {sorted(f)}")
+        if path_problem(f.get("path")):
+            bad.append(f"{where}: {path_problem(f.get('path'))}")
+        v = verification_problem(where, f.get("size"), f.get("sha256"), allow_empty=True)
+        if v:
+            bad.append(v)
+        if f.get("ownership") not in ("managed", "shipped_default"):
+            bad.append(f"{where}: ownership {f.get('ownership')!r} is not managed or shipped_default")
+        elif f["ownership"] == "shipped_default":
+            shipped.add(str(f.get("path")).upper())
+    bad += [f"empty_dirs {d!r}: {path_problem(d)}" for d in dirs if path_problem(d)]
+    folded = [str(f.get("path")).upper() for f in files] + [str(d).upper() for d in dirs]
+    seen, dup = set(), set()
+    for p in folded:
+        (dup if p in seen else seen).add(p)
+    bad += [f"duplicate path (ignoring case): {p}" for p in sorted(dup)]
+    bad += [f"{p} lies under {p[:i]}, which is a file or an empty dir" for p in folded for i in range(len(p))
+            if p[i] == "/" and p[:i] in seen]
+    return bad, shipped
+
+
+def _archive_listing_problems(entries, files, dirs, folder) -> list:
+    in7z, folders, outside, top = entries
+    bad = [f"7z entry outside the top folder: {p}" for p in outside]
+    if top != folder:
+        bad.append(f"the 7z's top folder is {top!r}, install_root names {folder!r}")
+    want = {f.get("path"): f.get("size") for f in files}
+    bad += [f"7z holds {p}, which files does not list" for p in sorted(set(in7z) - set(want))]
+    bad += [f"files lists {p}, which the 7z does not hold" for p in sorted(set(want) - set(in7z))]
+    bad += [f"{p}: {in7z[p]} B in the 7z, {want[p]} in files" for p in sorted(set(in7z) & set(want)) if in7z[p] != want[p]]
+    parents = {q[:i] for q in [*in7z, *folders] for i in range(len(q)) if q[i] == "/"}
+    empty = set(folders) - parents
+    if empty != set(dirs):
+        bad.append(f"the 7z's empty folders {sorted(empty)} are not empty_dirs {sorted(dirs)}")
+    return bad
+
+
+def _feed_problems(feed, man, man_bytes) -> list:
+    bad = []
+    if set(feed) != {"schema_version", "products"} or feed.get("schema_version") != CATALOG_SCHEMA:
+        bad.append(f"feed: must be {{schema_version: {CATALOG_SCHEMA}, products}}")
+    ids = [p.get("product_id") for p in feed.get("products") or []]
+    bad += [f"feed: product_id {i!r} is duplicated or not a machine ID" for i in ids
+            if ids.count(i) > 1 or not IDENT_RE.fullmatch(str(i))]
+    mine = None
+    for p in feed.get("products") or []:
+        if p.get("availability") == "upcoming":
+            if set(p) != {"product_id", "availability"}:
+                bad.append(f"feed: upcoming {p.get('product_id')!r} carries {sorted(p)}")
+        elif p.get("availability") == "available" and set(p) == {"product_id", "availability", "recommended"}:
+            r = p["recommended"]
+            if set(r) != {"release_id", "manifest_url", "manifest_size", "manifest_sha256"}:
+                bad.append(f"feed: recommended keys {sorted(r)}")
+            if url_problem(r.get("manifest_url")):
+                bad.append(f"feed: manifest_url {r.get('manifest_url')!r}: {url_problem(r.get('manifest_url'))}")
+            v = verification_problem("feed manifest", r.get("manifest_size"), r.get("manifest_sha256"))
+            if v:
+                bad.append(v)
+            if p.get("product_id") == man.get("product_id"):
+                mine = r
+        else:
+            bad.append(f"feed: product {p.get('product_id')!r} is neither upcoming nor available with a recommended release")
+    if mine is None:
+        bad.append(f"feed: does not recommend a release of {man.get('product_id')!r}")
+    elif mine.get("release_id") != man.get("release_id"):
+        bad.append(f"feed recommends {mine.get('release_id')!r}, the manifest is {man.get('release_id')!r}")
+    elif man_bytes is not None and (mine.get("manifest_size"), mine.get("manifest_sha256")) != \
+            (len(man_bytes), hashlib.sha256(man_bytes).hexdigest()):
+        bad.append("feed: manifest_size / manifest_sha256 do not match the manifest bytes")
+    return bad
+
+
+def catalog_problems(man: dict, feed: dict = None, man_bytes: bytes = None, archive: Path = None, feed_bytes: bytes = None,
+                     sevenzip=None) -> list:
+    """Everything the launcher would refuse in this manifest, plus the feed and the 7z file itself when given: its size
+    and sha256 against archive.size / archive.sha256, its top folder against install_root, its entries against files +
+    empty_dirs. [] = good."""
+    bad = []
+    add = bad.append
+    if man_bytes is not None and len(man_bytes) > MAX_MANIFEST:
+        add(f"the manifest is {len(man_bytes)} B, over the launcher's {MAX_MANIFEST} B")
+    if feed_bytes is not None and len(feed_bytes) > MAX_FEED:
+        add(f"the feed is {len(feed_bytes)} B, over the launcher's {MAX_FEED} B")
+    if set(man) != MANIFEST_KEYS:
+        add(f"manifest keys: missing {sorted(MANIFEST_KEYS - set(man))}, unknown {sorted(set(man) - MANIFEST_KEYS)}")
+    bad += [f"command, script, hook or argument key: {k}" for k in executable_keys(man) + executable_keys(feed or {})]
+    if man.get("schema_version") != CATALOG_SCHEMA:
+        add(f"schema_version {man.get('schema_version')!r} is not {CATALOG_SCHEMA}")
+    for k in ("product_id", "release_id"):
+        if not IDENT_RE.fullmatch(str(man.get(k, ""))):
+            add(f"{k} {man.get(k)!r} must be 1-64 of a-z 0-9 . _ - starting with a letter or digit")
+    for k in ("display_version", "release_notes"):
+        if not str(man.get(k) or "").strip():
+            add(f"{k} is empty")
+    if not DATE_RE.fullmatch(str(man.get("release_date", ""))):
+        add(f"release_date {man.get('release_date')!r} is not YYYY-MM-DD")
+    if man.get("status") not in ("alpha", "beta", "release"):
+        add(f"status {man.get('status')!r} is not alpha, beta or release")
+    if not VERSION_RE.fullmatch(str(man.get("min_launcher_version", ""))):
+        add(f"min_launcher_version {man.get('min_launcher_version')!r} is not MAJOR.MINOR.PATCH")
+    root = str(man.get("install_root", ""))
+    if path_problem(root) or root.count("/") != 1 or root.split("/")[0].lower() != "mods":
+        add(f"install_root {root!r} must be mods/<folder>")
+
+    files, dirs = man.get("files") or [], man.get("empty_dirs") or []
+    inv, shipped = _inventory_problems(files, dirs)
+    bad += inv
+
+    a = man.get("archive") or {}
+    if set(a) != {"url", "format", "size", "sha256", "file_count", "total_size"}:
+        add(f"archive keys {sorted(a)}")
+    if url_problem(a.get("url")):
+        add(f"archive.url {a.get('url')!r}: {url_problem(a.get('url'))}")
+    if a.get("format") != "7z":
+        add(f"archive.format {a.get('format')!r} is not 7z")
+    v = verification_problem("archive", a.get("size"), a.get("sha256"))
+    if v:
+        add(v)
+    if a.get("file_count") != len(files):
+        add(f"archive.file_count {a.get('file_count')} but files has {len(files)}")
+    total = sum(f["size"] for f in files if isinstance(f.get("size"), int))
+    if a.get("total_size") != total or total >= 1 << 64:
+        add(f"archive.total_size {a.get('total_size')} but the files add up to {total}")
+
+    c = man.get("compatibility") or {}
+    if set(c) != {"game_builds", "loader_versions", "required_settings"}:
+        add(f"compatibility keys {sorted(c)}")
+    if not c.get("game_builds"):
+        add("compatibility.game_builds is empty")
+    for i, g in enumerate(c.get("game_builds") or []):
+        where = f"compatibility.game_builds[{i}]"
+        if set(g) != {"build", "platform", "executable", "size", "sha256"}:
+            add(f"{where}: keys {sorted(g)}")
+        if not str(g.get("build") or "").strip():
+            add(f"{where}.build is empty")
+        if g.get("platform") != "windows_x64":
+            add(f"{where}.platform {g.get('platform')!r} is not windows_x64")
+        if path_problem(g.get("executable")):
+            add(f"{where}.executable {g.get('executable')!r}: {path_problem(g.get('executable'))}")
+        v = verification_problem(where, g.get("size"), g.get("sha256"))
+        if v:
+            add(v)
+    if not c.get("loader_versions"):
+        add("compatibility.loader_versions is empty")
+    bad += [f"loader version {v!r} is not MAJOR.MINOR.PATCH[-prerelease]" for v in c.get("loader_versions") or []
+            if not SEMVER_RE.fullmatch(str(v))]
+    for i, s in enumerate(c.get("required_settings") or []):
+        bad += _setting_problems(f"compatibility.required_settings[{i}]", s, shipped)
+
+    sv = man.get("saves") or {}
+    if not {"folder", "save_breaking", "incompatibility_notice"} <= set(sv) <= \
+            {"folder", "save_breaking", "incompatibility_notice", "loader_save_format"}:
+        add(f"saves keys {sorted(sv)}")
+    if path_problem(sv.get("folder")) or "/" in str(sv.get("folder")):
+        add(f"saves.folder {sv.get('folder')!r} must be one folder name")
+    notice = sv.get("incompatibility_notice")
+    if not isinstance(sv.get("save_breaking"), bool) or sv.get("save_breaking") != (notice is not None) or \
+            (notice is not None and not str(notice).strip()):
+        add("saves.incompatibility_notice must be non-empty text exactly when save_breaking is true, else null")
+    if sv.get("loader_save_format") is not None:
+        bad += _setting_problems("saves.loader_save_format", sv["loader_save_format"], shipped)
+
+    if archive is not None:
+        archive = Path(archive)
+        if not archive.is_file():
+            add(f"no archive at {archive}")
+        else:
+            if archive.stat().st_size != a.get("size") or sha256(archive) != a.get("sha256"):
+                add(f"{archive.name}: its size / sha256 are not archive.size / archive.sha256")
+            try:
+                bad += _archive_listing_problems(archive_entries(archive, sevenzip), files, dirs, root.partition("/")[2])
+            except RuntimeError as e:
+                add(str(e))
+    if feed is not None:
+        bad += _feed_problems(feed, man, man_bytes)
+    return bad
+
+
+def catalog_inputs(cfg: dict, version: str, game_exe=None, notes_file=None) -> tuple:
+    """(game_builds, notes text, problems) for schema 3, checked before the long 7z run."""
+    problems, builds, notes = [], [], ""
+    cat = cfg["catalog"]
+    if not IDENT_RE.fullmatch(str(cat["product_id"])):
+        problems.append(f"catalog.product_id {cat['product_id']!r} must be 1-64 of a-z 0-9 . _ -")
+    repo = str(cfg["repos"]["github"])
+    if "your-name" in repo or not re.fullmatch(r"[\w.-]+/[\w.-]+", repo):
+        problems.append(f"repos.github {repo!r} is not the GitHub repository the release goes to")
+    exe = Path(game_exe or cat["game_exe"] or "-")
+    if not exe.is_file():
+        problems.append("schema 3 needs the real D2R.exe the release was tested with: --game-exe or catalog.game_exe")
+    else:
+        builds = [game_build(cfg, exe)]
+    if notes_file:
+        notes = Path(notes_file).read_text("utf-8").strip()
+    else:
+        from github_release import changelog_section
+        try:
+            notes = changelog_section(Path(cfg["repos"]["changelog"]).read_text("utf-8"), version)
+        except (OSError, SystemExit) as e:
+            problems.append(f"no patch notes: --notes FILE, or a '### {version}' section in {cfg['repos']['changelog']} ({e})")
+    if not notes and not problems:
+        problems.append("the patch notes are empty")
+    return builds, notes, problems
 
 
 UNPACK_7Z = ("Unpack `{archive}` into `<D2R folder>\\mods\\` so that `<D2R folder>\\mods\\{folder}\\{folder}.mpq\\modinfo.json` "
@@ -347,6 +773,8 @@ def main(argv=None) -> int:
     ap.add_argument("--incomplete", action="store_true", help="a package without game data (CI): complete=false, not for players")
     ap.add_argument("--nexus", action="store_true", help="also write <Folder>-<version>-nexus.7z with INSTALL.txt (Nexus Mods)")
     ap.add_argument("--out", type=Path, help=f"output folder (default package.dist = {cfg['package']['dist']})")
+    ap.add_argument("--game-exe", type=Path, help="schema 3: the real D2R.exe the release was tested with (catalog.game_exe)")
+    ap.add_argument("--notes", type=Path, help="schema 3: the patch notes text (default: the version's changelog section)")
     a = ap.parse_args(argv)
 
     version = a.version.lstrip("v")
@@ -371,6 +799,14 @@ def main(argv=None) -> int:
         if problems:
             print("\n".join(problems))
             return 1
+    catalog = bool(cfg["catalog"]["product_id"]) and not a.incomplete  # an --incomplete build is never recommended
+    if catalog:
+        builds, catalog_notes, problems = catalog_inputs(cfg, version, a.game_exe, a.notes)
+        if problems:
+            print("error: schema 3 (catalog):\n  " + "\n  ".join(problems))
+            return 1
+    elif cfg["catalog"]["product_id"]:
+        print("note: --incomplete: no release-manifest.json or feed.json (schema 3) for the launcher")
 
     out = a.out or Path(pkg["dist"])
     out.mkdir(parents=True, exist_ok=True)
@@ -386,8 +822,8 @@ def main(argv=None) -> int:
         return 1
 
     complete = not a.incomplete
-    for old in out.glob(f"{folder}-*.7z"):  # an earlier release must not sit next to this one
-        old.unlink()
+    for old in [*out.glob(f"{folder}-*.7z"), *(out / n for n in (CATALOG_MANIFEST, FEED, DOWNLOADER_MANIFEST, "SHA256SUMS"))]:
+        old.unlink(missing_ok=True)  # an earlier release must not sit next to this one
     seven_path = out / archive_name(cfg, version, complete)
     t7 = time.time()
     try:
@@ -398,6 +834,21 @@ def main(argv=None) -> int:
         return 1
     t7 = time.time() - t7
     files = file_list(mod)
+    dirs = empty_dirs(mod)
+    written = []
+    if catalog:  # every launcher rule, the 7z's own listing included, before anything else is written
+        cman = catalog_manifest(cfg, version, files, seven_path, dirs, builds, catalog_notes)
+        cman_bytes = json_bytes(cman)
+        cfeed = catalog_feed(cfg, cman, cman_bytes, asset_url(cfg, version, CATALOG_MANIFEST))
+        problems = catalog_problems(cman, cfeed, cman_bytes, seven_path, json_bytes(cfeed), sevenzip)
+        if problems:
+            print("error: the launcher would refuse this release; nothing written:\n  " + "\n  ".join(problems[:40]))
+            seven_path.unlink(missing_ok=True)
+            shutil.rmtree(out / "stage", ignore_errors=True)
+            return 1
+        (out / CATALOG_MANIFEST).write_bytes(cman_bytes)
+        (out / FEED).write_bytes(json_bytes(cfeed))
+        written = [out / CATALOG_MANIFEST, out / FEED]
     sums = [seven_path]
     if a.nexus:
         nexus_path = out / nexus_archive_name(cfg, version)
@@ -408,16 +859,19 @@ def main(argv=None) -> int:
             shutil.rmtree(out / "stage", ignore_errors=True)
             return 1
         sums.append(nexus_path)
-    man_path = out / "release-manifest.json"
-    man_path.write_text(json.dumps(manifest(cfg, version, files, seven_path, complete, empty_dirs(mod), a.plugin_version),
+    man_path = out / DOWNLOADER_MANIFEST
+    man_path.write_text(json.dumps(manifest(cfg, version, files, seven_path, complete, dirs, a.plugin_version),
                                    indent=1) + "\n", encoding="utf-8", newline="\n")
     notes = out / f"RELEASE_NOTES-{version}.md"
     notes.write_text(release_notes(cfg, version, seven_path.name), encoding="utf-8", newline="\n")
-    (out / "SHA256SUMS").write_text("".join(f"{sha256(p)}  {p.name}\n" for p in (*sums, man_path, notes)),
+    # with [catalog], SHA256SUMS covers exactly the GitHub release assets (github_release.py --assets uploads those)
+    summed = [seven_path, *written] if catalog else [*sums, man_path, notes]
+    (out / "SHA256SUMS").write_text("".join(f"{sha256(p)}  {p.name}\n" for p in summed),
                                     encoding="utf-8", newline="\n")
     shutil.rmtree(out / "stage")
     print(f"{seven_path.name}: {len(files)} files, {sum(f['size'] for f in files) / 1e6:.0f} MB unpacked, "
-          f"{seven_path.stat().st_size / 1e6:.0f} MB as 7z ({t7:.0f} s); {man_path.name}, {notes.name}, SHA256SUMS"
+          f"{seven_path.stat().st_size / 1e6:.0f} MB as 7z ({t7:.0f} s); "
+          f"{', '.join(p.name for p in (*written, man_path, notes))}, SHA256SUMS"
           f"{', ' + sums[1].name if a.nexus else ''} in {out}")
     return 0
 
