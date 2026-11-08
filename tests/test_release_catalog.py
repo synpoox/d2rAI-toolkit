@@ -540,38 +540,69 @@ class SharedFeedPackageTests(CatalogBase):
 
 
 class SharedGh(FakeGh):
-    """FakeGh for two repositories: the product's (someone/my-mod) and the one whose `catalog` release holds the feed."""
+    """FakeGh for two repositories: the product's (someone/my-mod) and the one whose `catalog` release holds the feed.
 
-    def __init__(self, feed=None, home="false true", **kw):
+    feed: feed.json's bytes on the catalog release (None: not there). published: release-manifest.json's bytes on the
+    public product release (None: the product release is a draft until `release edit` makes it public, and then serves
+    what was uploaded). on_feed_download(n): called before the n-th download of feed.json (1-based), to race."""
+
+    def __init__(self, feed=None, home="false true", published=None, on_feed_download=None, **kw):
         super().__init__(**kw)
-        self.feed, self.home, self.public = feed, home, False
+        self.home, self.published, self.on_feed_download = home, published, on_feed_download
+        self.catalog = {} if feed is None else {"feed.json": feed}
+        self.public = published is not None
+        self.feed_downloads = 0
+
+    @property
+    def feed(self):
+        return self.catalog.get("feed.json")
 
     def __call__(self, args):
         repo = args[args.index("-R") + 1]
         verb = " ".join(args[:2])
+        ok = lambda out="": subprocess.CompletedProcess(args, 0, out, "")  # noqa: E731
         if repo != FEED_REPO:
             if verb == "release edit":
                 self.public = True
             if verb == "release view" and args[2] != "-R" and self.public:
                 self.calls.append(args)
-                return subprocess.CompletedProcess(args, 0, "false", "")
+                return ok("false")
+            if verb == "release download" and self.published is not None:
+                self.calls.append(args)
+                dest = Path(args[args.index("-D") + 1])
+                dest.mkdir(parents=True, exist_ok=True)
+                (dest / "release-manifest.json").write_bytes(self.published)
+                return ok()
             return super().__call__(args)
         self.calls.append(args)
-        ok = lambda out="": subprocess.CompletedProcess(args, 0, out, "")  # noqa: E731
         if verb == "release view":
             return ok(self.home) if self.home else subprocess.CompletedProcess(args, 1, "", "release not found")
         if verb == "release download":
-            if self.feed is None:
+            name = args[args.index("-p") + 1]
+            if name == "feed.json":
+                self.feed_downloads += 1
+                if self.on_feed_download:
+                    self.on_feed_download(self.feed_downloads)
+            if name not in self.catalog:
                 return subprocess.CompletedProcess(args, 1, "", "no assets match the file pattern")
             dest = Path(args[args.index("-D") + 1])
             dest.mkdir(parents=True, exist_ok=True)
-            (dest / "feed.json").write_bytes(self.feed)
+            (dest / name).write_bytes(self.catalog[name])
         if verb == "release upload":
-            self.feed = Path(args[3]).read_bytes()
+            for f in args[3:args.index("-R")]:
+                if Path(f).name in self.catalog and "--clobber" not in args:
+                    return subprocess.CompletedProcess(args, 1, "", "HTTP 422: Validation Failed (already_exists)")
+                self.catalog[Path(f).name] = Path(f).read_bytes()
+        if verb == "release delete-asset":
+            self.catalog.pop(args[3], None)
         return ok()
 
     def feed_calls(self):
         return [" ".join(c[:2]) for c in self.calls if c[c.index("-R") + 1] == FEED_REPO]
+
+    def feed_uploads(self):
+        """The uploads of feed.json itself (not of the lock)."""
+        return [c for c in self.calls if c[:2] == ["release", "upload"] and FEED_REPO in c and Path(c[3]).name == "feed.json"]
 
 
 @needs_7z
@@ -589,6 +620,10 @@ class SharedFeedPublishTests(PublishBase):
         sums.write_text("".join(line + "\n" for line in sums.read_text("utf-8").splitlines() if "feed.json" not in line),
                         encoding="utf-8")
 
+    def gh_public(self, feed=None, **kw):
+        """A SharedGh whose product release v1.2.3 is public and serves dist's release-manifest.json."""
+        return SharedGh(feed=feed, published=(self.dist / "release-manifest.json").read_bytes(), **kw)
+
     def test_product_release_first_then_the_shared_feed(self):
         gh = SharedGh(feed=pr.json_bytes(shared_feed_now()))
         self.publish(gh)
@@ -600,8 +635,7 @@ class SharedFeedPublishTests(PublishBase):
         self.assertEqual(feed["products"][0], other_product())
         b = (self.dist / "release-manifest.json").read_bytes()
         self.assertEqual(feed["products"][1]["recommended"]["manifest_sha256"], hashlib.sha256(b).hexdigest())
-        upload = next(c for c in gh.calls if c[:2] == ["release", "upload"] and FEED_REPO in c)
-        self.assertIn("--clobber", upload)
+        self.assertIn("--clobber", gh.feed_uploads()[0])
 
     def test_the_first_product_starts_the_feed(self):
         gh = SharedGh(feed=None)
@@ -610,11 +644,11 @@ class SharedFeedPublishTests(PublishBase):
 
     def test_the_feed_release_must_exist_and_never_be_latest(self):
         for home, why in (("", "create it once"), ("false false", "pre-release"), ("true true", "pre-release")):
-            gh = SharedGh(feed=None, home=home)
+            gh = self.gh_public(home=home)
             with self.assertRaises(gr.PublishFailed) as e:
-                gr.publish_feed(self.cfg, "1.2.3", self.dist, gh=gh, log=self.log.append, release_public=False)
+                gr.publish_feed(self.cfg, "1.2.3", self.dist, gh=gh, log=self.log.append)
             self.assertIn(why, str(e.exception))
-            self.assertNotIn("release upload", gh.feed_calls())
+            self.assertEqual(gh.feed_uploads(), [])
 
     def test_the_feed_never_points_at_a_draft(self):
         gh = SharedGh(feed=None)
@@ -625,25 +659,25 @@ class SharedFeedPublishTests(PublishBase):
 
     def test_a_published_release_id_never_changes_in_the_feed(self):
         mine = {**other_product("mymod-1.2.3"), "product_id": "mymod"}
-        gh = SharedGh(feed=pr.json_bytes(shared_feed_now(mine)))
+        gh = self.gh_public(feed=pr.json_bytes(shared_feed_now(mine)))
         with self.assertRaises(gr.PublishFailed) as e:
-            gr.publish_feed(self.cfg, "1.2.3", self.dist, gh=gh, log=self.log.append, release_public=False)
+            gr.publish_feed(self.cfg, "1.2.3", self.dist, gh=gh, log=self.log.append)
         self.assertIn("never changes", str(e.exception))
-        self.assertNotIn("release upload", gh.feed_calls())
+        self.assertEqual(gh.feed_uploads(), [])
 
     def test_an_older_release_does_not_replace_a_newer_one(self):
         newer = {**other_product("mymod-1.3.0"), "product_id": "mymod"}
-        gh = SharedGh(feed=pr.json_bytes(shared_feed_now(newer)))
+        gh = self.gh_public(feed=pr.json_bytes(shared_feed_now(newer)))
         with self.assertRaises(gr.PublishFailed) as e:
-            gr.publish_feed(self.cfg, "1.2.3", self.dist, gh=gh, log=self.log.append, release_public=False)
+            gr.publish_feed(self.cfg, "1.2.3", self.dist, gh=gh, log=self.log.append)
         self.assertIn("newer than 1.2.3", str(e.exception))
-        self.assertTrue(gr.publish_feed(self.cfg, "1.2.3", self.dist, gh=gh, log=self.log.append, release_public=False, allow_older=True))
+        self.assertTrue(gr.publish_feed(self.cfg, "1.2.3", self.dist, gh=gh, log=self.log.append, allow_older=True))
 
     def test_publishing_the_same_feed_again_changes_nothing(self):
-        gh = SharedGh(feed=pr.json_bytes(shared_feed_now()))
-        self.assertTrue(gr.publish_feed(self.cfg, "1.2.3", self.dist, gh=gh, log=self.log.append, release_public=False))
-        self.assertFalse(gr.publish_feed(self.cfg, "1.2.3", self.dist, gh=gh, log=self.log.append, release_public=False))
-        self.assertEqual(gh.feed_calls().count("release upload"), 1)
+        gh = self.gh_public(feed=pr.json_bytes(shared_feed_now()))
+        self.assertTrue(gr.publish_feed(self.cfg, "1.2.3", self.dist, gh=gh, log=self.log.append))
+        self.assertFalse(gr.publish_feed(self.cfg, "1.2.3", self.dist, gh=gh, log=self.log.append))
+        self.assertEqual(len(gh.feed_uploads()), 1)
 
     def test_dry_run_checks_but_sends_nothing(self):
         gh = SharedGh(feed=pr.json_bytes(shared_feed_now()))
@@ -651,6 +685,119 @@ class SharedFeedPublishTests(PublishBase):
         self.assertNotIn("release upload", [" ".join(c[:2]) for c in gh.calls])
         self.assertTrue(any("kept: other, project-09" in line for line in self.log), self.log)
         self.assertTrue(any(line.startswith(f"would run: gh release upload {FEED_TAG}") for line in self.log), self.log)
+
+
+    def test_the_lock_is_taken_and_dropped(self):
+        gh = SharedGh(feed=pr.json_bytes(shared_feed_now()))
+        self.publish(gh)
+        calls = gh.feed_calls()
+        self.assertLess(calls.index("release upload"), calls.index("release download"))  # the lock comes first
+        lock = next(c for c in gh.calls if c[:2] == ["release", "upload"] and FEED_REPO in c)
+        self.assertEqual(Path(lock[3]).name, gr.FEED_LOCK)
+        self.assertNotIn("--clobber", lock)
+        self.assertEqual(calls[-1], "release delete-asset")
+        self.assertEqual(set(gh.catalog), {"feed.json"})
+
+    def test_a_held_lock_stops_a_second_publish(self):
+        gh = self.gh_public(feed=pr.json_bytes(shared_feed_now()))
+        gh.catalog[gr.FEED_LOCK] = b"other-2.1.0\n"
+        before = gh.feed
+        with self.assertRaises(gr.PublishFailed) as e:
+            gr.publish_feed(self.cfg, "1.2.3", self.dist, gh=gh, log=self.log.append)
+        self.assertIn("another publish is running", str(e.exception))
+        self.assertIn("delete-asset", str(e.exception))
+        self.assertEqual(gh.feed, before)
+        self.assertIn(gr.FEED_LOCK, gh.catalog)  # not ours to drop
+
+    def test_a_feed_that_changes_during_the_merge_is_not_overwritten(self):
+        def race(n):
+            if n == 2:  # another product's publish replaced the feed after this one read it
+                gh.catalog["feed.json"] = pr.json_bytes(shared_feed_now(other_product("third-1.0.0") | {"product_id": "third"}))
+        gh = self.gh_public(feed=pr.json_bytes(shared_feed_now()), on_feed_download=race)
+        raced = None
+        with self.assertRaises(gr.PublishFailed) as e:
+            gr.publish_feed(self.cfg, "1.2.3", self.dist, gh=gh, log=self.log.append)
+        raced = gh.feed
+        self.assertIn("changed while", str(e.exception))
+        self.assertIn(b'"third"', raced)  # the other publish's feed stays
+        self.assertNotIn(gr.FEED_LOCK, gh.catalog)  # the lock is dropped on failure too
+
+    def test_the_feed_needs_the_public_manifest_to_be_the_one_in_dist(self):
+        for published, why in ((b'{"other": "bytes"}\n', "is not"), (None, "has no release-manifest.json")):
+            gh = SharedGh(feed=pr.json_bytes(shared_feed_now()), published=published)
+            if published is None:
+                gh.public = True  # public, but the asset is missing: FakeGh serves nothing
+            with self.assertRaises(gr.PublishFailed) as e:
+                gr.publish_feed(self.cfg, "1.2.3", self.dist, gh=gh, log=self.log.append)
+            self.assertIn(why, str(e.exception))
+            self.assertEqual(gh.feed_calls(), [])  # stops before it touches the feed release
+
+    def test_cli_feed_runs_only_the_feed_step(self):
+        cfg_file = self.tmp / "release.toml"
+        cfg_file.write_text("\n".join([
+            "[repos]", 'github = "someone/my-mod"', "[package]", f'preserve = ["{TOML}", "{FILTER}"]', "[catalog]",
+            'product_id = "mymod"', 'upcoming = ["project-09"]', f'feed_url = "{FEED_URL}"', f'feed_repo = "{FEED_REPO}"',
+            f'feed_tag = "{FEED_TAG}"', ""]), encoding="utf-8")
+        gh = self.gh_public(feed=pr.json_bytes(shared_feed_now()))
+        with mock.patch.object(gr, "gh_runner", gh), mock.patch("sys.stdout"):
+            self.assertEqual(gr.main(["--config", str(cfg_file), "1.2.3", "--feed", str(self.dist)]), 0)
+        self.assertEqual([p["product_id"] for p in json.loads(gh.feed)["products"]], ["other", "mymod", "project-09"])
+        self.assertNotIn("release create", [" ".join(c[:2]) for c in gh.calls])
+        gh = SharedGh(feed=pr.json_bytes(shared_feed_now()))  # the product release is still a draft
+        with mock.patch.object(gr, "gh_runner", gh), mock.patch("sys.stderr") as err:
+            self.assertEqual(gr.main(["--config", str(cfg_file), "1.2.3", "--feed", str(self.dist)]), 1)
+        self.assertIn("is not public", "".join(c.args[0] for c in err.write.call_args_list))
+
+
+class FeedRepoConfigTests(unittest.TestCase):
+    def test_the_feed_release_is_not_in_the_product_repository(self):
+        cfg = release_config.defaults()
+        cfg["repos"]["github"] = "someone/Launcher"
+        cfg["catalog"].update(feed_url=FEED_URL, feed_repo="Someone/launcher", feed_tag=FEED_TAG)
+        with self.assertRaises(release_config.ConfigError) as e:
+            release_config.validate(cfg)
+        self.assertIn("Latest", str(e.exception))
+
+
+class ReadFeedHttpsTests(unittest.TestCase):
+    def test_https_success_and_errors(self):
+        body = pr.json_bytes(shared_feed_now())
+        seen = {}
+
+        class Resp:
+            def __init__(self, data):
+                self.data = data
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def read(self, n):
+                return self.data[:n]
+
+        def serve(data):
+            def opener(req, timeout):
+                seen["ua"] = req.get_header("User-agent")
+                return Resp(data)
+            return opener
+        self.assertEqual(pr.read_feed(FEED_URL, opener=serve(body)), (shared_feed_now(), body))
+        self.assertEqual(seen["ua"], gr.USER_AGENT)
+        with self.assertRaises(ValueError) as e:
+            pr.read_feed(FEED_URL, opener=serve(b" " * (pr.MAX_FEED + 1)))
+        self.assertIn("over the launcher", str(e.exception))
+        import urllib.error
+
+        def fail(code):
+            def opener(req, timeout):
+                if code:
+                    raise urllib.error.HTTPError(req.full_url, code, "err", {}, None)
+                raise urllib.error.URLError("no route")
+            return opener
+        for code in (500, 403, None):
+            with self.assertRaises(ValueError):
+                pr.read_feed(FEED_URL, opener=fail(code))
 
 
 if __name__ == "__main__":

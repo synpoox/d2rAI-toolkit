@@ -174,6 +174,10 @@ def validate(cfg: dict, where="config"):
         if not re.fullmatch(r"[\w.-]+/[\w.-]+", str(cat["feed_repo"])) or not str(cat["feed_tag"]).strip():
             raise ConfigError(f"{where}: catalog.feed_url needs catalog.feed_repo (owner/repo) and catalog.feed_tag: "
                               "the GitHub release that holds the shared feed.json")
+        if str(cat["feed_repo"]).lower() == str(cfg["repos"]["github"]).lower():
+            raise ConfigError(f"{where}: catalog.feed_repo {cat['feed_repo']!r} is repos.github: each product release is "
+                              "made Latest, which would take Latest from that repository's own releases (for example a "
+                              "launcher's self-update); keep the feed in another repository")
     elif cat["feed_repo"] or cat["feed_tag"]:
         raise ConfigError(f"{where}: catalog.feed_repo and catalog.feed_tag need catalog.feed_url (the launchers' feed URL)")
     for pat in cfg["package"]["forbidden"]:

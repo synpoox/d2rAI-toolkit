@@ -278,6 +278,22 @@ products share one feed ([Shared catalog feed](#shared-catalog-feed)).
 
 A version that is public never changes. To fix a published release, package a new version.
 
+- The manifest: every file of the 7z is `managed`, except `package.preserve`, which are `shipped_default`;
+  `install_root` is `mods/<folder>`; `compatibility.game_builds` holds the exe's size and sha256; `required_settings`
+  and `saves` come from `[catalog]`. There is no loader installer pin: the launcher links to the D2RLoader download page.
+- The archive URL is `https://github.com/<repos.github>/releases/download/v<version>/<7z>`; the feed's `recommended`
+  points at the `release-manifest.json` asset next to it, with its exact size and sha256.
+- The packager checks everything the launcher would refuse before it writes anything: placeholder or zero hashes,
+  non-HTTPS URLs, unsafe or case-duplicate paths, counts, command keys, size limits (manifest 8 MiB, feed 1 MiB), the
+  7z's own size and sha256 against `archive`, its top folder against `install_root`, and its entry list against
+  `files` + `empty_dirs`. One problem and nothing is written. An `--incomplete` build gets no schema 3 files.
+- `--assets` (needs `gh`, signed in): creates `v<version>` as a **draft**, uploads the 7z, `release-manifest.json`,
+  `feed.json` (not with a [shared catalog feed](#shared-catalog-feed)) and `SHA256SUMS`, downloads them back and checks them again with the same checks and the launcher's
+  `validate-release <manifest> <feed> <archive>` (`RESURRECTED_VALIDATE_RELEASE`). Only then is the
+  release made public and Latest, which moves `releases/latest/download/feed.json`, the launcher's feed URL, to it.
+  Any failure leaves the draft (a rerun reuses it) and exits 1. A public release is never changed: a new release ID
+  needs a new version. The release is not marked pre-release, since GitHub's Latest skips pre-releases.
+
 #### Shared catalog feed
 
 Several products (several mods, each with its own repository and releases) can share **one** feed that lists them
@@ -292,7 +308,9 @@ feed_tag = "catalog"                   # ... and that release's tag
 ```
 
 Create that release once, by hand, as a **pre-release that is never Latest**, so it never takes the place of the
-repository's own Latest release (a launcher's self-update, for example, may read `releases/latest`):
+repository's own Latest release (a launcher's self-update, for example, may read `releases/latest`). For the same
+reason `feed_repo` must not be the product's own `repos.github`: every product release is made Latest, and the config
+is refused.
 
 ```sh
 gh release create catalog -R your-name/your-catalog --prerelease --latest=false --title "Catalog feed" --notes "The launcher's catalog feed."
@@ -305,32 +323,29 @@ What changes with `feed_url` set:
   (an `upcoming` entry becomes `available`), every other product keeps its entry, and `catalog.upcoming` adds the IDs
   the feed does not list yet. `SHA256SUMS` lists only the product release's assets: the 7z and the manifest.
 - `github_release.py --assets dist` publishes the product release without `feed.json`, draft first as above. Once it
-  is public, it downloads the shared feed again, merges this release into it, checks the result (every launcher rule
-  and `RESURRECTED_VALIDATE_RELEASE`), replaces `feed.json` on the feed release (`gh release upload --clobber`),
-  downloads it back and compares. So the order is always: the manifest is public first, then the feed points at it.
-- It refuses when the feed release is missing, a draft or not a pre-release; when the product release is not public;
-  when the feed already recommends this release ID with another manifest; and when it recommends a newer release of
-  this product (`--allow-older` to go back on purpose). The dry run (`--dry-run`) prints the merge and the upload.
-- `python release/github_release.py <version> --feed dist` runs only the feed step, for example after it failed.
+  is public, the feed step runs:
+  1. It downloads the public `release-manifest.json` of the product release and requires it to be byte-equal to
+     `dist/release-manifest.json`, so the feed only ever points at bytes players can download.
+  2. It takes the feed lock: it uploads `feed.lock` to the feed release without `--clobber`, so a second publish at
+     the same time fails there.
+  3. It downloads the shared feed, merges this release into it and checks the result (every launcher rule and
+     `RESURRECTED_VALIDATE_RELEASE`).
+  4. It downloads the feed once more; if it changed in the meantime it stops without uploading.
+  5. It replaces `feed.json` (`gh release upload --clobber`), downloads it back, compares, and deletes `feed.lock`.
 
-Two products released at the same moment can race: each re-reads the feed just before replacing it, so release them
-one after the other.
+  So the order is always: the manifest is public first, then the feed points at it.
+- It refuses when the feed release is missing, a draft or not a pre-release; when the product release is not public or
+  its manifest is not the one in `dist/`; when another publish holds the lock or changed the feed meanwhile; when the
+  feed already recommends this release ID with another manifest; and when it recommends a newer release of this
+  product (`--allow-older` to go back on purpose). The dry run (`--dry-run`) takes no lock and prints the merge and
+  the upload.
+- `python release/github_release.py <version> --feed dist` runs only the feed step, for example after it failed. Run
+  it with the same `dist/` that was published.
 
-- The manifest: every file of the 7z is `managed`, except `package.preserve`, which are `shipped_default`;
-  `install_root` is `mods/<folder>`; `compatibility.game_builds` holds the exe's size and sha256; `required_settings`
-  and `saves` come from `[catalog]`. There is no loader installer pin: the launcher links to the D2RLoader download page.
-- The archive URL is `https://github.com/<repos.github>/releases/download/v<version>/<7z>`; the feed's `recommended`
-  points at the `release-manifest.json` asset next to it, with its exact size and sha256.
-- The packager checks everything the launcher would refuse before it writes anything: placeholder or zero hashes,
-  non-HTTPS URLs, unsafe or case-duplicate paths, counts, command keys, size limits (manifest 8 MiB, feed 1 MiB), the
-  7z's own size and sha256 against `archive`, its top folder against `install_root`, and its entry list against
-  `files` + `empty_dirs`. One problem and nothing is written. An `--incomplete` build gets no schema 3 files.
-- `--assets` (needs `gh`, signed in): creates `v<version>` as a **draft**, uploads the 7z, `release-manifest.json`,
-  `feed.json` and `SHA256SUMS`, downloads them back and checks them again with the same checks and the launcher's
-  `validate-release <manifest> <feed> <archive>` (`RESURRECTED_VALIDATE_RELEASE`). Only then is the
-  release made public and Latest, which moves `releases/latest/download/feed.json`, the launcher's feed URL, to it.
-  Any failure leaves the draft (a rerun reuses it) and exits 1. A public release is never changed: a new release ID
-  needs a new version. The release is not marked pre-release, since GitHub's Latest skips pre-releases.
+A run that dies between steps 2 and 5 (power cut, killed process) leaves `feed.lock` behind, and every later publish
+stops with the command that removes it: `gh release delete-asset <feed_tag> feed.lock -R <feed_repo> -y`. Delete it
+only when no other publish is running, then run `--feed dist` again.
+
 
 ## Release notes
 

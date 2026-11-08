@@ -340,8 +340,9 @@ def read_feed(src, opener=None):
     if src.startswith("https://"):
         import urllib.error
         import urllib.request
+        from github_release import USER_AGENT
         try:
-            with (opener or urllib.request.urlopen)(urllib.request.Request(src, headers={"User-Agent": "d2r-modkit"}),
+            with (opener or urllib.request.urlopen)(urllib.request.Request(src, headers={"User-Agent": USER_AGENT}),
                                                     timeout=60) as r:
                 data = r.read(MAX_FEED + 1)
         except urllib.error.HTTPError as e:
