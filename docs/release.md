@@ -242,6 +242,7 @@ preserve = ["d2rloader/config/d2rloader.toml", "d2rloader/config/filter.json"]  
 product_id = "mymod"               # stable machine ID, never changes
 upcoming = []                      # other product IDs the feed lists as upcoming
 required_settings = [{file = "d2rloader/config/d2rloader.toml", key = "d2rcore.save_format.mode", value = "extended"}]
+loader_files = [{path = "<D2R folder>/D2RLoader.exe"}]   # the official loader, pinned by sha256 (version = d2rloader.version)
 ```
 
 The launcher's feed URL is then `https://github.com/<repos.github>/releases/latest/download/feed.json`, unless the
@@ -279,7 +280,9 @@ products share one feed ([Shared catalog feed](#shared-catalog-feed)).
 A version that is public never changes. To fix a published release, package a new version.
 
 - The manifest: every file of the 7z is `managed`, except `package.preserve`, which are `shipped_default`;
-  `install_root` is `mods/<folder>`; `compatibility.game_builds` holds the exe's size and sha256; `required_settings`
+  `install_root` is `mods/<folder>`; `compatibility.game_builds` holds the exe's size and sha256;
+  `compatibility.loader_builds` pins each `catalog.loader_files` entry (the official D2RLoader files, e.g.
+  `[{path = "<D2R folder>/D2RLoader.exe"}]`) by version, size and sha256; `required_settings`
   and `saves` come from `[catalog]`. There is no loader installer pin: the launcher links to the D2RLoader download page.
 - The archive URL is `https://github.com/<repos.github>/releases/download/v<version>/<7z>`; the feed's `recommended`
   points at the `release-manifest.json` asset next to it, with its exact size and sha256.
