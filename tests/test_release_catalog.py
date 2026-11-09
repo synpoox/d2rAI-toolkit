@@ -109,6 +109,46 @@ class GenerationTests(CatalogBase):
         self.assertTrue(any("incompatibility_notice" in p for p in pr.catalog_problems(man, feed, b)))
 
 
+class PreviousDefaultTests(CatalogBase):
+    """launcher #134: shipped defaults list the hashes earlier releases shipped, so the launcher's clean install tells an
+    older release's untouched default from a player edit."""
+
+    def test_previous_hashes_come_from_earlier_manifests_and_their_history(self):
+        old, _, _ = self.generate()
+        self.assertTrue(all("previous_default_sha256" not in f for f in old["files"]))  # nothing earlier: no field
+        older = "a" * 64
+        old = copy.deepcopy(old)
+        old_filter = next(f for f in old["files"] if f["path"] == FILTER)
+        old_filter.update(sha256="b" * 64, previous_default_sha256=[older])
+        (self.src / FILTER).write_text('{"new": 1}', encoding="utf-8")
+        files = pr.file_list(self.src)
+        archive = self.tmp / "MyMod-1.2.3-alpha.7z"
+        man = pr.catalog_manifest(self.cfg, "1.2.3-alpha", files, archive, pr.empty_dirs(self.src),
+                                  [pr.game_build(self.cfg, self.exe)], "Patch notes.", pr.previous_defaults([old]))
+        by = {f["path"]: f for f in man["files"]}
+        self.assertEqual(by[FILTER]["previous_default_sha256"], [older, "b" * 64])
+        self.assertNotIn("previous_default_sha256", by[TOML], "unchanged since: its own hash is not listed")
+        self.assertTrue(all("previous_default_sha256" not in f for f in man["files"] if f["ownership"] == "managed"))
+        b = pr.json_bytes(man)
+        feed = pr.catalog_feed(self.cfg, man, b, pr.asset_url(self.cfg, "1.2.3-alpha", pr.CATALOG_MANIFEST))
+        self.assertEqual(pr.catalog_problems(man, feed, b), [])
+
+    def test_read_manifest_checks_the_feed_pointer(self):
+        man, b, _ = self.generate()
+        path = self.tmp / "release-manifest.json"
+        path.write_bytes(b)
+        self.assertEqual(pr.read_manifest(path, size=len(b), sha=hashlib.sha256(b).hexdigest()), man)
+        with self.assertRaises(ValueError):
+            pr.read_manifest(path, sha="c" * 64)
+        with self.assertRaises(ValueError):
+            pr.read_manifest(self.tmp / "none.json")
+        feed = {"products": [{"product_id": "mymod", "recommended": {
+            "manifest_url": str(path), "manifest_size": len(b), "manifest_sha256": hashlib.sha256(b).hexdigest()}}]}
+        self.assertEqual(pr.recommended_manifest(feed, "mymod"), man)
+        self.assertIsNone(pr.recommended_manifest(feed, "other"))
+        self.assertIsNone(pr.recommended_manifest(None, "mymod"))
+
+
 class RefusalTests(CatalogBase):
     def refused(self, change, expect, feed_change=None):
         man, b, feed = self.generate()
@@ -160,6 +200,12 @@ class RefusalTests(CatalogBase):
         self.refused(lambda m: m["saves"].update(on_install_hook="x"), "hook")
         self.refused(lambda m: m.update(loader={"installer_version": "v0.1.0"}), "unknown ['loader']")
         self.refused(lambda m: m.update(schemaVersion=2), "unknown ['schemaVersion']")
+
+    def test_previous_default_hashes(self):
+        armor = "MyMod.mpq/data/global/excel/armor.txt"
+        self.refused(lambda m: self.file(m, armor).update(previous_default_sha256=["a" * 64]), "only for a shipped_default")
+        self.refused(lambda m: self.file(m, FILTER).update(previous_default_sha256=["0" * 64]), "placeholder")
+        self.refused(lambda m: self.file(m, FILTER).update(previous_default_sha256=[]), "non-empty list")
 
     def test_settings_point_at_shipped_defaults(self):
         self.refused(lambda m: m["compatibility"]["required_settings"][0].update(file="MyMod.mpq/modinfo.json"),

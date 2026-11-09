@@ -284,6 +284,11 @@ A version that is public never changes. To fix a published release, package a ne
   `compatibility.loader_builds` pins each `catalog.loader_files` entry (the official D2RLoader files, e.g.
   `[{path = "<D2R folder>/D2RLoader.exe"}]`) by version, size and sha256; `required_settings`
   and `saves` come from `[catalog]`. There is no loader installer pin: the launcher links to the D2RLoader download page.
+- `previous_default_sha256` (launcher #134): each `shipped_default` lists the sha256 values earlier releases shipped
+  for it, so the launcher's clean install can tell an older release's untouched default from a player edit. The
+  values come from the manifest the shared feed recommends now (checked against its pointer), which carries the earlier
+  history, plus any `--previous-manifest FILE|URL` (repeatable). Its own current hash is left out, and so is the key
+  when nothing remains.
 - The archive URL is `https://github.com/<repos.github>/releases/download/v<version>/<7z>`; the feed's `recommended`
   points at the `release-manifest.json` asset next to it, with its exact size and sha256.
 - The packager checks everything the launcher would refuse before it writes anything: placeholder or zero hashes,
