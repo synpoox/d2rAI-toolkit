@@ -70,6 +70,7 @@ DEFAULTS = {
         "save_breaking": False,       # true: characters of the previous release may not load ...
         "incompatibility_notice": "",  # ... and this text says so (required exactly then)
         "upcoming": [],               # other product IDs feed.json lists as upcoming
+        "header_image": "",           # optional Patch Notes banner: an https URL on github.com or objects.githubusercontent.com
         "game_exe": "",               # the real D2R.exe the release was tested with (--game-exe beats it)
         "feed_url": "",               # the shared catalog feed every product's releases update ("" = feed.json on this release)
         "feed_repo": "",              # with feed_url: the GitHub repository whose release holds the shared feed.json ...
