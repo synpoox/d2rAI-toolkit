@@ -64,6 +64,7 @@ DEFAULTS = {
         "product_id": "",             # stable machine ID, e.g. "pd2r"; release_id is <product_id>-<version>
         "min_launcher_version": "0.1.0",
         "loader_versions": [],        # allowed D2RLoader versions; [] = [d2rloader.version]
+        "loader_files": [],           # [{path, version}]: the official D2RLoader files to pin by sha256 (version = d2rloader.version)
         "required_settings": [],      # [{file, key, value}]; file must be in package.preserve (shipped_default)
         "loader_save_format": {},     # optional {file, key, value}, same rule
         "save_breaking": False,       # true: characters of the previous release may not load ...

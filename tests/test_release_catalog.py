@@ -40,6 +40,9 @@ class CatalogBase(unittest.TestCase):
         self.cfg = catalog_cfg()
         self.exe = self.tmp / "D2R.exe"
         self.exe.write_bytes(b"MZ not really the game")
+        self.loader = self.tmp / "D2RLoader.exe"
+        self.loader.write_bytes(b"MZ not really the loader")
+        self.cfg["catalog"]["loader_files"] = [{"path": str(self.loader)}]
         self.src = make_mod(self.tmp / "src", "MyMod", {"global/excel/armor.txt": b"armor\n", "empty.txt": b""})
         (self.src / FILTER).write_text("{}", encoding="utf-8")
 
@@ -76,6 +79,9 @@ class GenerationTests(CatalogBase):
             "build": "3.3.93847", "platform": "windows_x64", "executable": "D2R.exe", "size": self.exe.stat().st_size,
             "sha256": hashlib.sha256(self.exe.read_bytes()).hexdigest()}])
         self.assertEqual(man["compatibility"]["loader_versions"], ["1.3.1-beta"])
+        self.assertEqual(man["compatibility"]["loader_builds"], [{
+            "version": "1.3.1-beta", "file": "D2RLoader.exe", "size": self.loader.stat().st_size,
+            "sha256": hashlib.sha256(self.loader.read_bytes()).hexdigest()}])
         self.assertEqual(man["saves"], {"folder": "MyMod", "save_breaking": False, "incompatibility_notice": None})
 
     def test_feed_points_at_the_exact_manifest_bytes(self):
@@ -217,6 +223,20 @@ class RefusalTests(CatalogBase):
         self.refused(lambda m: m.update(release_notes=" "), "release_notes is empty")
         self.refused(lambda m: m["compatibility"].update(game_builds=[]), "game_builds is empty")
         self.refused(lambda m: m["compatibility"].update(loader_versions=["v1.3.1"]), "loader version")
+        lb = lambda m: m["compatibility"]["loader_builds"][0]  # noqa: E731
+        self.refused(lambda m: lb(m).update(version="9.9.9"), "is not in compatibility.loader_versions")
+        self.refused(lambda m: lb(m).update(sha256="0" * 64), "compatibility.loader_builds[0]")
+        self.refused(lambda m: lb(m).update(file="../D2RLoader.exe"), "loader_builds[0].file")
+        self.refused(lambda m: m["compatibility"]["loader_builds"].append(dict(lb(m), file="d2rloader.EXE")),
+                     "pinned twice")
+        self.refused(lambda m: m["compatibility"]["loader_versions"].append("1.4.0"), "has no pinned build")
+
+    def test_loader_files_are_required(self):
+        self.cfg["catalog"]["loader_files"] = []
+        notes = self.tmp / "notes.md"
+        notes.write_text("Patch notes.", encoding="utf-8")
+        _, _, problems = pr.catalog_inputs(self.cfg, "1.2.3-alpha", self.exe, notes)
+        self.assertIn("schema 3 needs the official D2RLoader files to pin: catalog.loader_files", problems)
         self.refused(lambda m: m["saves"].update(folder="a/b"), "saves.folder")
 
     def test_feed_rules(self):
@@ -260,7 +280,8 @@ class PackageTests(CatalogBase):
         lines += [f"{k} = {json.dumps(v)}" for k, v in cat.items() if not isinstance(v, (list, dict))]
         lines += [f'upcoming = {json.dumps(cat["upcoming"])}',
                   "required_settings = [" + ", ".join(
-                      f'{{file = "{s["file"]}", key = "{s["key"]}", value = "{s["value"]}"}}' for s in cat["required_settings"]) + "]"]
+                      f'{{file = "{s["file"]}", key = "{s["key"]}", value = "{s["value"]}"}}' for s in cat["required_settings"]) + "]",
+                  "loader_files = [" + ", ".join(f'{{path = "{Path(e["path"]).as_posix()}"}}' for e in cat["loader_files"]) + "]"]
         p = self.tmp / "release.toml"
         p.write_text("\n".join(lines).replace("False", "false").replace("True", "true") + "\n", encoding="utf-8")
         notes = self.tmp / "notes.md"

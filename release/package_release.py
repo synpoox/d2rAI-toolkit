@@ -269,6 +269,16 @@ def game_build(cfg: dict, exe: Path) -> dict:
             "size": exe.stat().st_size, "sha256": sha256(exe)}
 
 
+def loader_builds(cfg: dict) -> list:
+    """compatibility.loader_builds from catalog.loader_files: each official loader file pinned by version and bytes."""
+    out = []
+    for e in cfg["catalog"]["loader_files"]:
+        f = Path(e["path"])
+        out.append({"version": e.get("version") or cfg["d2rloader"]["version"], "file": f.name,
+                    "size": f.stat().st_size, "sha256": sha256(f)})
+    return out
+
+
 def setting(s: dict) -> dict:
     return {"file": s.get("file", ""), "key": s.get("key", ""), "value": s.get("value", "")}
 
@@ -326,6 +336,7 @@ def catalog_manifest(cfg: dict, version: str, files: list, archive_path: Path, d
         "compatibility": {
             "game_builds": game_builds,
             "loader_versions": list(cat["loader_versions"] or [cfg["d2rloader"]["version"]]),
+            "loader_builds": loader_builds(cfg),
             "required_settings": [setting(s) for s in cat["required_settings"]],
         },
         "saves": saves,
@@ -705,7 +716,7 @@ def catalog_problems(man: dict, feed: dict = None, man_bytes: bytes = None, arch
         add(f"archive.total_size {a.get('total_size')} but the files add up to {total}")
 
     c = man.get("compatibility") or {}
-    if set(c) != {"game_builds", "loader_versions", "required_settings"}:
+    if set(c) != {"game_builds", "loader_versions", "loader_builds", "required_settings"}:
         add(f"compatibility keys {sorted(c)}")
     if not c.get("game_builds"):
         add("compatibility.game_builds is empty")
@@ -726,6 +737,25 @@ def catalog_problems(man: dict, feed: dict = None, man_bytes: bytes = None, arch
         add("compatibility.loader_versions is empty")
     bad += [f"loader version {v!r} is not MAJOR.MINOR.PATCH[-prerelease]" for v in c.get("loader_versions") or []
             if not SEMVER_RE.fullmatch(str(v))]
+    versions, pinned = list(c.get("loader_versions") or []), set()
+    for i, lb in enumerate(c.get("loader_builds") or []):
+        where = f"compatibility.loader_builds[{i}]"
+        if set(lb) != {"version", "file", "size", "sha256"}:
+            add(f"{where}: keys {sorted(lb)}")
+        if lb.get("version") not in versions:
+            add(f"{where}.version {lb.get('version')!r} is not in compatibility.loader_versions")
+        if path_problem(lb.get("file")):
+            add(f"{where}.file {lb.get('file')!r}: {path_problem(lb.get('file'))}")
+        key = (lb.get("version"), str(lb.get("file")).upper())
+        if key in pinned:
+            add(f"{where}.file {lb.get('file')!r} is pinned twice for {lb.get('version')!r}")
+        pinned.add(key)
+        v = verification_problem(where, lb.get("size"), lb.get("sha256"))
+        if v:
+            add(v)
+    if pinned:
+        bad += [f"loader version {v!r} has no pinned build in compatibility.loader_builds" for v in versions
+                if v not in {p[0] for p in pinned}]
     for i, s in enumerate(c.get("required_settings") or []):
         bad += _setting_problems(f"compatibility.required_settings[{i}]", s, shipped)
 
@@ -772,6 +802,11 @@ def catalog_inputs(cfg: dict, version: str, game_exe=None, notes_file=None) -> t
         problems.append("schema 3 needs the real D2R.exe the release was tested with: --game-exe or catalog.game_exe")
     else:
         builds = [game_build(cfg, exe)]
+    loaders = cat["loader_files"]
+    if not loaders:
+        problems.append("schema 3 needs the official D2RLoader files to pin: catalog.loader_files")
+    problems += [f"catalog.loader_files: no file at {e.get('path')!r}" for e in loaders
+                 if not Path(str(e.get("path") or "-")).is_file()]
     if notes_file:
         notes = Path(notes_file).read_text("utf-8").strip()
     else:
