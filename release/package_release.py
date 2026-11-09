@@ -340,6 +340,8 @@ def catalog_manifest(cfg: dict, version: str, files: list, archive_path: Path, d
             "required_settings": [setting(s) for s in cat["required_settings"]],
         },
         "saves": saves,
+        # Optional Patch Notes banner (launcher #179); absent = the launcher shows the product's hero art.
+        **({"release_notes_header_image": cat["header_image"]} if cat.get("header_image") else {}),
     }
 
 
@@ -488,6 +490,17 @@ MAX_MANIFEST = 8 << 20  # the launcher's read limits
 MAX_FEED = 1 << 20
 MANIFEST_KEYS = {"schema_version", "product_id", "release_id", "display_version", "release_date", "status", "release_notes",
                  "min_launcher_version", "install_root", "archive", "files", "empty_dirs", "compatibility", "saves"}
+OPTIONAL_MANIFEST_KEYS = {"release_notes_header_image"}
+HEADER_IMAGE_HOSTS = ("github.com", "objects.githubusercontent.com")  # the launcher's allowlist (#179), exact match
+
+
+def header_image_problem(u) -> str:
+    """Why the launcher would refuse `u` as release_notes_header_image ("" when it is fine)."""
+    why = url_problem(u)
+    if why:
+        return why
+    host = re.split(r"[/?#]", u[len("https://"):])[0].lower()
+    return "" if host in HEADER_IMAGE_HOSTS else f"host {host} is not github.com or objects.githubusercontent.com"
 
 
 def path_problem(p) -> str:
@@ -674,8 +687,11 @@ def catalog_problems(man: dict, feed: dict = None, man_bytes: bytes = None, arch
         add(f"the manifest is {len(man_bytes)} B, over the launcher's {MAX_MANIFEST} B")
     if feed_bytes is not None and len(feed_bytes) > MAX_FEED:
         add(f"the feed is {len(feed_bytes)} B, over the launcher's {MAX_FEED} B")
-    if set(man) != MANIFEST_KEYS:
-        add(f"manifest keys: missing {sorted(MANIFEST_KEYS - set(man))}, unknown {sorted(set(man) - MANIFEST_KEYS)}")
+    if not MANIFEST_KEYS <= set(man) <= MANIFEST_KEYS | OPTIONAL_MANIFEST_KEYS:
+        add(f"manifest keys: missing {sorted(MANIFEST_KEYS - set(man))}, "
+            f"unknown {sorted(set(man) - MANIFEST_KEYS - OPTIONAL_MANIFEST_KEYS)}")
+    if "release_notes_header_image" in man and header_image_problem(man["release_notes_header_image"]):
+        add(f"release_notes_header_image: {header_image_problem(man['release_notes_header_image'])}")
     bad += [f"command, script, hook or argument key: {k}" for k in executable_keys(man) + executable_keys(feed or {})]
     if man.get("schema_version") != CATALOG_SCHEMA:
         add(f"schema_version {man.get('schema_version')!r} is not {CATALOG_SCHEMA}")
@@ -802,6 +818,8 @@ def catalog_inputs(cfg: dict, version: str, game_exe=None, notes_file=None) -> t
         problems.append("schema 3 needs the real D2R.exe the release was tested with: --game-exe or catalog.game_exe")
     else:
         builds = [game_build(cfg, exe)]
+    if cat.get("header_image") and header_image_problem(cat["header_image"]):
+        problems.append(f"catalog.header_image: {header_image_problem(cat['header_image'])}")
     loaders = cat["loader_files"]
     if not loaders:
         problems.append("schema 3 needs the official D2RLoader files to pin: catalog.loader_files")

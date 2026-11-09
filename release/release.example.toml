@@ -107,6 +107,7 @@ required_settings = []                     # e.g. [{file = "d2rloader/config/d2r
 save_breaking = false                      # true when characters of the previous release may not load ...
 incompatibility_notice = ""                # ... and then this text, shown before updating
 upcoming = []                              # other product IDs the feed lists as upcoming, e.g. ["project-09"]
+header_image = ""                          # optional Patch Notes banner, e.g. "https://github.com/<repos.github>/releases/download/v<version>/header.png"; "" = the product's hero art
 game_exe = ""                              # the real D2R.exe the release was tested with (or --game-exe)
 # One shared catalog feed for every product (docs/release.md "Shared catalog feed"). Empty: feed.json rides on this
 # product's release and the launcher reads https://github.com/<repos.github>/releases/latest/download/feed.json.

@@ -214,6 +214,20 @@ class RefusalTests(CatalogBase):
                      "saves.loader_save_format.file")
         self.refused(lambda m: m["compatibility"]["required_settings"][0].update(key=""), "key is empty")
 
+    def test_header_image_is_optional_and_on_github_only(self):
+        url = "https://github.com/someone/my-mod/releases/download/v1.2.3-alpha/header.png"
+        self.cfg["catalog"]["header_image"] = url
+        man, b, feed = self.generate()
+        self.assertEqual(man["release_notes_header_image"], url)
+        self.assertEqual(pr.catalog_problems(man, feed, b), [])
+        self.refused(lambda m: m.update(release_notes_header_image="https://evil.example/a.png"), "not github.com")
+        self.refused(lambda m: m.update(release_notes_header_image="http://github.com/a.png"), "not https://")
+        self.refused(lambda m: m.update(release_notes_header_image="https://github.com@evil.example/a.png"),
+                     "release_notes_header_image")
+        _, _, problems = pr.catalog_inputs(dict(self.cfg, catalog=dict(self.cfg["catalog"], header_image="x.png")),
+                                           "1.2.3-alpha", self.exe, None)
+        self.assertTrue(any("catalog.header_image" in p for p in problems), problems)
+
     def test_identity_and_compatibility_fields(self):
         self.refused(lambda m: m.update(product_id="My Mod"), "product_id")
         self.refused(lambda m: m.update(release_date="2026-13-01"), "release_date")
