@@ -273,11 +273,36 @@ def setting(s: dict) -> dict:
     return {"file": s.get("file", ""), "key": s.get("key", ""), "value": s.get("value", "")}
 
 
-def catalog_manifest(cfg: dict, version: str, files: list, archive_path: Path, dirs, game_builds: list, notes: str) -> dict:
+def previous_defaults(earlier) -> dict:
+    """{upper-cased path: [sha256, ...]} of every shipped_default in the earlier published manifests `earlier`: each
+    one's own hash and the previous_default_sha256 it carries, so one earlier manifest brings the whole history."""
+    out = {}
+    for man in earlier:
+        for f in man.get("files") or []:
+            if f.get("ownership") != "shipped_default":
+                continue
+            known = out.setdefault(str(f["path"]).upper(), [])
+            for h in [*(f.get("previous_default_sha256") or []), f["sha256"]]:
+                if h not in known:
+                    known.append(h)
+    return out
+
+
+def shipped_file(f: dict, previous: dict) -> dict:
+    """A shipped_default files[] entry; previous_default_sha256 lists the earlier releases' other hashes (launcher #134)."""
+    prev = [h for h in previous.get(f["path"].upper(), []) if h != f["sha256"]]
+    return {**f, "ownership": "shipped_default", **({"previous_default_sha256": prev} if prev else {})}
+
+
+def catalog_manifest(cfg: dict, version: str, files: list, archive_path: Path, dirs, game_builds: list, notes: str,
+                     previous: dict = None) -> dict:
     """The release manifest, schema 3 (the launcher's docs/specs/release-manifest.md). Files in package.preserve are
-    shipped_default, every other file is managed. No loader installer pin: the launcher links to LOADER_PAGE."""
+    shipped_default, every other file is managed. No loader installer pin: the launcher links to LOADER_PAGE.
+    `previous`: previous_defaults() of the earlier published manifests, so the launcher tells an older release's
+    untouched default from a player edit."""
     mod, cat = cfg["mod"], cfg["catalog"]
     preserve = {p.upper() for p in cfg["package"]["preserve"]}
+    previous = previous or {}
     breaking = bool(cat["save_breaking"])
     saves = {"folder": str(mod["save_folder"]).strip("/"), "save_breaking": breaking,
              "incompatibility_notice": (cat["incompatibility_notice"] or "") if breaking else None}
@@ -295,7 +320,8 @@ def catalog_manifest(cfg: dict, version: str, files: list, archive_path: Path, d
         "install_root": f"mods/{mod['folder']}",
         "archive": {"url": asset_url(cfg, version, archive_path.name), "format": "7z", "size": archive_path.stat().st_size,
                     "sha256": sha256(archive_path), "file_count": len(files), "total_size": sum(f["size"] for f in files)},
-        "files": [{**f, "ownership": "shipped_default" if f["path"].upper() in preserve else "managed"} for f in files],
+        "files": [shipped_file(f, previous) if f["path"].upper() in preserve else {**f, "ownership": "managed"}
+                  for f in files],
         "empty_dirs": list(dirs),
         "compatibility": {
             "game_builds": game_builds,
@@ -366,6 +392,46 @@ def read_feed(src, opener=None):
     if bad:
         raise ValueError(f"{src}: the current feed is not valid: " + "; ".join(bad[:10]))
     return feed, data
+
+
+def read_manifest(src, opener=None, size=None, sha=None) -> dict:
+    """An earlier published release-manifest.json: a local file or an https:// URL. `size`/`sha` (a feed pointer's
+    manifest_size/manifest_sha256) must match when given. Raises ValueError when it cannot be read or used."""
+    src = str(src)
+    if src.startswith("https://"):
+        import urllib.request
+        from github_release import USER_AGENT
+        try:
+            with (opener or urllib.request.urlopen)(urllib.request.Request(src, headers={"User-Agent": USER_AGENT}),
+                                                    timeout=60) as r:
+                data = r.read(MAX_MANIFEST + 1)
+        except OSError as e:
+            raise ValueError(f"{src}: {e}")
+    else:
+        try:
+            data = Path(src).read_bytes()
+        except OSError as e:
+            raise ValueError(f"{src}: {e}")
+    if len(data) > MAX_MANIFEST:
+        raise ValueError(f"{src}: over the launcher's {MAX_MANIFEST} B")
+    if (size is not None and len(data) != size) or (sha is not None and hashlib.sha256(data).hexdigest() != sha):
+        raise ValueError(f"{src}: not the bytes the feed pins")
+    try:
+        man = json.loads(data)
+    except ValueError as e:
+        raise ValueError(f"{src}: not JSON: {e}")
+    if not isinstance(man, dict) or not isinstance(man.get("files"), list):
+        raise ValueError(f"{src}: not a release manifest")
+    return man
+
+
+def recommended_manifest(feed: dict, product_id: str, opener=None):
+    """The manifest the feed recommends for `product_id`, checked against its pointer; None when there is none."""
+    for p in (feed or {}).get("products") or []:
+        rec = p.get("recommended") if p.get("product_id") == product_id else None
+        if rec:
+            return read_manifest(rec["manifest_url"], opener, rec["manifest_size"], rec["manifest_sha256"])
+    return None
 
 
 def json_bytes(obj) -> bytes:
@@ -495,8 +561,17 @@ def _inventory_problems(files, dirs) -> tuple:
         bad.append("files is empty")
     for i, f in enumerate(files):
         where = f"files[{i}] {f.get('path')!r}"
-        if set(f) != {"path", "size", "sha256", "ownership"}:
+        if set(f) - {"previous_default_sha256"} != {"path", "size", "sha256", "ownership"}:
             bad.append(f"{where}: keys {sorted(f)}")
+        if "previous_default_sha256" in f:
+            prev = f["previous_default_sha256"]
+            if f.get("ownership") != "shipped_default":
+                bad.append(f"{where}: previous_default_sha256 is only for a shipped_default")
+            elif not isinstance(prev, list) or not prev:
+                bad.append(f"{where}: previous_default_sha256 must be a non-empty list")
+            else:
+                bad += [f"{where}.previous_default_sha256 {h!r} is not 64 lower-case hex digits or is a placeholder"
+                        for h in prev if not isinstance(h, str) or not SHA_RE.fullmatch(h) or set(h) == {"0"}]
         if path_problem(f.get("path")):
             bad.append(f"{where}: {path_problem(f.get('path'))}")
         v = verification_problem(where, f.get("size"), f.get("sha256"), allow_empty=True)
@@ -841,6 +916,10 @@ def main(argv=None) -> int:
     ap.add_argument("--out", type=Path, help=f"output folder (default package.dist = {cfg['package']['dist']})")
     ap.add_argument("--game-exe", type=Path, help="schema 3: the real D2R.exe the release was tested with (catalog.game_exe)")
     ap.add_argument("--notes", type=Path, help="schema 3: the patch notes text (default: the version's changelog section)")
+    ap.add_argument("--previous-manifest", action="append", default=[], metavar="SRC",
+                    help="schema 3: an earlier published release-manifest.json (file or https:// URL), repeatable; its "
+                         "shipped defaults' hashes go in previous_default_sha256. The shared feed's recommended "
+                         "manifest for this product is always read too")
     ap.add_argument("--feed-in", help="schema 3 with catalog.feed_url: the shared feed as it is now, a file or an https:// "
                                       "URL (default catalog.feed_url); this release is merged into it")
     a = ap.parse_args(argv)
@@ -878,6 +957,13 @@ def main(argv=None) -> int:
                 problems.append(f"the shared feed: {e} (--feed-in FILE reads a saved copy)")
             if current is None and not problems:
                 print(f"note: no shared feed at {a.feed_in or cfg['catalog']['feed_url']} yet: feed.json starts with this product")
+        earlier = []
+        try:  # earlier published manifests: what the launcher must not mistake for player edits (launcher #134)
+            rec = recommended_manifest(current, cfg["catalog"]["product_id"])
+            earlier = [*([rec] if rec else []), *(read_manifest(m) for m in a.previous_manifest)]
+        except (ValueError, KeyError) as e:
+            problems.append(f"an earlier release manifest: {e}")
+        previous = previous_defaults(earlier)
         if problems:
             print("error: schema 3 (catalog):\n  " + "\n  ".join(problems))
             return 1
@@ -913,7 +999,7 @@ def main(argv=None) -> int:
     dirs = empty_dirs(mod)
     written = []
     if catalog:  # every launcher rule, the 7z's own listing included, before anything else is written
-        cman = catalog_manifest(cfg, version, files, seven_path, dirs, builds, catalog_notes)
+        cman = catalog_manifest(cfg, version, files, seven_path, dirs, builds, catalog_notes, previous)
         cman_bytes = json_bytes(cman)
         cfeed = catalog_feed(cfg, cman, cman_bytes, asset_url(cfg, version, CATALOG_MANIFEST), current)
         problems = catalog_problems(cman, cfeed, cman_bytes, seven_path, json_bytes(cfeed), sevenzip)
