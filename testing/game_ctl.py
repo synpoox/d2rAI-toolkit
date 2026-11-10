@@ -787,6 +787,19 @@ def run_screens_dir(cfg: tc.Config) -> str:
     return os.path.join(cfg.run_dir(run), cfg["runs"]["screenshots_dir"])
 
 
+def split_own_options(argv: list[str]) -> int | None:
+    """Index of the `pair` / `moved` command word in argv (skipping the values of --slot and --config), else None."""
+    skip = False
+    for i, t in enumerate(argv):
+        if skip:
+            skip = False
+        elif t in ("--slot", "--config"):
+            skip = True
+        elif not t.startswith("-"):
+            return i if t in ("pair", "moved") else None
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     tc.add_config_arg(ap)
@@ -794,8 +807,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("cmd", nargs="?", choices=("status", "start", "stop", "shot", "key", "click", "console", "harness",
                                                   "release", "pair", "moved"))
     ap.add_argument("args", nargs="*")
-    a, extra = ap.parse_known_args(argv)
-    a.args += extra  # pair/moved take their own --options
+    argv = sys.argv[1:] if argv is None else list(argv)
+    own = split_own_options(argv)  # pair and moved parse their own options, in any position: hand them the rest raw
+    if own is not None:
+        a = ap.parse_args(argv[:own + 1])
+        a.args = argv[own + 1:]
+    else:
+        a = ap.parse_args(argv)
     if not a.cmd:
         print(__doc__)
         return 0

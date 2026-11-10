@@ -67,15 +67,18 @@ Env vars: `MODKIT_SLOT`, `MODKIT_RUN`, `MODKIT_TESTING_CONFIG`.
 ## Check helpers
 
 - `game_ctl.py --slot N pair NAME LEVEL,X,Y [--light 12] [--settle 3] [--key g]`: runs `cheat stat item_lightradius,<light>`
-  (`--light 0` skips it), `cheat goto LEVEL,X,Y`, waits, shoots HD, presses `g`, shoots legacy, presses `g` back, and saves
+  (`--light 0` skips it; the radius stays raised for the rest of the game session, so use `--light 0` when lighting is what
+  you judge), `cheat goto LEVEL,X,Y`, waits, shoots HD, presses `g`, shoots legacy, presses `g` back, and saves
   HD (left) | legacy (right) as `<runs.dir>/<run>/screenshots/NAME.png`. The window is found again by PID before every shot
-  and key. Prints the path; warns and exits 1 when the two shots are identical (the toggle did nothing, or not in HD).
+  and key. The legacy toggle is pressed back even when a shot fails. Prints the path and the HD-to-legacy distance beside the noise
+  between two HD shots; warns and exits 1 when the shots are identical (within the larger of 0.5 and 3x the noise: the
+  toggle did nothing, or not in HD).
   The game must be in a game; use Hell and a level 90+ character.
-- `game_ctl.py --slot N moved click FX FY [right] | key KEY.. [--wait 1.5]`: reads the player position before and after
-  and prints whether and how far the character moved (exit 0 = moved, 1 = not). It reads the harness block's optional
-  `idx_player_x`/`idx_player_y` (world subtiles; set both in `[harness]` when your plugin writes them, see
-  docs/testing.md). Without them it compares screenshots (the camera follows the character) and labels the result a
-  screen estimate. The estimate is noisy (fire, monsters and effects change the frame even when the character is stuck against a wall: in a Torture Halls check it reported `moved` at a wall), so a blocking check needs the plugin to write the position; the d2r-test-harness plugin does not yet.
+- `game_ctl.py --slot N moved [--wait 1.5] click FX FY [right] | key KEY..`: reads the player position before and after
+  and prints whether and how far the character moved (exit 0 = moved, 1 = not, 2 = cannot tell). It needs the plugin to
+  write the position into the harness block: set `idx_player_x`/`idx_player_y` (and optionally `idx_player_level`) in
+  `[harness]` (world subtiles, see docs/testing.md). Without them it refuses with exit 2; there is no screen fallback
+  (animation made it report a move at a wall). Needs a plugin that writes the position (d2r-test-harness#1).
 - The pure parts (`side_by_side`, `identical`, `position_diff`, `parse_warp`) are tested in `tests/test_testing_helpers.py`.
 
 ## Config keys

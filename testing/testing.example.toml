@@ -67,8 +67,10 @@ idx_flags = 7
 idx_cmd_seq = 8
 idx_cmd_ack = 9
 idx_cmd_result = 10
-idx_player_x = 0                                # optional, 0 = none: the plugin writes the player's world subtile x here (`moved`)
-idx_player_y = 0                                # optional, 0 = none: ... and y here (a plugin that offers them, e.g. 11 and 12)
+# Optional, for `game_ctl.py moved`: -1 = the plugin offers none. Suggested indexes 11, 12, 13 (see docs/testing.md).
+idx_player_x = -1                               # the player's world subtile x, written by the plugin
+idx_player_y = -1                               # ... y
+idx_player_level = -1                           # ... and the level id (a change during an action stops `moved`)
 flag_background = 1                             # value for idx_flags: do not bring the game window to the front
 word_file = "my-testharness.txt"                # in the plugins folder; its presence turns the harness on
 console_file = "my-testharness-console.txt"     # in the plugins folder; the plugin appends command output here
