@@ -75,7 +75,7 @@ Env vars: `MODKIT_SLOT`, `MODKIT_RUN`, `MODKIT_TESTING_CONFIG`.
   and prints whether and how far the character moved (exit 0 = moved, 1 = not). It reads the harness block's optional
   `idx_player_x`/`idx_player_y` (world subtiles; set both in `[harness]` when your plugin writes them, see
   docs/testing.md). Without them it compares screenshots (the camera follows the character) and labels the result a
-  screen estimate: a plugin change is needed for exact positions.
+  screen estimate. The estimate is noisy (fire, monsters and effects change the frame even when the character is stuck against a wall: in a Torture Halls check it reported `moved` at a wall), so a blocking check needs the plugin to write the position; the d2r-test-harness plugin does not yet.
 - The pure parts (`side_by_side`, `identical`, `position_diff`, `parse_warp`) are tested in `tests/test_testing_helpers.py`.
 
 ## Config keys
