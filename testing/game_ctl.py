@@ -7,6 +7,8 @@
   python testing/game_ctl.py --slot N key esc enter ctrl+s  keys, as window messages
   python testing/game_ctl.py --slot N click 0.5 0.5 [right]  click at a fraction of the client area
   python testing/game_ctl.py --slot N console "some command"  a console line, run through the plugin harness
+  python testing/game_ctl.py --slot N pair NAME LEVEL,X,Y  warp, light up, save a side-by-side HD|legacy (g) PNG
+  python testing/game_ctl.py --slot N moved click FX FY | key KEY..   did the character move? (exit 1 = no)
   python testing/game_ctl.py --slot N release              give the mouse and keyboard back to the person at the PC
   python testing/game_ctl.py --slot N harness on|off       write / remove the plugin's harness word file
 
@@ -785,14 +787,33 @@ def run_screens_dir(cfg: tc.Config) -> str:
     return os.path.join(cfg.run_dir(run), cfg["runs"]["screenshots_dir"])
 
 
+def split_own_options(argv: list[str]) -> int | None:
+    """Index of the `pair` / `moved` command word in argv (skipping the values of --slot and --config), else None."""
+    skip = False
+    for i, t in enumerate(argv):
+        if skip:
+            skip = False
+        elif t in ("--slot", "--config"):
+            skip = True
+        elif not t.startswith("-"):
+            return i if t in ("pair", "moved") else None
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     tc.add_config_arg(ap)
     ap.add_argument("--slot", type=int, help="slot number (or MODKIT_SLOT); slot 1 is refused")
     ap.add_argument("cmd", nargs="?", choices=("status", "start", "stop", "shot", "key", "click", "console", "harness",
-                                                  "release"))
+                                                  "release", "pair", "moved"))
     ap.add_argument("args", nargs="*")
-    a = ap.parse_args(argv)
+    argv = sys.argv[1:] if argv is None else list(argv)
+    own = split_own_options(argv)  # pair and moved parse their own options, in any position: hand them the rest raw
+    if own is not None:
+        a = ap.parse_args(argv[:own + 1])
+        a.args = argv[own + 1:]
+    else:
+        a = ap.parse_args(argv)
     if not a.cmd:
         print(__doc__)
         return 0
@@ -834,6 +855,9 @@ def _run(g: Game, a) -> int:
         print(text.rstrip() or "(no output captured)")
     elif c == "harness":
         g.harness_switch((args[:1] or ["on"])[0] == "on")
+    elif c in ("pair", "moved"):
+        import check_helpers
+        return (check_helpers.run_pair if c == "pair" else check_helpers.run_moved)(g, args)
     elif c == "release":
         g.need_harness().release()
         print(f"slot {g.slot}: the game reads the real mouse and keyboard again")

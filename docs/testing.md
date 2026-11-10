@@ -254,6 +254,7 @@ the defaults are:
 | 8 | `idx_cmd_seq` | tools | Command counter. The tools write the command text, then increase this by one. |
 | 9 | `idx_cmd_ack` | plugin | The plugin sets this to the `cmd_seq` value it has handled. |
 | 10 | `idx_cmd_result` | plugin | Result of that command: 1 = handled by the console. |
+| (11, 12, 13) | `idx_player_x`, `idx_player_y`, `idx_player_level` | plugin | **Optional**, suggested indexes 11, 12, 13; the config default is `-1` = not offered. The player's position in world subtiles (the same ones `cheat goto` takes) and the level id, refreshed by the plugin at least every 100 ms while a game runs. A position of (0, 0) means "not written yet". `game_ctl.py moved` reads them and refuses (exit 2) without them; a level change during the action also stops it. |
 
 At byte `harness.command_offset` (default 64) is the command text: UTF-8, ending with a zero byte, at most
 `harness.command_max` (default 500) bytes. The block must be big enough: `command_offset + command_max + 1` must fit in

@@ -78,6 +78,7 @@ DEFAULTS: dict[str, Any] = {
         "command_max": 500,
         "idx_magic": 0, "idx_active": 1, "idx_x": 2, "idx_y": 3, "idx_buttons": 4, "idx_mods": 5, "idx_seq": 6,
         "idx_flags": 7, "idx_cmd_seq": 8, "idx_cmd_ack": 9, "idx_cmd_result": 10,
+        "idx_player_x": -1, "idx_player_y": -1, "idx_player_level": -1,  # optional (-1 = the plugin offers none): the player's world subtile and level id
         "flag_background": 1,           # value written to idx_flags: do not bring the game window to the front
         "word_file": "my-testharness.txt",              # in the plugins folder; its presence turns the harness on
         "console_file": "my-testharness-console.txt",   # in the plugins folder; the plugin appends command output

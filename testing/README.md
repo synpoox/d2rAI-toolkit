@@ -9,6 +9,7 @@ Windows is needed to run the game; everything else (locks, config, checks, relea
 | `testing_config.py` | Reads the config and does all the path math (slot folders, save folders, lock folders). |
 | `game_slots.py` | Slots = separate copies of the game install. Setup, sync, lock, unlock, status. |
 | `game_ctl.py` | Starts, stops and drives one slot's game: screenshots, keys, clicks, console commands. |
+| `check_helpers.py` | `pair` (warp, light up, HD|legacy side-by-side PNG) and `moved` (did the character move?), run as `game_ctl.py` subcommands. |
 | `game_checks.py` | Small checks framework: `@check` registry, runner, results JSON, summary, screenshots. |
 | `example_checks.py` | Example checks to copy (`config-sane`, `game-starts`, `main-menu-visible`, `console-echo`, `no-new-crash-files`). |
 | `slot_install.py` | Installs a built mod project into a slot (`modkit install`), keeping the slot's own savepath. |
@@ -51,7 +52,7 @@ python testing/game_slots.py [--config F] status | list
 python testing/game_slots.py setup|sync [N ...] [--link] [--dry-run]
 python testing/game_slots.py lock N|any [OWNER] [--wait SECONDS]
 python testing/game_slots.py unlock N [OWNER] [--force]
-python testing/game_ctl.py   --slot N status|start|stop|shot NAME|key KEY..|click FX FY [right]|console CMD|harness on|off
+python testing/game_ctl.py   --slot N status|start|stop|shot NAME|key KEY..|click FX FY [right]|console CMD|harness on|off|pair NAME LEVEL,X,Y [--light N] [--settle S]|moved click FX FY|key KEY..
 python testing/game_checks.py list [names or tags]
 python testing/game_checks.py run [names or tags] --slot N [--run-id ID] [--keep] [--stop-on-fail] [--module M] [--path DIR]
 python testing/slot_install.py --slot N PROJECT
@@ -62,6 +63,23 @@ python testing/release_install.py restore|status --slot N
 
 Config file: `--config F`, else env `MODKIT_TESTING_CONFIG`, else `./modkit-testing.toml`. A JSON file works too.
 Env vars: `MODKIT_SLOT`, `MODKIT_RUN`, `MODKIT_TESTING_CONFIG`.
+
+## Check helpers
+
+- `game_ctl.py --slot N pair NAME LEVEL,X,Y [--light 12] [--settle 3] [--key g]`: runs `cheat stat item_lightradius,<light>`
+  (`--light 0` skips it; the radius stays raised for the rest of the game session, so use `--light 0` when lighting is what
+  you judge), `cheat goto LEVEL,X,Y`, waits, shoots HD, presses `g`, shoots legacy, presses `g` back, and saves
+  HD (left) | legacy (right) as `<runs.dir>/<run>/screenshots/NAME.png`. The window is found again by PID before every shot
+  and key. The legacy toggle is pressed back even when a shot fails. Prints the path and the HD-to-legacy distance beside the noise
+  between two HD shots; warns and exits 1 when the shots are identical (within the larger of 0.5 and 3x the noise: the
+  toggle did nothing, or not in HD).
+  The game must be in a game; use Hell and a level 90+ character.
+- `game_ctl.py --slot N moved [--wait 1.5] click FX FY [right] | key KEY..`: reads the player position before and after
+  and prints whether and how far the character moved (exit 0 = moved, 1 = not, 2 = cannot tell). It needs the plugin to
+  write the position into the harness block: set `idx_player_x`/`idx_player_y` (and optionally `idx_player_level`) in
+  `[harness]` (world subtiles, see docs/testing.md). Without them it refuses with exit 2; there is no screen fallback
+  (animation made it report a move at a wall). Needs a plugin that writes the position (d2r-test-harness#1).
+- The pure parts (`side_by_side`, `identical`, `position_diff`, `parse_warp`) are tested in `tests/test_testing_helpers.py`.
 
 ## Config keys
 
