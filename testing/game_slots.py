@@ -252,7 +252,7 @@ MIN_UNLOCK_AGE = datetime.timedelta(minutes=30)
 def lock_age(info: LockInfo, now: datetime.datetime | None = None) -> datetime.timedelta | None:
     """How long the lock has been held, from the local time in owner.txt. None when it cannot be read."""
     when = info.when
-    if not when:
+    if not when:  # unreadable time fails open: only the pid rule then guards the lock
         return None
     try:
         t = datetime.datetime.strptime(when[:19], "%Y-%m-%d %H:%M:%S")
@@ -288,7 +288,7 @@ def unlock_refusal(info: LockInfo, caller: str | None, now: datetime.datetime | 
         why.append(f"its process {info.pid} is still running")
     if not why:
         return None
-    return f"slot lock of {info.owner or 'someone'} not freed: {'; '.join(why)}. Pass --force only if it is really finished"
+    return f"slot lock of {info.owner or 'someone'} not freed: {'; '.join(why)}. If this is your own lock, run with MODKIT_RUN=<owner>; else --force only if it is really finished"
 
 
 def is_stale(info: LockInfo, alive=None) -> bool:
@@ -370,7 +370,7 @@ def ensure_lock(cfg: tc.Config, n: int, owner: str, alive=None) -> tuple[bool, s
         return True, f"slot {n} locked by {owner}", False
     ok, msg = acquire(cfg, n, owner, pid=0, alive=alive)
     if ok:
-        msg += f" (manual lock: run `unlock {n}` when you are done)"
+        msg += f" (manual lock: run `MODKIT_RUN={owner} unlock {n} {owner}` when you are done)"
     return ok, msg, ok
 
 

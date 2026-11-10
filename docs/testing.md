@@ -45,7 +45,7 @@ MODKIT_RUN=my-lane python testing/slot_install.py --slot 2 my-project
 MODKIT_RUN=my-lane python testing/game_checks.py run --slot 2
 
 # 6. Give the slot back.
-python testing/game_slots.py unlock 2 my-lane
+MODKIT_RUN=my-lane python testing/game_slots.py unlock 2 my-lane   # PowerShell: $env:MODKIT_RUN='my-lane'; python ...
 ```
 
 In PowerShell set the variable first: `$env:MODKIT_RUN = "my-lane"`.
@@ -162,7 +162,7 @@ python testing/game_slots.py unlock N [OWNER] [--force]
 `--force` to clear whatever is there (use it for the lock of a lane that has died). Exit codes: 0 ok, 1 the lock is
 held by somebody else (or `unlock` refused it), 2 bad usage, bad config, or slot 1.
 `status` shows each lock's age. `unlock` refuses a lock younger than 30 min, or whose owner pid still runs, and names
-the age and owner; `OWNER` equal to your own `MODKIT_RUN` (you free your own lock) and `--force` pass.
+the age and owner; a manual `owner-*` lock is released by its owner with `MODKIT_RUN=<owner>` (otherwise only after 30 min), or by `--force` once you have confirmed no one is playing; `OWNER` equal to your own `MODKIT_RUN` (you free your own lock) and `--force` pass.
 
 ### The pattern for several agents
 
@@ -170,7 +170,7 @@ the age and owner; `OWNER` equal to your own `MODKIT_RUN` (you free your own loc
 2. `python testing/game_slots.py lock any <lane> --wait 1800`. Note the slot number it prints.
 3. Install, run, look. Put the slot and the run id on **every** command:
    `MODKIT_RUN=<lane> python testing/game_checks.py run --slot 2`.
-4. `python testing/game_slots.py unlock 2 <lane>`, also when something failed. Do not end your turn while holding a
+4. `MODKIT_RUN=<lane> python testing/game_slots.py unlock 2 <lane>` (PowerShell: `$env:MODKIT_RUN='<lane>'` first), also when something failed. Do not end your turn while holding a
    slot or while a game you started is still running.
 
 Only touch a slot you hold the lock for, checked at that moment. Never kill processes by a broad filter such as
@@ -393,7 +393,7 @@ python testing/game_slots.py lock 2 my-lane
 MODKIT_RUN=my-lane python testing/release_install.py install --slot 2
 MODKIT_RUN=my-lane python testing/game_checks.py run smoke --slot 2
 MODKIT_RUN=my-lane python testing/release_install.py restore --slot 2     # your developer install is back
-python testing/game_slots.py unlock 2 my-lane
+MODKIT_RUN=my-lane python testing/game_slots.py unlock 2 my-lane   # PowerShell: $env:MODKIT_RUN='my-lane'; python ...
 ```
 
 | Command | What it does |
