@@ -36,7 +36,7 @@ GAME SLOTS AND TESTS
   the mouse, keyboard or focus.
 - Game slots <N, N> are shared by many lanes and are queued, never added. Hold a slot for your whole game session:
   `python testing/game_slots.py lock N <lane>`. Run checks with the run id set to your lane name (`MODKIT_RUN=<lane>`) so runs don't release
-  your lock. Restore the slot afterwards, then `python testing/game_slots.py unlock N <lane>` straight away: others
+  your lock. Restore the slot afterwards, then `MODKIT_RUN=<lane> python testing/game_slots.py unlock N <lane>` straight away: others
   are waiting.
 - If every slot is locked, do NOT end your turn: poll `game_slots.py status` in a bounded wait loop (a few minutes at
   a time, up to about 30 minutes) and continue as soon as one is free.

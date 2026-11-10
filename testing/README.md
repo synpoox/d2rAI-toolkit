@@ -22,7 +22,7 @@ python testing/game_slots.py setup 2                       # copy your install i
 python testing/game_slots.py lock 2 my-lane                # take the slot (queue: add --wait 600)
 MODKIT_RUN=my-lane python testing/slot_install.py --slot 2 my-project   # your built mod, slot's savepath
 MODKIT_RUN=my-lane python testing/game_checks.py run --slot 2
-python testing/game_slots.py unlock 2 my-lane
+MODKIT_RUN=my-lane python testing/game_slots.py unlock 2 my-lane
 ```
 
 `python testing/game_checks.py list` shows the checks. Results: `<runs.dir>/<run id>/results.json`,
@@ -40,6 +40,8 @@ python testing/game_slots.py unlock 2 my-lane
   lock made by `lock`; it lasts until `unlock`, and runs inside it do not free it.
 - `lock N <owner> --wait SECONDS` queues: it prints who holds the slot and polls. `lock any <owner>` takes the first
   free slot from 2 up. `unlock N <owner>`, or `unlock N --force` to clear a stale lock of a finished lane.
+  `status` shows each lock's age ("held 6 min"). `unlock` refuses a lock younger than 30 min or whose owner pid still
+  runs, and names the age and owner, unless `<owner>` equals your own `MODKIT_RUN` (freeing your own lock) or `--force`.
 - Nothing here sends real mouse or keyboard input or takes focus. The window is found by PID, never by title.
 
 ## Command lines

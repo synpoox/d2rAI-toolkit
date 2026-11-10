@@ -5,6 +5,7 @@ No game, no network. Locks and copies happen in a temporary folder.
 from __future__ import annotations
 
 import contextlib
+import datetime
 import io
 import json
 import os
@@ -561,12 +562,48 @@ class StatusAndCliTests(unittest.TestCase):
         self.assertEqual(rc, 1)
         rc, _, _ = self.cli("unlock", "2")  # no owner, no force
         self.assertEqual(rc, 1)
-        rc, _, _ = self.cli("unlock", "2", "lane-a")
+        rc, _, _ = self.cli("unlock", "2", "lane-a", env={"MODKIT_RUN": "lane-a"})
         self.assertEqual(rc, 0)
         self.assertIsNone(gs.lock_info(self.cfg, 2))
         self.cli("lock", "3", "lane-a")
         rc, _, _ = self.cli("unlock", "3", "--force")
         self.assertEqual(rc, 0)
+
+    def write_lock(self, n, owner, pid, when):
+        gs.acquire(self.cfg, n, owner, pid=pid)
+        Path(self.cfg.lock_path(n), "owner.txt").write_text(gs.format_owner(owner, pid, when), encoding="utf-8")
+
+    def test_status_shows_lock_age(self):
+        now = datetime.datetime.now()
+        self.write_lock(2, "lane-a", 0, now - datetime.timedelta(minutes=6, seconds=10))
+        self.write_lock(3, "lane-b", 0, now - datetime.timedelta(days=1, hours=3, minutes=5))
+        _, out, _ = self.cli("status")
+        self.assertIn("(held 6 min)", out)
+        self.assertIn("(held 1 d 3 h)", out)
+        self.assertEqual(gs.format_age(datetime.timedelta(seconds=20)), "<1 min")
+        self.assertEqual(gs.format_age(datetime.timedelta(minutes=135)), "2 h 15 min")
+
+    def test_unlock_refuses_young_lock_of_another_caller(self):
+        self.write_lock(2, "lane-a", 0, datetime.datetime.now() - datetime.timedelta(minutes=5))
+        rc, out, _ = self.cli("unlock", "2", "lane-a", env={"MODKIT_RUN": "orchestrator"})
+        self.assertEqual(rc, 1)
+        self.assertIn("5 min", out)
+        self.assertIn("lane-a", out)
+        self.assertIsNotNone(gs.lock_info(self.cfg, 2))
+        rc, _, _ = self.cli("unlock", "2", "lane-a", "--force", env={"MODKIT_RUN": "orchestrator"})
+        self.assertEqual(rc, 0)
+        self.assertIsNone(gs.lock_info(self.cfg, 2))
+
+    def test_unlock_old_dead_lock_passes_but_live_owner_refused(self):
+        old = datetime.datetime.now() - datetime.timedelta(hours=2)
+        self.write_lock(2, "lane-a", 0, old)
+        rc, _, _ = self.cli("unlock", "2", "lane-a", env={"MODKIT_RUN": "orchestrator"})
+        self.assertEqual(rc, 0)
+        self.write_lock(2, "lane-a", 4242, old)
+        info = gs.lock_info(self.cfg, 2)
+        self.assertIn("4242", gs.unlock_refusal(info, "other", alive=alive))
+        self.assertIsNone(gs.unlock_refusal(info, "other", alive=dead))
+        self.assertIsNone(gs.unlock_refusal(info, "lane-a", alive=alive))  # the owner frees its own lock
 
     def test_slot_one_exit_code_is_2(self):
         for cmd in (("lock", "1", "lane-a"), ("unlock", "1", "lane-a"), ("setup", "1")):

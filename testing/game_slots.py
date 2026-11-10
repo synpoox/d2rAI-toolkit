@@ -10,6 +10,9 @@ Slots 2..game.slot_count are copies in game.slots_dir. See docs/testing.md.
   python testing/game_slots.py lock N|any [OWNER] [--wait SECONDS]
   python testing/game_slots.py unlock N [OWNER] [--force]
 
+`status` shows each lock's age. `unlock` refuses a lock younger than 30 min or whose owner process still runs, unless
+OWNER is your own MODKIT_RUN (you free your own lock) or --force is given.
+
 Environment: MODKIT_RUN is the default OWNER, MODKIT_SLOT the default N. A lock is a folder
 <runs.dir>/game.lock.N holding owner.txt: `<owner> pid=<pid> <time>`. A lock whose pid is dead is stale and is
 replaced. pid=0 marks a manual lock (made by `lock`): it lasts until `unlock`.
@@ -243,6 +246,51 @@ def lock_info(cfg: tc.Config, n: int) -> LockInfo | None:
     return LockInfo(p, txt)
 
 
+MIN_UNLOCK_AGE = datetime.timedelta(minutes=30)
+
+
+def lock_age(info: LockInfo, now: datetime.datetime | None = None) -> datetime.timedelta | None:
+    """How long the lock has been held, from the local time in owner.txt. None when it cannot be read."""
+    when = info.when
+    if not when:  # unreadable time fails open: only the pid rule then guards the lock
+        return None
+    try:
+        t = datetime.datetime.strptime(when[:19], "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return None
+    return max((now or datetime.datetime.now()) - t, datetime.timedelta(0))
+
+
+def format_age(age: datetime.timedelta) -> str:
+    mins = int(age.total_seconds() // 60)
+    if mins < 1:
+        return "<1 min"
+    if mins < 60:
+        return f"{mins} min"
+    h, m = divmod(mins, 60)
+    if h < 24:
+        return f"{h} h {m} min"
+    d, h = divmod(h, 24)
+    return f"{d} d {h} h"
+
+
+def unlock_refusal(info: LockInfo, caller: str | None, now: datetime.datetime | None = None, alive=None) -> str | None:
+    """Why `unlock` must not free this lock (None: it may). The owner freeing its own lock (caller == the lock's
+    owner, i.e. MODKIT_RUN) always passes; anybody else needs the lock to be 30 min old and its process gone."""
+    if info.owner is not None and info.owner == caller:
+        return None
+    alive = alive or pid_alive
+    age = lock_age(info, now)
+    why = []
+    if age is not None and age < MIN_UNLOCK_AGE:
+        why.append(f"held only {format_age(age)} (under {int(MIN_UNLOCK_AGE.total_seconds() // 60)} min)")
+    if info.pid and alive(info.pid):
+        why.append(f"its process {info.pid} is still running")
+    if not why:
+        return None
+    return f"slot lock of {info.owner or 'someone'} not freed: {'; '.join(why)}. If this is your own lock, run with MODKIT_RUN=<owner>; else --force only if it is really finished"
+
+
 def is_stale(info: LockInfo, alive=None) -> bool:
     """True when the owner's pid is known, is not 0 (manual) and no longer runs."""
     alive = alive or pid_alive
@@ -322,7 +370,7 @@ def ensure_lock(cfg: tc.Config, n: int, owner: str, alive=None) -> tuple[bool, s
         return True, f"slot {n} locked by {owner}", False
     ok, msg = acquire(cfg, n, owner, pid=0, alive=alive)
     if ok:
-        msg += f" (manual lock: run `unlock {n}` when you are done)"
+        msg += f" (manual lock: run `MODKIT_RUN={owner} unlock {n} {owner}` when you are done)"
     return ok, msg, ok
 
 
@@ -572,14 +620,16 @@ def slot_state(cfg: tc.Config, n: int) -> dict:
     return {"slot": n, "dir": game, "present": have, "own": cfg.is_slot_one(n),
             "running": slot_processes(cfg, n) if have else [],
             "lock": None if lk is None else lk.describe(), "names": matched_names(cfg, n),
-            "stale": bool(lk and lk.text and is_stale(lk)), "savepath": sp}
+            "stale": bool(lk and lk.text and is_stale(lk)), "savepath": sp,
+            "age": None if lk is None else lock_age(lk)}
 
 
 def format_status(st: dict) -> str:
     if st.get("error"):
         return f"slot {st['slot']}: {st['error']}"
     name = "slot 1 (your own game, never touched)" if st.get("own") else f"slot {st['slot']}"
-    lock = "free" if st["lock"] is None else ("STALE " if st["stale"] else "") + f"locked: {st['lock']}"
+    lock = "free" if st["lock"] is None else ("STALE " if st["stale"] else "") + f"locked: {st['lock']}" + (
+        f" (held {format_age(st['age'])})" if st.get("age") is not None else "")
     return (f"{name}: {st['dir']} {'ok' if st['present'] else 'MISSING (run setup)'}; "
             f"matches {', '.join(st.get('names') or []) or '-'}; "
             f"running {st['running'] or '-'}; {lock if not st.get('own') else 'not lockable'}; savepath {st['savepath']}")
@@ -659,6 +709,12 @@ def _run(cfg: tc.Config, a) -> int:
             return 2
         return 0 if ok else 1
     if a.cmd == "unlock":
+        info = lock_info(cfg, n)
+        if owner and info is not None and info.owner == owner and not a.force and not cfg.is_slot_one(n):
+            why = unlock_refusal(info, tc.env_run())
+            if why:
+                print(why)
+                return 1
         ok, msg = release(cfg, n, owner, manual=True, force=a.force)
         print(msg)
         if cfg.is_slot_one(n):
