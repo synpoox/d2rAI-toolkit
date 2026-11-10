@@ -67,6 +67,8 @@ idx_flags = 7
 idx_cmd_seq = 8
 idx_cmd_ack = 9
 idx_cmd_result = 10
+idx_player_x = 0                                # optional, 0 = none: the plugin writes the player's world subtile x here (`moved`)
+idx_player_y = 0                                # optional, 0 = none: ... and y here (a plugin that offers them, e.g. 11 and 12)
 flag_background = 1                             # value for idx_flags: do not bring the game window to the front
 word_file = "my-testharness.txt"                # in the plugins folder; its presence turns the harness on
 console_file = "my-testharness-console.txt"     # in the plugins folder; the plugin appends command output here

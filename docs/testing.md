@@ -254,6 +254,7 @@ the defaults are:
 | 8 | `idx_cmd_seq` | tools | Command counter. The tools write the command text, then increase this by one. |
 | 9 | `idx_cmd_ack` | plugin | The plugin sets this to the `cmd_seq` value it has handled. |
 | 10 | `idx_cmd_result` | plugin | Result of that command: 1 = handled by the console. |
+| 11, 12 | `idx_player_x`, `idx_player_y` | plugin | **Optional** (config 0 = not offered). The player's position in world subtiles, refreshed by the plugin at least every 100 ms while a game runs. `game_ctl.py moved` reads them; without them it only estimates movement from the screen. |
 
 At byte `harness.command_offset` (default 64) is the command text: UTF-8, ending with a zero byte, at most
 `harness.command_max` (default 500) bytes. The block must be big enough: `command_offset + command_max + 1` must fit in
