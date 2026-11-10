@@ -160,7 +160,9 @@ python testing/game_slots.py unlock N [OWNER] [--force]
 
 `OWNER` defaults to `MODKIT_RUN` (then `manual`); the slot defaults to `MODKIT_SLOT`. `unlock` needs the owner, or
 `--force` to clear whatever is there (use it for the lock of a lane that has died). Exit codes: 0 ok, 1 the lock is
-held by somebody else, 2 bad usage, bad config, or slot 1.
+held by somebody else (or `unlock` refused it), 2 bad usage, bad config, or slot 1.
+`status` shows each lock's age. `unlock` refuses a lock younger than 30 min, or whose owner pid still runs, and names
+the age and owner; `OWNER` equal to your own `MODKIT_RUN` (you free your own lock) and `--force` pass.
 
 ### The pattern for several agents
 
