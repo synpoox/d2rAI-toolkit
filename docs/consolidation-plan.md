@@ -41,8 +41,12 @@ What local first still requires (phase 1):
 
 ## 2. Rules for every move
 
-1. **Generic moves, constants stay.** A moved module takes the project's data as parameters or config: id lists,
-   rules maps, scopes, mod name, slot numbers. The project keeps a thin driver.
+1. **Only generic tools move.**
+   - The test: would another mod use it as it is, passing in only its own data (id lists, rules maps, scopes, mod
+     name, slot numbers)? If not, it stays in its project. Section 5.10 lists what stays.
+   - A file may be split only when the generic part stands on its own. The project keeps the rest plus a thin driver.
+   - Something that is generic in principle but that only one project uses today is marked **"later"**. It moves when
+     a second mod needs it, not before.
 2. **Tests move with code.** A module never moves without its unit tests. Fixtures are made synthetic where they
    embed project data.
 3. **Copy first, switch later.**
@@ -119,10 +123,14 @@ other P tools import it.
 | P | `pd2-baseline.json` | `templates/baseline.example.json`. | S |
 | 9 | Monster AI pairing (BaseId to D2R AI) | New dataset, generated. Only 9 of 169 pairs are read today. | M |
 
-### 5.2 `shared/classic_import/maps`: DS1 to HD presets and scoring (P, one unit)
+### 5.2 Later: DS1 to HD presets and scoring (P, one unit)
 
-These files depend on each other and move together. The PD2 constants are few: jungle UNWALKABLE ratios, the TERRAIN
-preset, `merge/presets-hd.d` and overrides paths, and the scorer baselines.
+**Stays in pd2-resurrected for now.** Only pd2-resurrected adds classic maps today, and the generator is tuned to its
+maps. Exception: the two plain file readers in the first two rows move now, because they are useful to any mod.
+
+When a second mod adds maps, these files move to `shared/classic_import/maps` as one unit, because they depend on each
+other. The PD2 constants to leave behind then: jungle UNWALKABLE ratios, the TERRAIN preset, `merge/presets-hd.d` and
+overrides paths, the area lists and the scorer baselines.
 
 | Item | Size |
 |---|---|
@@ -154,7 +162,7 @@ preset, `merge/presets-hd.d` and overrides paths, and the scorer baselines.
 | 9 | `tests/game/leech_checks.py` @ticket/29-leech | `testing/save_edit.py`: unlock difficulties (byte 0x15 = 0x0f, bytes 0x98–0x9a, then `finalize`). | S |
 | P | `tests/game/*_checks.py` `_log(ctx)` | `check_helpers.plugin_log()`. | S |
 | P | `tests/game/missile_probe.py` | `testing/unit_probe.py`: read-only unit and missile counter; RVAs come from the address registry. | S |
-| P | `tools/pd2_edge_tour.py` | `testing/edge_tour.py`: plan warps along map edges, capture HD and legacy pairs. Reuse `check_helpers.pair` and `goto_line`; drop the duplicate subtile maths. | L |
+| P | `tools/pd2_edge_tour.py` | **Later, with 5.2**: it depends on `pd2_fidelity.classify`. When it moves: `testing/edge_tour.py`, reusing `check_helpers.pair` and `goto_line`. | L |
 | P | `tools/contact_sheet.py` | `testing/contact_sheet.py`: contact sheet plus luma and black-pixel metrics. Merge with `check_helpers.side_by_side`. | S |
 | P | `tools/pd2_warps.py` | `testing/warps.py`: generate a `cheat goto` doc for added maps. | S |
 | P | `tools/pd2_force_ds1.py` | `testing/force_ds1.py`: pin a DS1 variant in a slot; mod folder read from `mod.json`. | S |
@@ -297,6 +305,36 @@ The three repos carry drifting copies of the same agent scaffold. Write it once 
 | Periodic documentation audit: check claims and links against main | P `@research/documentation-audit` | `docs/ai-workflow.md` | S |
 | Player README outline, GLOSSARY template | P | `templates/` | S |
 
+### 5.10 What stays in each project
+
+None of this moves. Where a generic tool above reads one of these, the project passes it in.
+
+**pd2-resurrected**
+
+| What | Why it stays |
+|---|---|
+| `merge/**` rule data: `ids-*.tsv`, rule JSON, `presets-hd.d`, overrides, committed `merge/art` | PD2 content |
+| The project halves of split tools: the RULES map in `pd2_merge`; REFS, FORMULAS, FUNCS, FIXES and the other constants in `pd2_ids`; ITEM_TABLES and the P2/P3/P4/M1/alpha scopes in `pd2_diff`; the PLUGINS and staging lists in `release.py` | PD2 data and choices |
+| The specifics in `companions.py` for its chosen loot filter and item-roll-ranges plugin (FILTER_TABLES, ITEM_RANGES, the item toggle), `companions/**`, the manifest entries | PD2 product choices; only the fetch, verify and install mechanism moves |
+| DS1 to HD preset generator, scorers, `pd2_edge_tour`, `contact_sheet` baselines, `docs/coverage-baseline.tsv` | Section 5.2: later |
+| Gameplay plugin code: `plugin/core-maps` (maps, uber bosses, unique maps, key drops, event portals, the boss AIs), `plugin/core-rules` (cube, item, loot, hireling rules and PD2 skills), `plugin/core-ui` features (quantity overlay, stack split) | PD2 gameplay; only the engine mechanisms in 5.7 move |
+| `tests/game/*_checks.py` and fixtures | Checks for PD2 rules; only the `_log` helper moves |
+| `patches/*.json`, `mod.json`, `release.toml`, `pd2-baseline.json` values, `.gitmodules`, `.github/FUNDING.yml` | Project configuration |
+| Workflow specifics: runner labels, `C:\pd2r-cache`, the `parity-drop-ok` label, the release title | Project configuration; only templates with inputs move |
+| `docs/roadmap.md` (its work items and prefixes), `deviations.md` / `pd2-origin-bugs.md` / `d2r-only-content.md` rows, `core-rules.md` rows, `item-rules.md`, `map-system.md`, `uber-bosses.md`, `unported-rows.md`, `warlock.md`, `docs/agents/warp-locations.md` | PD2 plans and ledgers; only the formats move as templates |
+| The decisions in ADRs 0001–0005 | Project decisions; knowledge gains only the option and its consequences |
+| Research on the source mod's own DLL (`pd2-map-system-dll`, `pd2-uber-bosses-dll`, `pd2-pandemonium-uber-tristram`), the PD2 inventories (map system, only-levels data, remaining items, uber bosses, unported rows), `@research/pd2-merge-speed`, `@research/lp-comparisons` | About PD2, not D2R |
+| The PD2 behaviour in the 25 skill work-item notes | Only the D2R function signatures and slots move |
+| `GLOSSARY.md` map and uber terms, README, CHANGELOG entries, `changelog.d` fragments | Product text |
+| Its own test-slot numbers (Slot4–8) and testing config | Go into the slot registry as data, not code |
+
+**Project Forever:** the product docs (priorities, identity, overhaul scope, first-release strategy, play modes and
+leagues, the bow Amazon rework), `GLOSSARY.md`, the ADR's decision, the build choices in `archetype-weaknesses`, the
+options sections of its research docs, `source-document-inventory.json`.
+
+**resurrected-09:** the `09-rules` plugin and its chosen values (the DR cap of 75, the leech rule), the 09 rules in
+`to_113c.py`, `docs/deviations.md` rows, `mod.json`, map issue #12, the mod-name and character assertions in its checks.
+
 ## 6. Contradictions and drift to settle in the toolkit
 
 Each becomes one toolkit issue, fixed with evidence while doing the matching move.
@@ -336,7 +374,7 @@ Each becomes one toolkit issue, fixed with evidence while doing the matching mov
 2. **Phase 1**: 1.1–1.4 in the toolkit, then 1.5 and 1.6. 1.7 waits for the pd2-resurrected alpha.
 3. **Phase 2** lanes. Each lane has its own toolkit folder, so they can run in parallel:
    - A. `classic_import` layer (5.1 P rows), first and blocking for B and C.
-   - B. maps and scoring (5.2), after A.
+   - B. DS1/DT1 and terrain readers (first two rows of 5.2). The rest of 5.2 is later.
    - C. art and asset ports (5.3, plus the 5.1 rows for strings, sounds, animdata, skill icons and automap), after A.
    - D. 1.09d datasets and generators (5.1 rows from 9), independent.
    - E. testing (5.4), independent.
@@ -370,6 +408,6 @@ when that happens, kept small by phase 1:
 2. Decision records: should each project keep its own style (ADRs in pd2-resurrected and Project Forever, the map
    issue in resurrected-09), or should the toolkit pick one?
 3. Is `archetype-weaknesses` (Project Forever) worth a toolkit page, or does it stay with the mod?
-4. Should the HD preset generator (5.2) move now, or wait for a second mod that adds maps? It is large, and only
-   pd2-resurrected uses it today.
+4. Review section 5.10, the list of what stays in each project. Anything there that you would share, or anything
+   in 5.1–5.9 that you see as pd2-resurrected-only, flips with one line.
 5. Confirm level 95 for the shared testing rules (contradiction 17).
