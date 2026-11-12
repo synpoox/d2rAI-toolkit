@@ -14,6 +14,7 @@ runs. Everything that needs Windows is behind a function, so the scripts also im
 | `testing/release_install.py` | Puts the **published** release into a slot, the way a player gets it. |
 | `testing/warps.py` | Makes `cheat goto` lines for a level's DS1 reference spots, or a markdown doc for a list of levels. |
 | `testing/force_ds1.py` | Test-only: pins a level to one DS1 variant in a slot's installed `lvlprest.txt`. |
+| `testing/unit_probe.py` | Reads the client's units (monsters, missiles) from the game running in a slot, read-only; see [Reading units](#reading-units-unit_probe). |
 | `testing/example_checks.py` | Five example checks. Copy it and make your own. |
 | `testing/stock_checks.py` | Stock checks that hold for any mod (`slot-savepath`). Turn on with `modules = ["stock_checks"]`. |
 | `testing/testing.example.toml` | The config. Copy it to `modkit-testing.toml`. |
@@ -427,6 +428,24 @@ Everything a run writes goes to `<runs.dir>/<run id>/`:
 
 Screenshots show the game. Keep the whole `runs.dir` **outside the repository**, and never commit a screenshot of the
 game, a save or a log. Share a result by its summary text, or by describing what the picture shows.
+
+## Reading units (unit_probe)
+
+`testing/unit_probe.py` lists the units the game client holds right now (monsters alive, missiles, by their table row) and
+groups missiles that appear together into bursts, so a check can count "how many of this missile did one cast make".
+It uses `ReadProcessMemory` only (it never writes to the game), needs no plugin, and works on **build 93847** only: it
+refuses any other image. Its addresses are copies of `shared/plugin-common/src/rvas_93847*.h`, and a unit test fails if
+they drift.
+
+```python
+from unit_probe import UnitProbe, MONSTER, bursts
+with UnitProbe.for_slot(cfg, 2) as probe:      # needs: MODKIT_RUN=<lane> and `game_slots.py lock 2 <lane>`
+    print(probe.units(MONSTER))
+    print(bursts(probe, row=5, seconds=3.0))
+```
+
+`UnitProbe.for_slot(cfg, n)` is the only way in: it refuses slot 1 (your own game), a slot that is not locked by
+`MODKIT_RUN`, and a slot without a running game, and it takes the process id from that slot's own process list.
 
 ## Test what players get
 

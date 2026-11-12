@@ -21,6 +21,7 @@ Windows is needed to run the game; everything else (locks, config, checks, relea
 | `warps.py` | `cheat goto` lines (and a markdown doc for a list of levels) for a DS1 map's centre, waypoints and boss presets. |
 | `slot_install.py` | Installs a built mod project into a slot (`modkit install`), keeping the slot's own savepath. |
 | `force_ds1.py` | Test-only: pins a level to one DS1 variant in a slot's installed `lvlprest.txt`, so a warp lands on the preset under test. |
+| `unit_probe.py` | Reads the client's units (monsters, missiles) from a running game, read-only, build 93847 only. |
 | `release_install.py` | Installs the PUBLISHED release into a slot, as a player would get it. |
 | `stats.py` | Rate checks for random outcomes (drop, proc, block): `count`, `tolerance_for`, `assert_rate`. |
 | `lod_checks.py` | Checks and helpers for a Lord of Destruction character: plugin loaded, save read, save and exit, create, reload, delete. |
