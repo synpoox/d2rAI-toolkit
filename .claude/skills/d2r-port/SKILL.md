@@ -16,7 +16,7 @@ Read `${CLAUDE_PLUGIN_ROOT}/knowledge/porting-classic-mods.md` first; it has the
   (credit, publishing). Without their permission, stop and say why. Follow their terms throughout.
 - Never commit Blizzard's files or the mod's archives.
 - HD first; classic graphics later. Stand-in vanilla art first, custom art last.
-- Keep an unported list (feature, why, what players see) in the mod project.
+- Keep a deviations ledger (feature, why, what players see) in the mod project: `${CLAUDE_PLUGIN_ROOT}/templates/deviations.md`, saved as `docs/deviations.md`.
 - First milestone: a new character in Act 1. Then work from what breaks.
 
 ## Steps

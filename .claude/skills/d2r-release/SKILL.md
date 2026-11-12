@@ -1,6 +1,6 @@
 ---
 name: d2r-release
-description: Ship a new version of a Diablo II Resurrected mod to players - bump the version, write the changelog in player wording, build and publish the release package with a single fail-fast script, verify the version is live, create release pages, and update the bug list. Use after a batch of fixes is merged, when the user says "release", "publish", "ship it", "new version", or asks how to distribute the mod.
+description: Ship a new version of a Diablo II Resurrected mod to players - bump the version, write the changelog in player wording, build and publish the release package with a single fail-fast script, verify the version is live, create release pages, and close the fixed issues. Use after a batch of fixes is merged, when the user says "release", "publish", "ship it", "new version", or asks how to distribute the mod.
 ---
 
 # Release a mod version
@@ -30,7 +30,7 @@ Releases, Nexus Mods, or a mix) is in `${CLAUDE_PLUGIN_ROOT}/docs/distribution.m
 2. **Changelog: fragments only.** Nobody writes a version section by hand. Each PR added a fragment file in the project's
    `changelog.d/` (`${CLAUDE_PLUGIN_ROOT}/templates/changelog.d/README.md`): player wording, one line per change, issue
    numbers, and a bold note first if players must restart or update something. Check the fragments read well
-   (`${CLAUDE_PLUGIN_ROOT}/templates/CHANGELOG.md` has the format); a missing one is a fix to the PR, not a hand edit. Rename
+   (the README there has the format); a missing one is a fix to the PR, not a hand edit. Rename
    `### Unreleased` to the version heading in the release commit, and `${CLAUDE_PLUGIN_ROOT}/release/stage.py` folds the
    fragments in when it packages (and deletes them only if the run succeeded).
 3. **Commit** the bump and changelog (noreply identity). Generated headers that differ only in line endings are not

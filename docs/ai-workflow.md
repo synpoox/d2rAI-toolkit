@@ -93,8 +93,8 @@ place to save money.
 ## 3. Lanes: one job, one branch, one PR
 
 **One bug or feature per lane.** Two bugs in one lane means one slow review, one big diff, and one fix you can't ship
-without the other. If two reports look related, merge them into one bug first (see [section 6](#6-the-bug-list)),
-then give that one bug to one lane.
+without the other. If two reports look related, merge them into one issue first,
+then give that one issue to one lane.
 
 **Each lane works in its own checkout.** Use a git worktree (or a separate clone) so lanes never share a working
 directory:
@@ -150,6 +150,17 @@ The orchestrator's context is finite. Before it fills, fill in [`templates/hando
 running agents, waiting items, next jobs, decisions and traps not yet recorded elsewhere) and push it as the only file on
 an **orphan branch** `handoff/orchestrator-<YYYY-MM-DD>`. Orphan, so it shares no history with `main` and never
 shows in a diff; kept, never merged and never deleted. The next orchestrator starts by reading the newest one.
+
+### Decision records
+
+There is one baseline for what the mod is held to, and decisions about how it differs from it are **ADRs**, not
+chat or a long-lived issue. One file per decision, `docs/adr/NNNN-<slug>.md`, from [`templates/ADR.md`](../templates/ADR.md):
+Status, Context, Considered Options, Decision, Consequences, and dated Amendments at the end (later changes are added
+there, not written over the original). A research document ([`templates/research.md`](../templates/research.md))
+lists options and chooses nothing; the owner's choice becomes an ADR. A row of the deviations ledger
+([`templates/deviations.md`](../templates/deviations.md)) cites its ADR, and the table-diff gate checks the ledger
+against the tables. The roadmap ([`templates/PLAN.md`](../templates/PLAN.md)) links the ADRs that shape it and keeps
+status on the issues, not in the file.
 
 ## 4. Choosing models and providers
 
@@ -229,7 +240,7 @@ The steps (the `d2r-release` skill walks through them):
 3. Fold the changelog fragments. Nobody writes a version section by hand: every PR that players will notice adds a
    small file to `changelog.d/` in the player's words ([`templates/changelog.d/README.md`](../templates/changelog.d/README.md)),
    and the release stager folds them into the `### <version> (<date>)` section of
-   [`CHANGELOG.md`](../templates/CHANGELOG.md). Evidence: two PRs editing the same changelog lines conflict; fragments
+   `CHANGELOG.md`. Evidence: two PRs editing the same changelog lines conflict; fragments
    never do.
 4. Run the **whole release as one script** with `set -euo pipefail`, which stops at the first failed step and refuses
    to run if the version, the changelog and the build disagree.
@@ -339,7 +350,7 @@ Tips:
 Setting up a project:
 
 - [ ] Repo created, `main` protected in practice (only the orchestrator merges).
-- [ ] `docs/PLAN.md` and `CHANGELOG.md` (with an empty `changelog.d/`) created from the templates.
+- [ ] `docs/PLAN.md`, `docs/deviations.md`, `changelog.d/` (and `CHANGELOG.md` from its README) created from the templates.
 - [ ] `AGENTS.md` and `docs/agents/` written; private-words list created outside the repo; `tools/check_public.py` wired in.
 - [ ] Commit identity decided (noreply address) and written into the rules.
 - [ ] Game slots set up and locked-down; the owner's real install marked untouchable.

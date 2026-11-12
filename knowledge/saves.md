@@ -12,7 +12,7 @@ Resurrected\mods\<Mod>\` (kept apart from retail saves). D2RLoader also writes i
 | Offset | Size | Field |
 |---|---|---|
 | 0x00 | u32 | signature `0xaa55aa55` |
-| 0x04 | u16 | version `0x69` (105) in 3.3. In D2RLoader extended-format saves bytes 0x06-0x07 read `RD` (u32 `0x44520069`); likely the extended marker (observed, not documented) |
+| 0x04 | u16 / u32 | retail: u16 version `0x69` (105) in 3.3, bytes 0x06-0x07 zero. D2RLoader extended format: u32 `0x44520000 \| extended version`, so bytes 0x06-0x07 read `RD`. Saves written by loader 1.3.1 here carry `0x44520005`; the PluginSDK 0.4.0 README documents `0x44520006` for a loader that carries its custom-page change ([the marker](#the-extended-save-marker)) |
 | 0x08 | u32 | file size |
 | 0x0c | u32 | checksum |
 | 0x15 | u8 | progression. A test save sets `0x0f` to open every difficulty (observed on 3.3; used by `testing/save_edit.py`) |
@@ -119,3 +119,85 @@ Get test items with D2RLoader's debug-mode **Item Spawner** instead of writing i
   the other options are per mod).
 - The shared stash is a separate file per mod save folder (`SharedStashSoftCoreV2.d2i`); it must stay valid (an
   empty valid stash is fine). The folder also holds `Settings.json` and loot-filter files (`*.fltr`).
+
+## The extended-save marker
+
+The first four bytes after the signature tell the formats apart.
+
+| Source | What it says |
+|---|---|
+| PluginSDK 0.4.0 README ("Inventory and Custom Player Pages") | Extended character version `0x44520006` and item version 6. Earlier extended saves (`0x44520005`, item version 5) still load and use the new format after their next save |
+| A scan of the first 8 bytes of 1,051 `.d2s` files (test-slot characters and loader backups, written up to 2026-11-12 by loader 1.3.0-1.3.1) | 844 read `69 00 00 00` (retail: u16 `0x69`, then zero). 207 read `05 00 52 44` (u32 `0x44520005`, extended). **None** read `0x44520069` or `0x44520006` |
+
+So the u32 at 0x04 is `0x44520000 | extended version`: `RD` (`0x52 0x44`) in bytes 0x06-0x07, the version in the low
+16 bits. Both numbers are right for their loader version: **5** on saves written by loader 1.3.1, which ships SDK 0.3.0
+services ([d2rloader-capabilities.md](d2rloader-capabilities.md), "Loader and SDK differ"); **6** is documented by the
+SDK 0.4.0 README for a loader that carries its custom-page change, and no such save has been seen here. A tool must not compare the whole u32 to one constant. Test
+bytes 0x06-0x07 for `RD` to tell extended from retail, and read the low 16 bits as the extended version
+(`testing/lod_checks.py` does the first).
+
+`0x44520069` was an earlier note, never seen in a scan. It is most likely the retail version value `0x69` read
+together with the `RD` bytes (inference). If a save ever shows `0x06`, it was rewritten by a newer loader, one-way
+(below).
+
+## Retail and extended compared
+
+The format is chosen per mod with `[d2rcore.save_format] mode = "extended"` in the mod's
+`d2rloader/config/d2rloader.toml` ([tables.md](tables.md)); retail is the default. Source tags: **doc** = the loader's
+changelog (1.3.0-beta, 1.1.0-beta), guide or the PluginSDK README; **code** = read in this toolkit or in a public
+Rust `.d2s` parser (v96-v105); **observed** = seen in this toolkit's own tests, not root-caused; **unverified** = not tested in game.
+
+| Fact | Retail (`.d2s` v105) | D2RLoader extended | Source |
+|---|---|---|---|
+| Loads where | Retail D2R and D2RLoader | D2RLoader with extended mode on, nowhere else ("cannot load in retail D2R or with extended mode disabled") | doc |
+| Character stat id ("gf") | 9 bits, list ends `0x1ff` (ids 0-510) | 16 bits, ends `0xffff` | code |
+| Item stat id | 9 bits, ends `0x1ff` | wider (exact width not documented) | code / unverified |
+| Class skills ("if") | exactly 30 bytes, one per class skill | more than 30 allowed | doc |
+| Skill ids inside items (oskill, charges, chance-to-cast) | bounded by the stat's `Save Param Bits` | full skill id up to 32,767 | doc |
+| Magic prefix / suffix id | 11 bits (rows 0-2047) | wider ("preserve the wider affix IDs") | code; doc |
+| Rare name ids | 8 bits each | not stated | code |
+| Unique / set id | 12 bits, shared field (rows 0-4095) | high ids need extended (tables go to 32,768 rows) | code; doc |
+| Runeword id | 16-bit field | not stated | code |
+| Item x / y | 4 bits per axis, so a grid is at most 16 x 16 | same | doc |
+| Character file size | 65,535 bytes | **1 MiB** | doc |
+| Custom player pages (plugin inventories) | 1, and the save does not record which plugin owns it | **up to 247**, each identified by plugin scope + plugin id + `logicalId` | doc |
+| Hand-built items | retail layout decoded here | rejected: two hand-built items made characters vanish with correct checksums | observed |
+| Public parsers | read v96-v105, widths from `itemstatcost` | none found | code; unverified |
+
+Retail D2R character stat ids in 3.3 use ids 0-367 (build 93847 `itemstatcost` has 368 rows), well inside 510.
+
+**The sidecar** `<name>.d2rl` (written beside both formats) records the saved mod, plugins, native save identity and
+the `itemstatcost` schema (changelog 1.1.0-beta), plus the hashes above. A save from a missing, different, older or
+incompatible environment gets one combined warning. The body layout beyond the hashes is not documented.
+
+**Format is permanent per character.** Nothing documents a retail-to-extended or extended-to-retail conversion, and
+the loader guide says changing the default mod does not convert a character. Turning extended on after players made
+characters is therefore unverified at best: decide before the first release. The toolkit installer writes the extended
+`d2rloader.toml` only when the file is missing, and never overwrites an edited one. The validator checks the 30-class-
+skill rule only when extended saves are allowed; it does not check ids above the retail widths (511 stats, 2047
+affixes, 4095 uniques and sets).
+
+## Loader updates and extended saves
+
+| Fact | Source |
+|---|---|
+| The extended format first shipped in loader 1.3.0-beta (2026-09-15); 1.3.1-beta followed on 2026-09-24. Every release is labelled beta | doc |
+| It has changed once (not yet in saves written by loader 1.3.1): SDK 0.4.0 moved the character version `0x44520005` to `0x44520006` and the item version 5 to 6. Older saves still load and **are rewritten in the new format on their next save**. Old custom-page items do not name their plugin: load and save them once with only their original page active | doc |
+| Whether an older loader reads a save written by a newer one is not documented: assume one-way | unverified |
+| Multiplayer checks the save format; TCP/IP also checks loader version, mod, shared plugins and the `itemstatcost` schema | doc |
+| Server and shared plugins are recorded in the character's plugin history; client-only plugins are not | doc |
+| A missing custom-page provider: the loader copies the save to `D2RLoader Backups\Recovery`, loads the character **without those items** and warns. If the copy fails the load stops; other placement errors also stop it | doc |
+| The loader backs up offline characters and shared stashes before each session's first save, keeping 1-100 snapshots in `D2RLoader Backups` (one folder for every mod, not per savepath) | doc |
+
+The extended layout belongs to the loader's authors: a loader update can migrate saves forward without asking. Keep a
+corpus of test characters and load them in every candidate loader before a release.
+
+## Savepath
+
+`"savepath": "<X>/"` in modinfo.json sets the folder (`...\Saved Games\Diablo II Resurrected\mods\<X>\`), apart from
+retail. It holds the mod's shared stash, `Settings.json`, loot filters, and beside each character its `.d2rl`, `.key`,
+`.map` and `.ma0`-`.ma3`. **Changing `savepath` hides the old characters**: nothing moves or converts them, and
+character select shows only the new folder. The same savepath under another mod loads these characters against
+foreign tables (unverified; the default-mod trap is in [d2rloader.md](d2rloader.md)). Treat the value as frozen with
+the tables ([tables.md](tables.md), "Freeze before release"). If a project's install step rewrites both modinfo files
+from `mod.json`'s `savepath` on every install, `mod.json` is the value to freeze.

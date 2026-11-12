@@ -1,76 +1,70 @@
-# Plan
+# Roadmap
 
 Target: Diablo II: Resurrected `<GAME VERSION>` (build `<BUILD>`) + D2RLoader `<LOADER VERSION>`.
 Mod: `<MOD NAME>`. Goal: `<one sentence>`.
 
-Update this file when a phase item is done, with the date. The orchestrator owns it. Progress per phase is a rough
-estimate, not a promise.
+The roadmap orders the work. It does not track it: **status lives on the issues**, one per work item, closed by the
+pull request that finishes it. Do not copy status, percentages or dates into this file; they go stale. Link the open
+items with a query instead (`is:open parent-issue:<owner>/<repo>#<milestone issue>`).
 
-| Phase | What | Progress |
+## Work items
+
+- **A work item is about one agent session**: one bug or feature, one branch, one PR. If it needs more, split it.
+- **Lettered prefixes.** Each stream of work gets a prefix letter (or two), numbered on its own: `P1`, `P2`, ... for
+  the data pipeline, `W1`, ... for engine rules. The "Names" table says what each prefix means and where its items are
+  listed. Never reuse a number.
+- **One issue per item**, titled `<prefix><n>: <what>`, a sub-issue of the milestone's issue. The issue holds the
+  status and, when it closes, the PR.
+- **Blocked by** names the items that must land first. An item with `none`, or whose blockers are all closed, can
+  start now. Do not start a blocked item.
+- **Lane** says which lane normally takes the item, so related items run one after another in one lane instead of
+  conflicting.
+
+## Names used in the roadmap
+
+| Prefix | Meaning | Listed in |
 |---|---|---|
-| 0 | Setup | 0% |
-| 1 | Tools | 0% |
-| 2 | Data | 0% |
-| 3 | Engine triage | 0% |
-| 4 | Plugin | 0% |
-| 5 | Graphics | 0% |
-| 6 | Release | 0% |
+| M1, M2 | Milestones | this file |
+| `<P>` | `<e.g. data, pipeline, art, release work>` | this file |
+| `<W>` | `<e.g. engine-rule work items>` | `<doc>` |
 
-## Phase 0: Setup
-- [ ] Repository created from the toolkit; `main` is merged only by the orchestrator
-- [ ] Toolchain: git, Python 3.12+, CMake, C++ build tools
-- [ ] Game installed at build `<BUILD>`; D2RLoader installed
-- [ ] `python -m modkit fetch` works (tables, strings, layouts)
-- [ ] Game slots set up (slot 1 is the owner's real game and is never touched)
-- [ ] Private-words list created outside the repo; `tools/check_public.py` passes
-- [ ] Lane rules, orchestrator prompt, changelog (with `changelog.d/`) created from `templates/`
-- [ ] Owner decisions recorded: name, hosting, public/private, providers
-- [ ] Source mod inventory (ports only): `docs/source-inventory.md`
+## M1: `<milestone name>`
 
-## Phase 1: Tools
-- [ ] Extractors for the source's archives (ports only)
-- [ ] Table migration to D2R's formats (columns added, removed or renamed)
-- [ ] String conversion to D2R's JSON
-- [ ] ID mapping layer (source ids to D2R ids)
-- [ ] Validation: `python -m modkit build <project>` reports the baseline
+`<One sentence: what is true when this milestone is done.>`
 
-## Phase 2: Data
-- [ ] Item types, items, affixes, uniques, sets, runewords
-- [ ] Skills, missiles, states, sounds
-- [ ] Monsters, levels, areas, drops
-- [ ] Cube recipes, vendors, quests (data part)
-- [ ] 0 validation errors; warnings reviewed
-- [ ] First boot into the character screen
+| # | Work item | Blocked by | Lane | Issue |
+|---|---|---|---|---|
+| `<P1>` | `<what it delivers, in a line>` | none | `<A>` | `<#n>` |
+| `<P2>` | `<what it delivers>` | `<P1>` | `<A>` | `<#n>` |
 
-## Phase 3: Engine triage
-- [ ] List every code change the source (or the design) needs that data cannot do
-- [ ] Mark each one: `data can do it` / `plugin needed` / `D2R already has it` / `drop`
-- [ ] Record unportable gaps with a reason in `docs/unported.md` (ports)
+## M2: `<milestone name>`
 
-## Phase 4: Plugin
-- [ ] Plugin skeleton builds and loads
-- [ ] Every hook checks the game build and the expected bytes
-- [ ] Each plugin part has an off switch and a line in the status console command
-- [ ] A game check per part; the targeted-test map is up to date
-- [ ] Crash-safety review of every hook
+| # | Work item | Blocked by | Lane | Issue |
+|---|---|---|---|---|
+| | | | | |
 
-## Phase 5: Graphics
-- [ ] HD first with the closest vanilla stand-ins
-- [ ] Icons, item pictures, missile and monster models as needed
-- [ ] Custom art last
-- [ ] Classic mode later, if at all
+## Phases a new mod usually goes through
 
-## Phase 6: Release
-- [ ] Release package builds; installs like a player's install on a slot
-- [ ] Installer/downloader, with game and loader version checks
-- [ ] Hosting set up; upload verified
-- [ ] Changelog, release pages
-- [ ] Public repository (only with the owner's approval)
+A guide for the first milestones, not a checklist to tick here: turn each line into work items and issues.
 
-## Milestone tests
-Full game-check suite, one game at a time, at the end of each phase: `<command>`.
+0. **Setup.** Repository from the toolkit; toolchain; game at build `<BUILD>` with the loader; `python -m modkit fetch`
+   works; game slots (slot 1 is the owner's real game and is never touched); private-words list outside the repo and
+   `tools/check_public.py` passing; lane rules, orchestrator prompt, handoff, deviations ledger and `changelog.d/` from `templates/`;
+   owner decisions (name, hosting, public or private, providers) recorded as decision records.
+1. **Tools.** Extractors and table migration for a port's source; ID mapping layer; `python -m modkit build <project>`
+   reports the baseline.
+2. **Data.** Items, skills, monsters, areas, cube, strings; 0 validation errors; first boot into the character screen.
+3. **Engine triage.** List every change that data cannot do and mark each `data can do it` / `plugin needed` /
+   `D2R already has it` / `drop`; record what is not ported in the deviations ledger.
+4. **Plugin.** Skeleton builds and loads; every hook checks the game build and expected bytes; an off switch and a
+   status line per part; a game check per part; crash-safety review.
+5. **Graphics.** HD first with the closest vanilla stand-ins; custom art last.
+6. **Release.** Package installs like a player's install; installer with version checks; hosting; release pages;
+   public repository only with the owner's approval.
 
 ## Decisions
-| Date | Decision | Why |
-|---|---|---|
-| | | |
+
+Decisions are not kept in this file. Each is a decision record (`docs/adr/NNNN-<slug>.md`, from `templates/ADR.md`);
+link the ones that shape this roadmap here:
+
+- `<ADR 0001: title>`

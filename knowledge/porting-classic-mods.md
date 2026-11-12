@@ -17,7 +17,7 @@ Read with: [tables.md](tables.md) (how D2R reads tables), [engine-limits.md](eng
 | **Never ship Blizzard's files or the original mod's archives** in your repo | Players own D2R; the original mod's files come from its own release |
 | **HD first.** Make every feature work in HD graphics; classic graphics (the G key) come later | Almost every D2R player plays in HD, and both modes load different files |
 | **Stand-in art first, custom art last.** Give every new monster, missile and item the closest vanilla look until the rules work | Art is the biggest single job; gameplay bugs are found faster with a playable build |
-| **Keep an unported list** (section 10) | So "missing" never gets mistaken for "broken" |
+| **Keep a deviations ledger** (section 10) | So "missing" never gets mistaken for "broken" |
 | First milestone: **a new character in Act 1** as early as possible | From then on, work from what breaks in game |
 
 ### 0a. Decisions to make first
@@ -94,7 +94,7 @@ Triage the engine DLL by its source files: its assert strings usually name them 
 | b service | A D2RLoader/PluginSDK service does it (strings, sounds, saves, shared parts) | Use the service |
 | c native hook | Only code can do it (skill function, missile function, event raise) | Plugin hook; slot per section 5a |
 | d UI rebuild | A screen the engine draws (stash pages, panels) | UI work, HD first |
-| e cut | The rule has no reachable data or the cost is not worth it | Unported list (section 10) |
+| e cut | The rule has no reachable data or the cost is not worth it | Deviations ledger (section 10) |
 
 4. Put the unknowns last. A source file with no assert strings gets its bucket from what its patch records change.
 
@@ -347,7 +347,7 @@ strips are capped at 16,384 px (62 icons at 130 px with pressed frames), see [en
   tiles for areas). Ship every classic file the tables reference, or the game crashes on spawn or area entry.
 - Upscaling classic DC6 bilinearly is an acceptable first HD picture for items and panels.
 
-## 10. The unported list
+## 10. The deviations ledger
 
 Keep a table of what the original mod has and the port does not, with the reason. Example rows:
 
@@ -362,7 +362,7 @@ Keep a table of what the original mod has and the port does not, with the reason
 ### 10a. Deviation status vocabulary and the D2R-only ledger
 
 Every difference from the original is a **deviation** (section 0b glossary). Give each one a status from this list, in
-the unported table or a deviation register, and use these words:
+the deviations ledger (`templates/deviations.md`), and use these words:
 
 | Status | Meaning | Next step |
 |---|---|---|

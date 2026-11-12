@@ -1,0 +1,250 @@
+{
+  "about": "Example patch: Terror Zones and Heralds off in every game mode and difficulty (desecratedzones.json); the Colossal Summit portal recipe off in excel/ (excel/base/ has none). Sunder charms drop through Terror Zone and Herald treasure classes, so they go with them. Copy it into a project's patches/ folder under a numbered name. Build 93847.",
+  "ops": [
+    {
+      "op": "json",
+      "file": "data/hd/global/excel/desecratedzones.json",
+      "path": [
+        "desecrated_zones",
+        0,
+        "game_difficulties",
+        "expansion",
+        "normal",
+        "ladder_enabled"
+      ],
+      "value": false
+    },
+    {
+      "op": "json",
+      "file": "data/hd/global/excel/desecratedzones.json",
+      "path": [
+        "desecrated_zones",
+        0,
+        "game_difficulties",
+        "expansion",
+        "normal",
+        "non_ladder_enabled"
+      ],
+      "value": false
+    },
+    {
+      "op": "json",
+      "file": "data/hd/global/excel/desecratedzones.json",
+      "path": [
+        "desecrated_zones",
+        0,
+        "game_difficulties",
+        "expansion",
+        "normal",
+        "max_herald_tiers"
+      ],
+      "value": 0
+    },
+    {
+      "op": "json",
+      "file": "data/hd/global/excel/desecratedzones.json",
+      "path": [
+        "desecrated_zones",
+        0,
+        "game_difficulties",
+        "expansion",
+        "nightmare",
+        "ladder_enabled"
+      ],
+      "value": false
+    },
+    {
+      "op": "json",
+      "file": "data/hd/global/excel/desecratedzones.json",
+      "path": [
+        "desecrated_zones",
+        0,
+        "game_difficulties",
+        "expansion",
+        "nightmare",
+        "non_ladder_enabled"
+      ],
+      "value": false
+    },
+    {
+      "op": "json",
+      "file": "data/hd/global/excel/desecratedzones.json",
+      "path": [
+        "desecrated_zones",
+        0,
+        "game_difficulties",
+        "expansion",
+        "nightmare",
+        "max_herald_tiers"
+      ],
+      "value": 0
+    },
+    {
+      "op": "json",
+      "file": "data/hd/global/excel/desecratedzones.json",
+      "path": [
+        "desecrated_zones",
+        0,
+        "game_difficulties",
+        "expansion",
+        "hell",
+        "ladder_enabled"
+      ],
+      "value": false
+    },
+    {
+      "op": "json",
+      "file": "data/hd/global/excel/desecratedzones.json",
+      "path": [
+        "desecrated_zones",
+        0,
+        "game_difficulties",
+        "expansion",
+        "hell",
+        "non_ladder_enabled"
+      ],
+      "value": false
+    },
+    {
+      "op": "json",
+      "file": "data/hd/global/excel/desecratedzones.json",
+      "path": [
+        "desecrated_zones",
+        0,
+        "game_difficulties",
+        "expansion",
+        "hell",
+        "max_herald_tiers"
+      ],
+      "value": 0
+    },
+    {
+      "op": "json",
+      "file": "data/hd/global/excel/desecratedzones.json",
+      "path": [
+        "desecrated_zones",
+        0,
+        "game_difficulties",
+        "rotw",
+        "normal",
+        "ladder_enabled"
+      ],
+      "value": false
+    },
+    {
+      "op": "json",
+      "file": "data/hd/global/excel/desecratedzones.json",
+      "path": [
+        "desecrated_zones",
+        0,
+        "game_difficulties",
+        "rotw",
+        "normal",
+        "non_ladder_enabled"
+      ],
+      "value": false
+    },
+    {
+      "op": "json",
+      "file": "data/hd/global/excel/desecratedzones.json",
+      "path": [
+        "desecrated_zones",
+        0,
+        "game_difficulties",
+        "rotw",
+        "normal",
+        "max_herald_tiers"
+      ],
+      "value": 0
+    },
+    {
+      "op": "json",
+      "file": "data/hd/global/excel/desecratedzones.json",
+      "path": [
+        "desecrated_zones",
+        0,
+        "game_difficulties",
+        "rotw",
+        "nightmare",
+        "ladder_enabled"
+      ],
+      "value": false
+    },
+    {
+      "op": "json",
+      "file": "data/hd/global/excel/desecratedzones.json",
+      "path": [
+        "desecrated_zones",
+        0,
+        "game_difficulties",
+        "rotw",
+        "nightmare",
+        "non_ladder_enabled"
+      ],
+      "value": false
+    },
+    {
+      "op": "json",
+      "file": "data/hd/global/excel/desecratedzones.json",
+      "path": [
+        "desecrated_zones",
+        0,
+        "game_difficulties",
+        "rotw",
+        "nightmare",
+        "max_herald_tiers"
+      ],
+      "value": 0
+    },
+    {
+      "op": "json",
+      "file": "data/hd/global/excel/desecratedzones.json",
+      "path": [
+        "desecrated_zones",
+        0,
+        "game_difficulties",
+        "rotw",
+        "hell",
+        "ladder_enabled"
+      ],
+      "value": false
+    },
+    {
+      "op": "json",
+      "file": "data/hd/global/excel/desecratedzones.json",
+      "path": [
+        "desecrated_zones",
+        0,
+        "game_difficulties",
+        "rotw",
+        "hell",
+        "non_ladder_enabled"
+      ],
+      "value": false
+    },
+    {
+      "op": "json",
+      "file": "data/hd/global/excel/desecratedzones.json",
+      "path": [
+        "desecrated_zones",
+        0,
+        "game_difficulties",
+        "rotw",
+        "hell",
+        "max_herald_tiers"
+      ],
+      "value": 0
+    },
+    {
+      "op": "set",
+      "table": "cubemain",
+      "bank": "excel",
+      "where": {
+        "description": "1 Uber Ancient Summon Material from Act 1 + Act2 + Act3 + Act 4 + Act 5 -> Portal to Colossal Summit"
+      },
+      "set": {
+        "enabled": 0
+      }
+    }
+  ]
+}

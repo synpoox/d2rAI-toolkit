@@ -36,7 +36,8 @@ Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you ar
 - `${CLAUDE_PLUGIN_ROOT}/docs/`: how to run a project. `${CLAUDE_PLUGIN_ROOT}/docs/ai-workflow.md` is the method for a mod built with AI
   agents: an orchestrator plus parallel lanes and reviewers, model choice, game slots, releases, safety, handoff.
 - `${CLAUDE_PLUGIN_ROOT}/templates/`: fill-in files for a new project: orchestrator prompt, handoff, lane rules, lane prompt,
-  `PLAN.md`, `CHANGELOG.md`, owner update.
+  `PLAN.md` (phase outline), `ADR.md`, `deviations.md`, `research.md`, `README-player.md`, `GLOSSARY.md`, owner update,
+  `changelog.d/` (see `${CLAUDE_PLUGIN_ROOT}/templates/README.md`).
 - `${CLAUDE_PLUGIN_ROOT}/testing/`: how to test a mod in the real game without a human: game slots (frozen copies of
   the install, queued with locks), named game checks driven through a plugin test harness, release-like installs.
 - `${CLAUDE_PLUGIN_ROOT}/release/`: packaging and publishing: the release package, a manifest, a fail-fast release
@@ -49,6 +50,9 @@ Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you ar
   `${CLAUDE_PLUGIN_ROOT}/tools/check_public.py`, the privacy scan (`--root` is the repo to scan).
 - `${CLAUDE_PLUGIN_ROOT}/examples/showcase/`: a small working mod project (a reworked class skill with a new icon and
   HD animation, an item skill with a new missile, a bigger stash).
+- `${CLAUDE_PLUGIN_ROOT}/examples/patches/`: single patches to copy, for example `no-terror-zones.json`. Also
+  `${CLAUDE_PLUGIN_ROOT}/knowledge/d2r-conveniences.md` (D2R 3.3 comforts a port can keep or cut) and
+  `${CLAUDE_PLUGIN_ROOT}/docs/runtime-qualification.md` (testing a game build and loader release).
 - `${CLAUDE_PLUGIN_ROOT}/.claude/skills/`: how to do each kind of job. Use them. Craft skills:
   - `d2r-mod-setup`: setup, build, install, run.
   - `d2r-skill`: skills.

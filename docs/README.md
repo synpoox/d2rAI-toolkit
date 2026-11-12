@@ -11,6 +11,7 @@ the table below.
 | Know what the agent is told to do (and not do) | [d2r-toolkit skill](../.claude/skills/d2r-toolkit/SKILL.md) |
 | See a small mod that builds with 0 errors | [examples/showcase](../examples/showcase/) |
 | Look up a patch operation | [knowledge/modkit-ops.md](../knowledge/modkit-ops.md) |
+| Copy a ready patch (Terror Zones off) | [examples/patches/](../examples/patches/no-terror-zones.json) |
 
 ## Running a project
 
@@ -21,8 +22,9 @@ the table below.
 | [release.md](release.md) | Packaging and publishing: 7z and manifest, content-addressed objects, delta upload, server ingest, CDN mirror, release pages, `release.sh` |
 | [distribution.md](distribution.md) | Where players get the files: your own host + CDN + downloader, GitHub Releases, Nexus Mods (archive layout, uploads, API limits, Vortex), and combinations, with a comparison table |
 | [toolkit-finder.md](toolkit-finder.md) | Finding the toolkit from a mod project (also from worktrees) in Python, PowerShell and CMake, and pinning a toolkit commit with `toolkit.version` |
+| [runtime-qualification.md](runtime-qualification.md) | Qualifying a game build and loader release: choosing a loader policy (rolling or pinned), what to record, the baseline checklist |
 | [downloader.md](downloader.md) | The player-facing installer and updater: what it does, building your own from one config header |
-| [../templates/](../templates/) | Fill-in files: orchestrator prompt, handoff, lane rules, lane prompt, `PLAN.md`, `CHANGELOG.md`, owner update |
+| [../templates/](../templates/) | Fill-in files: orchestrator prompt, handoff, lane rules, lane prompt, `PLAN.md`, decision record, deviations, research doc, player README, glossary, `changelog.d/`, owner update |
 | [../tools/publish_mirror.md](../tools/publish_mirror.md) | Publishing a scrubbed, squashed public copy of a private repo |
 
 ## How D2R works
