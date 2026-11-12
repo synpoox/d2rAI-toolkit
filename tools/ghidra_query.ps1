@@ -7,13 +7,16 @@
 # -Ghidra: Ghidra install dir (env MODKIT_GHIDRA, default the newest C:\ghidra*\ or C:\ghidra\ghidra*\ install)
 # -Work:   projects/dumps dir (env MODKIT_GHIDRA_WORK, default C:\ghidra-work); the D2R project is
 #          <Work>\project\D2R.gpr made by ghidra_analyze.ps1, the program the newest <Work>\D2RLoader_*_dump.exe.
-# -Project D2R (default) is built in and needs no config. Any other name is looked up in a JSON config file:
+# -Project D2R (default) is built in and needs no config (a config entry named D2R is ignored; a warning
+#          is printed when the config is read for another project).
+#          Any other name is looked up in a JSON config file:
 #          env MODKIT_GHIDRA_PROJECTS, default ~/.d2r-modkit/ghidra_projects.json (outside the repo). Format, a name
 #          mapped to either a .gpr path or an object with the path and an optional default program:
 #            { "mymod": "C:/ghidra-work/mymod-project/mymod.gpr",
 #              "other": { "gpr": "D:/re/other.gpr", "program": "Game.dll" } }
-#          The Ghidra project name is the .gpr file name without its extension. A relative .gpr path is taken
-#          relative to -Work. -Program picks the program inside the project (default: the entry's "program";
+#          The Ghidra project name is the .gpr file name without its extension. A leading ~ in the .gpr path
+#          means the home folder; any other relative path is taken relative to -Work.
+#          -Program picks the program inside the project (default: the entry's "program";
 #          for D2R the newest dump). Names are case-insensitive.
 # Full Ghidra output: <Work>\query.log. The project must not be open in the Ghidra GUI (it is locked then).
 param([Parameter(Mandatory = $true, Position = 0)][string]$Script,
@@ -33,10 +36,13 @@ if ($Project -ne "D2R") {
     $cfg = if ($env:MODKIT_GHIDRA_PROJECTS) { $env:MODKIT_GHIDRA_PROJECTS } else { Join-Path $HOME ".d2r-modkit\ghidra_projects.json" }
     if (-not (Test-Path $cfg)) { throw "unknown project '$Project': no config file $cfg (see the header of this script)" }
     $entry = $null
-    foreach ($prop in (Get-Content $cfg -Raw | ConvertFrom-Json).PSObject.Properties) { if ($prop.Name -ieq $Project) { $entry = $prop.Value } }
+    $props = (Get-Content $cfg -Raw | ConvertFrom-Json).PSObject.Properties
+    if ($props | Where-Object { $_.Name -ieq "D2R" }) { Write-Warning "${cfg}: an entry named D2R is ignored; the built-in D2R project is always used for -Project D2R" }
+    foreach ($prop in $props) { if ($prop.Name -ieq $Project) { $entry = $prop.Value } }
     if ($null -eq $entry) { throw "project '$Project' is not listed in $cfg" }
     $gpr = if ($entry -is [string]) { $entry } else { $entry.gpr }
     if (-not $gpr) { throw "project '$Project' in $cfg has no .gpr path" }
+    if ($gpr -match '^~([\\/]|$)') { $gpr = Join-Path $HOME $gpr.Substring(1).TrimStart('\', '/') }
     if (-not [IO.Path]::IsPathRooted($gpr)) { $gpr = Join-Path $Work $gpr }
     if (-not (Test-Path $gpr)) { throw "no Ghidra project file $gpr (project '$Project' in $cfg)" }
     $projDir = Split-Path -Parent $gpr
@@ -55,7 +61,7 @@ if ($Project -ne "D2R") {
 }
 $log = Join-Path $Work "query.log"
 $env:GHIDRA_HEADLESS_MAXMEM = "6G"
-$argLine = @("`"$projDir`"", $projName, "-process", $Program, "-noanalysis", "-readOnly",
+$argLine = @("`"$projDir`"", "`"$projName`"", "-process", "`"$Program`"", "-noanalysis", "-readOnly",
              "-scriptPath", "`"$(Join-Path $PSScriptRoot 'ghidra_scripts')`"", "-postScript", $Script) + $ScriptArgs
 $p = Start-Process -FilePath $headless -ArgumentList $argLine -NoNewWindow `
     -Wait -PassThru -RedirectStandardOutput $log -RedirectStandardError "$log.err"
