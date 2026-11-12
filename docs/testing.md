@@ -347,6 +347,17 @@ Helpers in `game_ctl`: `wait_for(fn, timeout, interval, desc)` (poll until true,
 needle, timeout, offset)`, and the picture tools of `Image`: `stats()` (mean and spread of the grey level),
 `signature(box)`, `box(fx0, fy0, fx1, fy1)`, `pixel(x, y)`, and `signature_distance(a, b)`.
 
+### Ready-made parts for a mod's checks
+
+Three modules hold parts that are the same for every mod. The plugin, the mod and the character are always parameters;
+nothing about a mod is written in them.
+
+| Module | What it gives |
+|---|---|
+| `check_helpers.plugin_log(ctx, plugin, scope="auto", skip_if_missing=False, since_size=0)` | The text of `<plugin>`'s log since its last `<plugin>: <version> loaded (` line, so an old run does not count. `scope` is `mod` (`<mod>/d2rloader/logs/`), `game` (the slot's `d2rloader/logs/`), `config` (the config's `[logs] plugin_log`) or `auto` (that config key when it names `<plugin>.log`, else the mod log, else the game-wide log). `plugin_log_path` gives the path, `plugin_log_size` the size to pass as `since_size` (taken before the game starts) to ignore everything already in the file. |
+| `lod_checks.py` | `assert_plugin_loaded(ctx, plugin, mod, expect=...)`, `read_save` / `check_save` (signature, size field, checksum), `save_and_exit` (Esc, Save and Exit, waits until the whole save is written in the extended format and its `.d2rl` sidecar matches it; a half-written file counts as not yet), `delete_character`, and `create_save_reload(ctx, char, class_name=...)`, which creates a Lord of Destruction character, saves, restarts the game, loads and saves again. Needs the harness; run it only in a slot you locked. |
+| `menu_layout.py` | The click positions of the main menu, the create-character screen and the Esc menu as fractions of the window, with the class portraits. Measured for **D2R 3.3 at 1920x1080** (`D2R_VERSION`, `CLIENT`): re-measure them for another D2R version, and add a class by passing `class_pos` and `class_id` to `create_save_reload`. |
+
 ### The example checks
 
 | Check | Tags | What it checks |
