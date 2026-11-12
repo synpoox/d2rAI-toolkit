@@ -27,6 +27,27 @@ import game_slots as gs  # noqa: E402
 import testing_config as tc  # noqa: E402
 
 
+# Tests never read the machine's real slot table: every test here sees an empty one unless it sets its own.
+_ISOLATION = None
+
+
+def setUpModule():
+    global _ISOLATION
+    tmp = tempfile.TemporaryDirectory()
+    path = os.path.join(tmp.name, "slots.toml")
+    Path(path).write_text("[owners]\n", encoding="utf-8")
+    patch = mock.patch.dict(os.environ, {"MODKIT_SLOTS_FILE": path})
+    patch.start()
+    os.environ.pop("MODKIT_PROJECT", None)
+    _ISOLATION = (tmp, patch)
+
+
+def tearDownModule():
+    tmp, patch = _ISOLATION
+    patch.stop()
+    tmp.cleanup()
+
+
 def make_cfg(tmp: str, **over) -> tc.Config:
     t = Path(tmp).as_posix()
     data = {
@@ -319,6 +340,51 @@ class RunTests(unittest.TestCase):
         self.assertIn("lane-a", str(cm.exception))
         gc.run(infos, 2, self.cfg, run_id="lane-a", out=self.out.append)  # the lane runs inside its own session lock
         self.assertEqual(gs.lock_info(self.cfg, 2).owner, "lane-a")  # and the lock is still there afterwards
+
+
+class SlotTableTests(unittest.TestCase):
+    """The slot table at the two places that start a game: game_checks.run and game_ctl.Game.start."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.cfg = make_cfg(self.tmp.name)
+        self.table = os.path.join(self.tmp.name, "owned.toml")
+        Path(self.table).write_text('[owners]\n"2" = "toolkit"\n', encoding="utf-8")
+        conf = os.path.join(self.tmp.name, "c.json")
+        Path(conf).write_text(json.dumps(self.cfg.data), encoding="utf-8")
+        self.conf = conf
+
+    def env(self, table, project=None):
+        env = {"MODKIT_SLOTS_FILE": table}
+        if project:
+            env["MODKIT_PROJECT"] = project
+        return mock.patch.dict(os.environ, env)
+
+    def test_run_refuses_a_slot_another_project_owns(self):
+        with self.env(self.table, "mod-a"):
+            with self.assertRaises(gc.RunRefused) as cm:
+                gc.run([], 2, self.cfg, run_id="r1", out=lambda m: None)
+        self.assertIn("toolkit", str(cm.exception))
+        self.assertIsNone(gs.lock_info(self.cfg, 2))
+
+    def test_game_start_refuses_a_slot_another_project_owns(self):
+        g = game_ctl.Game(self.cfg, 2, owner="r1", log=lambda m: None)
+        with self.env(self.table, "mod-a"), mock.patch.object(game_ctl, "need_windows"):
+            with self.assertRaises(game_ctl.GameCtlError) as cm:
+                g.start()
+        self.assertIn("toolkit", str(cm.exception))
+        self.assertIsNone(gs.lock_info(self.cfg, 2))
+
+    def test_broken_table_exits_2_with_one_line_in_both_clis(self):
+        broken = os.path.join(self.tmp.name, "broken.toml")
+        Path(broken).write_text("[owners\n", encoding="utf-8")
+        for main, argv in ((gc.main, ["run", "--slot", "2"]), (game_ctl.main, ["start", "--slot", "2"])):
+            out, err = io.StringIO(), io.StringIO()
+            with self.env(broken), mock.patch.object(game_ctl, "need_windows"),                     contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                rc = main(["--config", self.conf, *argv])
+            self.assertEqual(rc, 2, (main, err.getvalue()))
+            self.assertTrue(err.getvalue().startswith("error: slot table"), err.getvalue())
+            self.assertEqual(len(err.getvalue().strip().splitlines()), 1, err.getvalue())
 
 
 class CliTests(unittest.TestCase):

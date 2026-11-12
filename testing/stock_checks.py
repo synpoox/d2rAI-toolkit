@@ -31,7 +31,7 @@ def savepath_problems(cfg, slot: int) -> list[str]:
         except (OSError, ValueError, AttributeError) as e:
             problems.append(f"{path}: cannot read ({e})")
             continue
-        if not isinstance(got, str) or os.path.normcase(got.replace("\\", "/").rstrip()) != os.path.normcase(want):
+        if not isinstance(got, str) or got.replace("\\", "/").rstrip().casefold() != want.casefold():
             problems.append(f"{path}: savepath is {got!r}, slot {slot} wants {want!r}")
     if not found:
         looked = cfg.modinfo_paths(slot)

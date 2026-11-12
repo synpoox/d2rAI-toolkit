@@ -60,6 +60,8 @@ class SavePath(unittest.TestCase):
     def test_case_insensitive(self):
         self.put_all(2, "mymod-S2/")
         self.assertEqual(sc.savepath_problems(self.cfg, 2), [])
+        self.put_all(2, "MYMOD-s2\\")  # case and separator differences are the same on every OS
+        self.assertEqual(sc.savepath_problems(self.cfg, 2), [])
         self.put(3, "mymod-s3")  # still needs its trailing slash
         self.put(3, "MyMod-s3/", 1)
         self.assertEqual(len(sc.savepath_problems(self.cfg, 3)), 1)
