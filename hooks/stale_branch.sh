@@ -5,11 +5,12 @@
 # skips the fetch.
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 if [ -z "$D2R_STALE_NO_FETCH" ]; then
-    export GIT_TERMINAL_PROMPT=0
+    export GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never GIT_ASKPASS=echo SSH_ASKPASS=echo
+    export GIT_SSH_COMMAND="${GIT_SSH_COMMAND:-ssh} -o BatchMode=yes"
     if command -v timeout >/dev/null 2>&1; then
-        timeout 5 git fetch -q origin main >/dev/null 2>&1 </dev/null
+        timeout 5 git -c credential.interactive=false fetch -q --no-auto-gc --no-auto-maintenance origin main >/dev/null 2>&1 </dev/null
     else
-        git fetch -q origin main >/dev/null 2>&1 </dev/null
+        git -c credential.interactive=false fetch -q --no-auto-gc --no-auto-maintenance origin main >/dev/null 2>&1 </dev/null
     fi
 fi
 git rev-parse --verify -q origin/main >/dev/null 2>&1 || exit 0

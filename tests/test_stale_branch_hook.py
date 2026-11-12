@@ -75,6 +75,17 @@ class StaleBranchHook(unittest.TestCase):
         self.assertIn("WARNING", out)
         self.assertIn("does not contain origin/main", out)
 
+    def test_fetch_path_refreshes_origin_main_and_warns(self):
+        clone = self.repo()
+        other = Path(self.tmp, "other")
+        run(["git", "clone", "-q", str(Path(self.tmp, "origin.git")), str(other)], self.tmp)
+        run(GIT + ["commit", "-q", "--allow-empty", "-m", "newer main"], other)
+        run(["git", "push", "-q", "origin", "main"], other)
+        self.env.pop("D2R_STALE_NO_FETCH")
+        out = self.hook(clone)
+        self.assertIn("WARNING", out)
+        self.assertIn("does not contain origin/main", out)
+
 
 if __name__ == "__main__":
     unittest.main()
