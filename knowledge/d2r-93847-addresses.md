@@ -744,3 +744,9 @@ function (bytes in the header, checked before the patch); **D** data: a variable
 | `0x3e2a448` | CrushingBlowApplySlot | - | CrushingBlowApply's entry is jmp [rip+0x38a8872]: the qword it jumps through, which a plugin can swap | T |
 | `0x3e2aab0` | DamageTypeStepSlot | - | DamageEffects (0x44df10) runs its 12 damage types (1.13c's table, 0x40 bytes each here) through (&ctx, &type, flag), called as jmp [this slot]: D2RCore's resist step (1.13c's 0x6fcfbd00). | T |
 | `0x3e2b652` | SetUnitStateKey | (unit, key) | UnitStateKey's setter (a jmp stub) | R |
+
+## Monster AI table (build 93847)
+
+| RVA | Meaning |
+|---|---|
+| `0x2396e90` | Monster AI table: 155 records of 32 bytes `{kind (u64), init fn, think fn, next}`, absolute 64-bit pointers (image base `0x140000000`). Indexed by the row of `monai.txt` (the monstats `AI` column names the row). Examples: Skeleton think `0x5b43a0`, Brute `0x5acc20`, Zombie `0x5ba780`, BloodHawk `0x5aca20`. Read from a memory-layout dump; pairs with 1.09d's AI table in [porting-classic-mods.md](porting-classic-mods.md). The generator `shared/classic_import/gen_109d_monster_ai.py` reads it |
