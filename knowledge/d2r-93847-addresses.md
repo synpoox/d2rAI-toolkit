@@ -123,7 +123,7 @@ Displacement sites a "move the state arrays" patch would touch (for reference on
 |---|---|
 | `0x238ea00` | **srvdofunc table**, 191 x 8-byte pointers (.data). D2R fills 0-171; **172-190 empty** |
 | `0x43acb0` | server skill dispatcher (`D2Game\src\Skills\Skills.cpp`): reads srvdofunc (u16 skills +0x4e), rejects > 0xbe, calls (game, unit, skillId, level) if non-null; nonzero = success |
-| `0x238e710` | srvstfunc table (indexed by u16 skills +0x4c; size not confirmed) |
+| `0x238e710` | srvstfunc table (indexed by u16 skills +0x4c; 91 slots by the dispatcher's bound immediate `0x5a`, 94 by the span to `0x238ea00`; 71-90 free) |
 | `0x43b3e0` | (game, unit, skill, level, force) start a skill (calls srvstfunc). Hooked; entry `48 89 5C 24 10 48 89 6C 24 18 48 89 74 24 20` |
 | `0x235f7d0` | **cltdofunc table**, 130 x 8 bytes, bound at `0x235f7c4`; D2R uses up to 109, **110-129 empty** |
 | `0x216d20` | client skill dispatcher: (unit, skill, level) -> nonzero ran |
@@ -286,7 +286,7 @@ frame), +0x30 step counter (Fire Wall's).
 
 | RVA | Signature | Meaning |
 |---|---|---|
-| `0x314110` | (dataFlag, classId) -> record | items record (armor/weapons/misc): +0x80 code (4 chars), +0x94 i32 pSpell, +0xa4 calc1-3, +0x144 i8 spellicon (layout as classic 1.13c up to +0x94) |
+| `0x314110` | (dataFlag, classId) -> record | items record (armor/weapons/misc): +0x80 code (a dword, but the engine keys items by its first 3 characters), +0x94 i32 pSpell, +0xa4 calc1-3, +0x144 i8 spellicon (layout as classic 1.13c up to +0x94) |
 | `0x373890` | (item, itemtype) -> nonzero | item is of type |
 | `0x36cf60` | (item) -> quality | item data +0 |
 | `0x36cfe0` | (item) -> u8 | item data +0x55: page (0 inventory, 3 cube, 4 stash) |
@@ -316,7 +316,7 @@ frame), +0x30 step counter (Fire Wall's).
 | `0x517f90` | (game, room, xy[2], 3, 0x400, &room, 5, 100) free spot near xy |
 | `0x34e9d0` | (object, level byte) set portal destination (clears the high byte) |
 | `0x34ad40` | portal destination getter (16 bits: object data +0x08 low, +0x78 high) |
-| `0x5da800` | cube output "Red Portal" |
+| `0x5da800` | cube output "Red Portal": (game, player, key, level, max). Needs the player in town and finds a free spot (`0x517f90`), makes object 60 to `level` through the portal maker `0x432ce0` (last argument 1 lifts the town portal's level whitelist), then adds 1 to the game counter named by `key` (`0x5d88b0`); with `max` 1 it refuses once the counter is 1 |
 | `0x490410` | (unitType, row, x, y, game, room, 1, 0, 0, 0) -> unit: spawn a unit; type 2 = object. Tested from a game-thread callback |
 | `0x4022a0` | debug `SpawnObject` handler: a worked example of the spawn. Game: `0x4062f0(0x4061e0(1))`; player: `0x484c90(*(game+0x138), 0)`; room: `0x34b440(unit)`; free spot: `0x402f50(room, xy, 5, 0x3e01, &room)`; objects row count: `0x38fc70(*(u8*)(game+0x106))` |
 | `0x23a51c0` | object operate table, 75 entries, indexed by objects.txt `OperateFn` (compiled row `+0x15e`); entry = `int fn(args*)`, args = { game, object, player, seed, id }. Slot 60 is null and unused: a plugin can write its own function there, no hook needed. Called from `0x592c40` and `0x593630` |
@@ -378,7 +378,7 @@ these need no guard.
 | `0x45ce90` | server missile hit function 6: spawns the monstats row `sHitPar1` through `0x50a050(game, room, sHitPar1, ...)` |
 | `0x5c1400` | NecroPet AI think; branches on the pet's AI control (monster data +0x30) +0x44: 1 = ranged branch, 0 = melee (observed) |
 | `0x57ecb0` | timed potion handler (item spell 3): stat calc = total over the duration for hitpoints, mana, manarecovery, hpregen (`<< 8`); other stats stored as calc / len |
-| `0x5269c0` | cube executor; its "portal" output (byte 1) opens only the Cow Level |
+| `0x5269c0` | cube executor. Its "portal" outputs: `Cow Portal` is fixed to the Cow Level; `Red Portal,lvl=<id>` (cubemain output column) opens a red portal to level `<id>` of the player's act through `0x5da800`, so a fixed destination needs no plugin (untested in game here: the data form is from another D2R mod's recipes and the handler's arguments; the handler needs the player in town, so the portal opens from town only). A different level per use is the plugin case |
 
 ## Item packets
 
@@ -416,6 +416,21 @@ pairs and `scha`/`pelt`. The plugin template's `item_type_check.cpp` checks them
 | Allocate wrapper | `0xf6f060` | (size, align); 100+ callers; on null reports "Failed to allocate from Renderer pool!" (`0xf6ef40`) and returns null |
 | Free wrapper / object getter | `0xf6f0c0` / `0xf6efd0` | |
 | A null-allocation crash site | `0xf3d028` in `0xf3cfd0` | moves 0x80-byte records into a new vector buffer (vector grow `0xf3d587`, model instance build, `D2Render\src\model_instance.cpp`) |
+
+### Memory pools
+
+The Renderer Pool is one of six TLSF pools. The size D2R gives a pool is its *start* size: memory can be added to a running pool (see [engine-limits.md](engine-limits.md) "Memory"). Build 93847.
+
+| Pool | Object RVA | Start size (maker) | When it ran dry |
+|---|---|---|---|
+| Entity System | `0x2677438` | 70 MiB (`0xd714e0`) | A map preset over about 34,000 entities: the entity vector grow `0x6d17d0` memsets a null |
+| Renderer | `0x2810ff0` | 12 MiB (`0xf6efe0`) | A full-density map: `0xdafe30` (from `0xeeb4d0`) writes through the null |
+| JSON | `0x27d1770` | 40 MiB (`0xa0a230`) | A 46 MB generated preset: null write in the memcpy at `0x12d36f3` |
+| Object | `0x27d7848` | 50 MiB (`0xa20bb0`) | - |
+| Jobs | `0x34c3ce8` | 10 MiB (`0xa00000`; maker `0x9e91e0`) | A full-density map: `0xd9e740` writes through the null `0x9e8ca0` returned |
+| Texture cache | `0x27ff098` | 24 MiB (`0xe8b100`) | - |
+
+To add memory (tlsf_add_pool, which is inlined in `0x1215a30`): allocate a block, take the pool's lock (`+0x28`; `EntityPoolLock` `0x122ad60` / `EntityPoolUnlock` `0x122ad90`; the Jobs pool's `+0x28` is a spinlock instead: swap in its own address, spin while it is not 0, store 0 to release), write the block's size word (size | 1) and call `TlsfBlockInsert` `0x1215650` (control at pool `+0x20`, block 8 bytes before the size word), then write the sentinel (previous-block pointer, then a size word of 2) after the block. The pool objects exist only after D2R makes them (the control pointer at `+0x20` is null until then), so a plugin loaded early waits for it. Evidence: a classic port's plugin installs this on all six pools at start (it logs `on: +<n> MiB` per pool); it was written for the crashes above. The toolkit holds no growth code. Not re-run by the toolkit: the growth is read from that plugin's code and log line; no before/after crash test is recorded here.
 
 ## HD asset indexes
 
@@ -810,10 +825,158 @@ Built into `tools/probe_tables.py` and printed there as "(UNVERIFIED)". No Ghidr
 | RVA | Guess | Status |
 |---|---|---|
 | `0x1d1945c` | u32 read as the compiled-formula (prgcalc) count, named `prgcalc_bound` | unverified |
-| `0x238e710` | srvstfunc table size: the tool reads up to the next table `0x238ea00` (94 slots); an earlier draft used 91 | unverified |
 
 ## Monster AI table (build 93847)
 
 | RVA | Meaning |
 |---|---|
+| `0x2396e90` | Monster AI table: 155 records of 32 bytes `{kind (u64), init fn, think fn, next}`, absolute 64-bit pointers (image base `0x140000000`). Indexed by the row of `monai.txt` (the monstats `AI` column names the row). Examples: Skeleton think `0x5b43a0`, Brute `0x5acc20`, Zombie `0x5ba780`, BloodHawk `0x5aca20`. Read from a memory-layout dump; pairs with 1.09d's AI table in [porting-classic-mods.md](porting-classic-mods.md). The generator `shared/classic_import/gen_109d_monster_ai.py` reads it |
 | `0x2396e90` | Monster AI table: 155 records of 32 bytes `{kind (u64), init fn, think fn, next}`, absolute 64-bit pointers (image base `0x140000000`). Indexed by the row of `monai.txt` (the monstats `AI` column names the row). Examples: Skeleton think `0x5b43a0`, Brute `0x5acc20`, Zombie `0x5ba780`, BloodHawk `0x5aca20`. Read from a memory-layout dump; pairs with 1.09d's AI table in [classic-109d-engine.md](classic-109d-engine.md#monster-ai). The generator `shared/classic_import/gen_109d_monster_ai.py` reads it |
+## Function tables: bounds, free slots, readers (build 93847)
+
+Every skill and missile function column is an index into one of these tables. The "free" slots hold null; a plugin writes its own function there (`PatchWriteU64`) and needs no code patch. Read from the dispatchers' bound immediates and the tables' contents; the sizes are the dispatchers' own, not a guess.
+
+| Table | RVA | Slots | Bound (where read) | Free slots |
+|---|---|---|---|---|
+| skills srvstfunc | `0x238e710` | 91 by bound (`0x5a`), 94 by span | immediate in the dispatcher | 71-90 (use none above 90) |
+| skills srvdofunc | `0x238ea00` | 191 | immediate `0xbe` in the skill dispatcher, and the dword `0x1d1945c` on the prg path | 172-190 |
+| skills cltstfunc | `0x235f590` | 70 | dword `0x235f7c0` | 62-69 |
+| skills cltdofunc | `0x235f7d0` | 130 | dword `0x235f7c4` | 110-129 |
+| missiles srvdo | `0x2390e80` | 54 | none | 46-53 |
+| missiles srvhit | `0x2391030` | 71 | dword `0x2391404` | 61-70 |
+| missiles srvdmg | `0x2391270` | 31 | dword `0x2391408` | 18-30 (read by srvhit 1 `0x45bc40`) |
+| missiles cltdo | `0x2358430` | 92 | none | 78-91 |
+| missiles clthit | `0x2358710` | 81 | dword `0x2358a64` | 6-8, 11, 15, 17, 20-23, 27, 35, 45, 49, 58, 59, 66-80 |
+| item property functions | `0x2386ab0` | 37 | dword `0x2386bd8` | 26-35 |
+| aura event functions | `0x238e5c0` | 41 | `cmp eax,0x28` in the dispatcher `0x43823a` (lookup `0x438f70`) | none (1-40 filled; slot 0 unchecked) |
+| item spells | `0x236fe30` | 20 | none; handler indexes are checked (check < 11, use < 16) | entries 16-19 empty |
+
+Readers (who indexes the table, and with which field):
+
+| Table | Reader | Field and bound |
+|---|---|---|
+| srvdofunc | `0x43acb0` (skill use) | skills +0x4e, bound 190; the item cast path uses `ItemEffect` (+0x20a) with **no bound** |
+| srvdofunc | `0x56c3e0` (prg dispatcher) | `srvprgfunc1-3` (+0x50), bound 191 |
+| srvdofunc | `0x435490`, `0x435520` | by number (bound 190), by record field +0x36 (bound 190) |
+| srvstfunc | `0x43b3e0`, `0x43acb0`, `0x438670`, `0x433910` | skills +0x4c |
+| cltdofunc | `0x216d20` | skills +0x14a, and `ItemCltEffect` (+0x20c); bound 130 |
+| cltdofunc | `0x216380`, `0x216920` (prg) | `cltprgfunc1-3` (+0x14c); no bound |
+| cltdofunc | `0x215180` | 0x44-byte record field +0x34; bound 130 |
+| cltstfunc | `0x218030` | skills +0x148 |
+
+Facts a plugin can rely on:
+
+- **The prg columns index the do tables.** `srvprgfunc1-3` / `cltprgfunc1-3` pick entries of srvdofunc / cltdofunc, not of a separate table.
+- **Some slots that look unused hold real functions**: srvdo 41 `0x56dd60` and 143 `0x56e240`, cltdo 15 and 83. srvdo 163 `0x520a00` and cltdo 22 `0x2aed10` are called from code only (no skill row names them); srvdo 171 is Charged Bolt Disk. Check a slot's contents before using it.
+- **Six slots point to jmp stubs at `0x3e2b6xx`** (srvst 64, srvdo 23 and 157, cltst 61, srvhit 49, cltdo 77), read from the 93847 table dump and listed in [classic-109d-engine.md](classic-109d-engine.md) "Slots the loader redirects". The stubs are likely D2RLoader's, not checked in a live process: a jmp stub at `0x3e2b652` is all the dump shows, and the stubs jump through pointers outside the image (e.g. `0x3e2add0`), and the same range holds D2R's own level-to-act function (`0x3e2b5c8`).
+- **A "router slot"** needs no code change: put one function in one free srvdofunc slot (for example 172) that looks the skill id up in the plugin's own table and calls its function. A hook for ids above 190 would need five code sites with three different bound styles, one of them unbounded.
+- The missile collision `0x4639a0` builds the damage (`0x465420`) and applies it (`0x462e40`) only when the hit result has bit 2, and calls `[0x2391270 + n*8]` (srvdmg) after the srvhit function. The clthit dispatcher `0x1b8e60` skips empty slots.
+- Not located: the srvstopfunc / cltstopfunc tables, and the item event function table (events are raised through `0x44d570`, which dispatches through a further indirection; the aura event table `0x238e5c0` is the one that is located).
+
+## D2R skill and missile functions by slot (build 93847)
+
+Signatures and slots only; what a mod does with them is not recorded here. Slot numbers are positions in the tables above. These rows are Ghidra reads of the functions.
+
+| Slot | RVA | What it is |
+|---|---|---|
+| srvdo 2 | `0x430240` | applies a queued hit |
+| srvst 32 | `0x5695d0` | generic melee start; calls ElementalDamage `0x437d00` through `0x567070` |
+| srvst 68 | `0x569b20` | Cleave start |
+| srvst 58 | `0x577c90` | Fire Claws start; its roll is `0x437000` |
+| srvst 66 / cltst 56 | `0x42fa90` / `0x2b67e0` | srvst 66 is RegisterSkillEvents (see the function list above); cltst 56 is not described in the source |
+| cltst 57 | `0x2b68c0` | D2R's own function; not described in the source |
+| srvdo 32 | `0x55cc50` | Poison Dagger do |
+| srvdo 22 / cltdo 25 | `0x553cf0` / `0x220140` | Nova |
+| srvdo 84 / cltdo 46 | `0x57b880` / `0x223cb0` | Maggot Egg |
+| srvdo 91 | `0x57c590` | Nest: `0x48e820`, `0x3636d0`, SpawnMonster `0x492cf0` |
+| srvdo 119 | `0x575990` | pet summon: reads pettype (+0x112) and petmax (+0x114) |
+| srvdo 122 | `0x576630` | Hunger: corpse from the skill target (`0x48fe20`) |
+| srvdo 166 | `0x522e70` | D2R fills this slot; what it does is not described in the source |
+| srvdo 56 | `0x55c080` | golem |
+| srvdo 34 | `0x570a70` | one-charge hit |
+| srvdo 38 / 39 | `0x56ef30` / `0x571860` | vanilla's later Fists of Fire charges |
+| srvdo 30 | `0x55c840` | curse (curse function `0x55a7e0`) |
+| prg release | `0x56c3e0` / `0x56bfe0` | release dispatcher |
+| Charge | srvst 31 `0x564dc0`, srvdo 67 `0x5622c0`, cltst 25 `0x22e1a0`, cltdo 37 `0x22d420` | srvdo 180 and srvst 72 empty |
+| Leap Attack hit | `0x56b170` | (game, unit, skillId, level): the hit on the skill target |
+| aura hit | `0x566bc0` | called by the Leap Attack hit; gives the skill's aurastate on a hit (a port's note; not read again here) |
+| Firestorm | `0x5764e0` -> `0x5769f0` | |
+| DiabWall | `0x578bb0` | callback table `0x2381f30` (index 1 `0x3b75c0`, index 7 `0x3b7f70`) |
+| missile sdo 40 / cdo 72 | `0x455450` / `0x1b4ea0` | Blessed Hammer slots |
+| missile cdo 12 | `0x1b6b30` | screen shake |
+| missile srvhit 12 | `0x45d5e0` | chain |
+| missile srvhit 5 / clthit 4 | `0x45fd20` / `0x1ae5d0` | |
+| missile clthit 12 | `0x1acda0` | |
+| missile clthit 26 | `0x1bc380` | callback |
+| missile srvhit 62 | - | empty |
+| missile srvdmg 1 | `0x453490` | evaluates DmgCalc1 through `0x3b4a90` |
+| missile srvdmg ringoffire | `0x4549f0` | |
+| aura event 32 | `0x42eea0` | golem events `0x55b2d0`, `0x55b0c0`, `0x55b6a0`; Chilling Armor event 3 `0x552a50` |
+| aura event register / cleanup | `0x438230` / `0x588670` | `0x438370` is the path |
+
+Other D2R functions seen from these:
+
+| RVA | What it is |
+|---|---|
+| `0x2f9b10`, `0x2fa430` | stat operation base |
+| `0x584170` | open-wounds table |
+| `0x44d660` | QueuedHit |
+| `0x583580`, `0x583b30` | item-event functions 14 and 20 |
+| `0x3885e0` | item at a body location |
+| `0x432c40` | online cast limit |
+| `0x5896e0`, `0x589820` | cast-as-event (target, point) |
+| `0x470470`, `0x581970`, `0x581ae0` | item aura |
+| `0x3e5e60` | cube output parser (words `qty pre suf nor hiq mag set rar uni crf tmp eth sock mod uns rem reg exc eli rep rch lvl`) |
+| `0x5269c0` | cube executor: `reg` at `0x52748e` takes the input's quality (`0x36cf60`), unique / set row + 1 (`0x36ce70`) and item level (`0x36ccf0`) |
+| `0x58c2f0` | expansion set maker |
+| `0x375560` | socket count |
+| `0x475140` | gem mods (socket insert `0x46eb00`) |
+| `0x48fa40` | input removal (`game`, `item`) |
+| `0x411340` | `cheat uniques` handler (table entry `0x238b600`) |
+| `0x429d10` | mode change (jump table `0x42a2ca`) |
+| `0x42de40`, `0x42d840`, `0x42d020` | queued-command mode entry, busy gate, StartMode |
+| `0x4f8de0`, `0x4fdca0` | skill message handler, skill validation |
+| `0x302380` | aura event fields: auraevent1-4 (u16 at +0xa4..+0xaa), auraeventfunc1-4 (+0xac..+0xb2) |
+| skills record | auralencalc +0x80, summode +0x113, calc4 +0x19c (`0x306193`) |
+
+## Maps, regions, portals and item spells (build 93847)
+
+Read in Ghidra. A level's monsters come from a per-game region record; a level is opened by a portal or a warp.
+
+| RVA | What it is |
+|---|---|
+| `0x4f40c0` | use-item handler; calls the check dispatcher `0x5817f0` and the use dispatcher `0x581680`, which look the spell entry up through `0x300ae0` |
+| `0x236fe30` | item spell table: 20 entries; the entry holds handler indexes (check < 11, use < 16), so entry 16 runs nothing. The caller frees the item when the entry's flag is 0 |
+| `0x5da800` | cube Red Portal `(game, player, key, level, max)`: needs town, finds a free spot (`0x517f90`), makes object 60 through the portal maker `0x432ce0` (last argument 1 lifts the town-portal level whitelist), then increments the per-game counter of `key` (`0x5d88b0`, game +0x1aac8) |
+| `0x432ce0` | portal maker; spawns through `0x490410` in a room found by `0x38dfb0`, sets mode 1, adds event 1, then `0x435dd0` makes the linked return portal |
+| `0x58f680` | portal operate (object operate function 15); needs a linked partner. Operate table `0x23a51c0` has 75 slots, slot 60 empty; dispatcher `0x592c40` |
+| `0x488180` | warp `(game, player, level, 0)` |
+| `0x484c90` | `(client, 0)` -> the client's player; game clients list at game +0x138, next at +0x628 |
+| `0x325c50` | quest record; player data at +0x40 + difficulty * 8. Rite of Passage is quest 39, bit 0 = done |
+| `0x2ef4d0`, `0x48faa0`, `0x2f0530` | object removal |
+| `0x2efde0` | room neighbours. Room units start at +0xa8, next at unit +0x160; the game's monster lists are at game +0x2630 (128 lists by unit id & 0x7f, next at +0x158) |
+| `0x508740` | level id -> region record, array at `*(game + 0x1d0)` |
+| `0x5098b0` | builds all regions once per game (called from `0x508750`) |
+| `0x509940` | group choice; component picks `0x4195e0` |
+| `0x50acf0` | spawns a pack: MonDen is capped at 10000 and a pack spawns when `rand % 100000 <= MonDen` |
+| `0x419d20` | pack kind: unique while packs so far < MonUMin / MonUMax, else champion if `rand % 100 > 35`, else normal |
+| `0x419e80` | pack picker: weights each group by its rarity (group +2) against the sum (+0x11); swaps to monstats `spawn` (+0x54) only when isSpawn (+0x3e). MinGrp / MaxGrp at monstats +0x65 / +0x66, sparsePopulate +0x67 |
+| `0x508f80` | monster level: MonLvl / MonLvlEx through `0x32c700`, plus the terror zone bump `0x35b340`. The region's own level field (+0x2dc / +0x2e0) is never read |
+| `0x4926b0` | preset spawn `(game, room, preset)`; the only callee of the room preset loop `0x48f190`, reached from `0x48dc50` -> `0x50a050`. Preset record: id +4, x +8, unit type +0x20, y +0x24 |
+| `0x494a60` | monster setup; called only from `0x493cc0` |
+| `0x444680` | treasure class drop; drop request flags at +0xc0 (ethereal is 0x4). Quality roll `0x442d60`, item maker `0x43cd50`, socketable test `0x36b410`, set sockets `0x36e880`, monster TC drop `0x447b80`, TC by name `0x4404f0` |
+| `0x443910` | unique roll; the dropped-uniques mask is at game +0x3638, one bit per row. A second forced drop of a unique comes out normal until its bit is cleared |
+| `0x2f5b80` | `(item, 0, 0x40)` -> the item's magic stat list (entries `{layer, stat, value, extra}` at +0x30, count at +0x38). The stat-list setter `0x2f7c00` sets a value, it does not add |
+
+Region record layout (the record at the level's slot of `0x508740`, build 93847):
+
+| Offset | Field |
+|---|---|
+| +0x10 | group count |
+| +0x11 | rarity sum |
+| +0x12 | spawn count |
+| +0x14 | groups, 0x34 bytes each: `{monstats id u16, rarity u8, picks u8, ..., components at +0x10}` |
+| +0x2b8 | MonDen (u32) |
+| +0x2bc, +0x2bd | MonUMin, MonUMax |
+| +0x2c8 | packs made so far |
+| +0x2e8 onward | terror zone fields |

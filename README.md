@@ -191,7 +191,7 @@ This is a multi-lane project, not one prompt and done. A good agent says so, and
 
 | Limit | What it means for maps |
 |---|---|
-| The cube's "portal" output opens only the Cow Level | The portal needs a plugin hook on that output |
+| The cube's `Cow Portal` output is fixed to the Cow Level; `Red Portal,lvl=<id>` opens one fixed level of the same act, from town (untested in game here) | A pool level chosen per map still needs a plugin hook on the portal output |
 | Portals link levels within one act only | Map areas are Act 1 levels; the device is the cube in the Rogue Encampment |
 | Portal links store the level as a byte in many places | Map areas need level ids of 255 or below: a pool of a few areas, reused, not one per map |
 | levels.txt `Layer` below 100; clear `Position` on new maze levels | Set both on every cloned level, or entering it crashes |
@@ -201,7 +201,7 @@ This is a multi-lane project, not one prompt and done. A good agent says so, and
 
 | Lane | Work | Tools |
 |---|---|---|
-| RE spike | Confirm each hook: the cube's portal output (and the checks it makes for the Cow Level), the portal maker, the monster spawn path the level populator uses, room to level. Record the signatures and entry bytes | `tools/ghidra_query.ps1` with `Decompile.java`, `Disasm.java`, `Refs.java`; [engine-re.md](knowledge/engine-re.md); the [93847 address registry](knowledge/d2r-93847-addresses.md) |
+| RE spike | Confirm each hook: the cube's portal output (`Red Portal` handler `0x5da800`), the portal maker, the monster spawn path the level populator uses, room to level. Record the signatures and entry bytes | `tools/ghidra_query.ps1` with `Decompile.java`, `Disasm.java`, `Refs.java`; [engine-re.md](knowledge/engine-re.md); the [93847 address registry](knowledge/d2r-93847-addresses.md) |
 | Data | Item type `map`, 10 map bases, map affixes and the stats they roll, a pool of map levels cloned from a vanilla cave (with their lvlmaze rows), area levels per tier, treasure classes, the cube recipe, strings, stand-in HD art | `modkit` patches ([modkit-ops.md](knowledge/modkit-ops.md)), skills `d2r-items`, `d2r-monsters`, `d2r-cube` |
 | Plugin | Three parts, each with its own off-switch word. `mapportal`: the cube output opens a portal to a free pool level and remembers the map's tier and modifiers. `mapmods`: monsters spawned in that level get the modifiers. `maplevel`: picks the area level for the tier and frees the level when the run ends | [plugin-template](plugin-template/README.md) |
 | Tests | Named checks in a game slot: a map drops, the recipe consumes it, the portal leads to a map level, the area level matches the tier, a monster has the modifier's stats, the portal closes | [testing](docs/testing.md) |

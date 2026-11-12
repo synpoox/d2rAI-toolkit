@@ -47,7 +47,7 @@ plugin) and presets/maps (lvlprest, lvlmaze, lvlsub); reuse existing layouts wit
 New maze levels: leave `Position` empty unless the maze's presets have entry rooms (else the game crashes on
 entry); keep `Layer` below 100 and automap cels at or below 1498 (${CLAUDE_PLUGIN_ROOT}/knowledge/engine-limits.md). Cast-on-death
 properties need a plugin: D2R never raises a mod's own events. A busy scene (many traps and effects per attack) can
-fill the renderer's 12 MB pool.
+fill the renderer's pool (12 MB at start; engine pools can be grown by a plugin, ${CLAUDE_PLUGIN_ROOT}/knowledge/engine-limits.md "Memory").
 
 ## Difficulty
 monlvl.txt (per-level stat scaling, separate L columns per difficulty), difficultylevels.txt (resist penalties,

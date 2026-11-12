@@ -98,7 +98,7 @@ Verdict: **Yes** = a supported service or documented path. **Plugin** = possible
 | Engine | Inline hooks, byte patches | Yes | Atomic, with rollback; needs `NativeHooks`; RVAs are build-specific | SDK, [d2r-93847-addresses.md](d2r-93847-addresses.md) |
 | Engine | Detect patched bytes | Yes | `diagnostics.h` | SDK |
 | Engine | Low-level D2RCore exports | Yes | `core_exports.h` (1-99), `reimplementation_exports.h` (2000-2999) | SDK |
-| Engine | Renderer pool | Limit | Fixed 12 MB arena; busy scenes crash; a plugin heap fallback is possible | [engine-limits.md](engine-limits.md) |
+| Engine | Renderer pool | Limit | 12 MB at start; it grows only if a plugin adds memory (tlsf_add_pool, from a classic port's plugin code, not re-tested here) or falls back to the heap; busy scenes crash without either | [engine-limits.md](engine-limits.md) |
 | Engine | Coexisting with other gameplay plugins | Limit | The same hooks conflict; detect and warn, do not try to support. Method: [d2rloader.md](d2rloader.md), *Other plugins* | [d2rloader.md](d2rloader.md) |
 | Misc | HTTP | Yes | Async HTTPS and loopback HTTP | SDK |
 | Misc | Threading, inter-plugin events | Yes | `threads.h`, `plugin_communication.h`; payloads <= 1 MiB; keep callbacks short | SDK |

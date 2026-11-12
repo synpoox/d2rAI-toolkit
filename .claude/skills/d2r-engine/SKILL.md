@@ -38,8 +38,11 @@ lives), then build it part by part with this skill.
   `srvdofunc` to that number. The template's slot-172 missile fan shows target lookup, calc evaluation and missile
   creation.
 - **Hook a function**: `InstallInlineHook(rva, entryBytes, size, Hook, &original)`. Entry bytes must be whole
-  instructions covering at least 14 bytes (REX prefixes like 40/48 included), copied from the disassembly
-  (`Disasm.java`); the SDK refuses on mismatch. Hook function pointer types must be `noexcept`.
+  instructions (REX prefixes like 40/48 included), copied from the disassembly (`Disasm.java`), ending on an
+  instruction boundary. There is no 14-byte minimum: 8- to 12-byte signatures ran in game; longer is only safer
+  against a false match (${CLAUDE_PLUGIN_ROOT}/knowledge/engine-re.md section 6). The SDK refuses on mismatch. Hook function pointer types must be `noexcept`.
+- **One owner per hook site**: two plugins hooking the same entry disable each other by load order. Search your
+  plugins for the address first; one site, one owner (${CLAUDE_PLUGIN_ROOT}/knowledge/engine-re.md section 5).
 - **Before patching anything**, check the function entry for `FF 25` (jmp [rip+x]): D2RLoader already hooks it
   (e.g. its wide state sync). Work with D2RLoader's exports instead of fighting them; patching state arrays yourself
   broke monster hover and overlays in a past port.

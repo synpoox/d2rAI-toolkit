@@ -29,7 +29,7 @@ Data first: many "new" behaviours are an existing D2R function with different ta
 
 | Usually data (modkit patches) | Usually plugin (D2RLoader, from `plugin-template/`) |
 |---|---|
-| New item bases and item types (misc, itemtypes) | What a cube **output** does beyond D2R's built-ins (the "portal" output opens only the Cow Level) |
+| New item bases and item types (misc, itemtypes) | What a cube **output** does beyond D2R's built-ins (`Red Portal,lvl=<id>` opens a fixed same-act level without a plugin; a destination chosen per use needs one) |
 | Affixes and the stats they roll (magicprefix/suffix, itemstatcost, properties) | Reading an item's stats at the moment something happens |
 | Areas: levels, lvlprest / lvlmaze, area level (`MonLvl*`), monster lists, density | Changing monsters as they spawn, or anything per game rather than per row |
 | Drops (treasureclassex), recipes (cubemain), vendors | New cube conditions (D2R checks player ops 1-14 and item ops 15+ only; unknown ops pass) |
@@ -107,7 +107,7 @@ The ones new systems hit most (all in [engine-limits.md](engine-limits.md)):
   ids: count them before you design "one area per tier".
 - levels.txt `Layer` below 100; clear `Position` on new maze levels; ship every tile file a level type uses.
 - Portals link levels **within one act** only.
-- The cube "portal" output opens only the Cow Level; unknown cube `op` values are ignored.
+- The cube "portal" output opens a fixed level (`Cow Portal`: the Cow Level; `Red Portal,lvl=<id>`: any level of the same act, opened from town; untested in game here); a destination chosen per use needs a plugin. Unknown cube `op` values are ignored.
 - Indexed tables: append only. Item type numbers D2R tests in code stay where they are.
 - 30 skills per class; new events are never raised by D2R itself.
 
@@ -129,3 +129,15 @@ A typical order, with one PR each ([docs/ai-workflow.md](../docs/ai-workflow.md)
 - One part word per hook in `g_parts`, so `<name>-off.txt` can turn each one off.
 - A log line per part at load (`mapportal on`, or why it is off), and the part's counters in the status command.
 - Refuse, don't guess: a hook whose entry bytes differ is not installed, and the system says which part is missing.
+
+## 10. Example: opening a level from an item or the cube
+
+What the D2R side offers (RVAs in [d2r-93847-addresses.md](d2r-93847-addresses.md) "Maps, regions, portals and item spells"; build 93847):
+
+- **Cube first.** `Red Portal,lvl=<level id>` in the cube output opens a portal to any level of the same act from town, no code needed (the handler takes the level as an argument; untested in game here). Try this before any plugin.
+- **From an item.** The item spell table `0x236fe30` has 20 entries and entries 16-19 are empty; an entry's handler indexes are checked (check < 11, use < 16), so a new spell number needs a plugin that fills a free entry and supplies both handlers. The use-item handler `0x4f40c0` frees the item when the entry's flag is 0, so say in the entry whether the item is consumed.
+- **Making the portal.** Call the portal maker `0x432ce0` with its last argument 1 (that lifts the town-portal level whitelist). It creates object 60 and the linked return portal. A portal with no linked partner cannot be operated (operate function 15 needs one).
+- **Moving a player directly.** `0x488180(game, player, level, 0)` warps without a portal. For a party, walk the game's client list (game +0x138, next at +0x628; `0x484c90` gives the client's player).
+- **A level's monsters** come from the region record by level id (`0x508740`): group list, rarity weights, MonDen, unique counts. The region's own monster-level field is never read; monster level comes from `MonLvl` / `MonLvlEx` (plus the terror zone bump). To change density or packs for one level, change the table row, not the record.
+- **Gating by progress.** Quest records are read with `0x325c50`; Rite of Passage is quest 39, bit 0 = done.
+- **State.** Per-game counters live in the game object (the cube portal keeps its counter at game +0x1aac8, per key); clean up on game end, as in section 4.
