@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640" role="img" aria-labelledby="t d">
   <title id="t">d2rAI-toolkit architecture</title>
-  <desc id="d">You describe a change. An AI agent, guided by CLAUDE.md, the skills and the knowledge base, uses the toolkit's parts (modkit, plugin template, testing, release, downloader). They read the game from your own install and write a mod folder, test copies and a release that players install with the downloader.</desc>
+  <desc id="d">You describe a change. An AI agent, guided by its rules, the skills and the knowledge base, uses the toolkit's parts (modkit, plugin template, testing, release, downloader). They read the game from your own install and write a mod folder, test copies and a release that players install with the downloader.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#15110e"/>
@@ -46,7 +46,7 @@
   <rect class="hot" x="296" y="40" width="568" height="170" rx="12"/>
   <text class="h" x="316" y="72">AI agent (Claude Code or another coding agent)</text>
   <rect class="chip" x="316" y="88" width="168" height="104" rx="8"/>
-  <text class="m" x="330" y="114">CLAUDE.md</text>
+  <text class="m" x="330" y="114">d2r-toolkit rules</text>
   <text class="t" x="330" y="138">rules: data first,</text>
   <text class="t" x="330" y="156">build and validate,</text>
   <text class="t" x="330" y="174">no game files in git</text>

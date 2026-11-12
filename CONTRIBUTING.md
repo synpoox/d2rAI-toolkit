@@ -44,7 +44,7 @@ py -3 -m modkit build examples\showcase  # if you touched modkit/: 0 errors
   one place ([`knowledge/`](knowledge/README.md)) and link to it from elsewhere.
 - **Skills:** a skill in `.claude/skills/<name>/SKILL.md` has a front matter `name` and a `description` that says
   *when* to use it. The body is steps the agent can follow, with links to the knowledge pages. Add new skills to the
-  table in [README.md](README.md) and to the list in [CLAUDE.md](CLAUDE.md).
+  table in [README.md](README.md) and to the list in the [d2r-toolkit skill](.claude/skills/d2r-toolkit/SKILL.md).
 - **Python:** standard library where you can, `python -m modkit ...` style CLIs, no hard-coded paths or hosts (use
   config files and placeholders like `files.example.com`).
 - **Addresses:** build-specific values go in [`knowledge/d2r-93847-addresses.md`](knowledge/d2r-93847-addresses.md)
