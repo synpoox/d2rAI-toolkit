@@ -1,0 +1,43 @@
+{
+  "_note": "Pinned companion plugins (release/companions.py). Copy to companions/manifest.json and edit. sha256 is of the downloaded file: from the release's SHA256SUMS, or computed once after you checked the file. Bump one companion per PR, after a coexistence check in a test slot. Our settings for a companion go in companions/config/ and are copied over the zip's own.",
+  "game": "3.3",
+  "config": ["companions/config/", "companions/filter.json"],
+  "companions": [
+    {
+      "name": "Example Loot Filter",
+      "repo": "example-owner/example-repo",
+      "tag": "v1.0.0",
+      "asset": "example-loot-filter-1.0.0.zip",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "files": {
+        "d2rloader/plugins/example-lootfilter.dll": "d2rloader/plugins/example-lootfilter.dll",
+        "Other.mpq/data/hd/global/sfx/item/": "MyMod.mpq/data/hd/global/sfx/item/"
+      },
+      "filter_tables": ["armor", "weapons", "misc", "itemtypes", "skills", "itemstatcost"]
+    },
+    {
+      "name": "Example Item Ranges",
+      "repo": "example-owner/example-repo",
+      "tag": "v2.0.0",
+      "asset": "example-item-ranges-2.0.0.zip",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "files": { "d2rloader/plugins/example-ranges.dll": "d2rloader/plugins/example-ranges.dll" },
+      "loader_settings": { "d2rcore.items": { "item_stat_ranges": true } }
+    },
+    {
+      "name": "Example Plugin Built From A Commit",
+      "repo": "example-owner/another-repo",
+      "commit": "0000000000000000000000000000000000000000",
+      "asset": "release/example-plugin.dll",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "files": { "release/example-plugin.dll": "d2rloader/plugins/example-plugin.dll" }
+    },
+    {
+      "name": "Example Hub Download",
+      "url": "https://hub.example.com/api/releases/1234/download",
+      "asset": "example-hub-plugin-1.0.zip",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "files": { "plugins/example-hub.dll": "d2rloader/plugins/example-hub.dll" }
+    }
+  ]
+}

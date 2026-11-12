@@ -88,7 +88,7 @@ Each entry: the rule, what happens when a mod breaks it, and the fix. "Plugin" m
 |---|---|---|---|
 | missiles `pSrvHitFunc` | 0-60 | `0x2391030`, bound 71 (`0x2391404`), dispatcher `0x464ac0` | **61-70** |
 | missiles `pCltHitFunc` | 0-65 (6, 7 and others unused) | `0x2358710`, bound 81 (`0x2358a64`) | 66-80, plus unused low slots (6 and 7 confirmed empty) |
-| missiles `pSrvDoFunc` | 1-45 | `0x2390e80`, **no bound check** (dispatcher `0x466ce0`) | **46-54** empty (table end not confirmed) |
+| missiles `pSrvDoFunc` | 1-45 | `0x2390e80`, **no bound check** (dispatcher `0x466ce0`) | **46-53** empty (next table `0x2391030` starts after slot 53) |
 | missiles `pCltDoFunc` | 1-77 | `0x2358430` (port notes say 77 slots, but D2R's `heraldspawner` uses 77: verify the size); called from `0x1ba040` | 14 unused by any D2R missile |
 | itemstatcost `descfunc` | 5-29 in use | not located | Values outside D2R's set print nothing useful: plugin |
 | properties `func1` | 1-25, 36 | funcs at `0x2386ab0` | plugin |

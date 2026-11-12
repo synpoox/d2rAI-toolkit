@@ -15,6 +15,7 @@ runs. Everything that needs Windows is behind a function, so the scripts also im
 | `testing/warps.py` | Makes `cheat goto` lines for a level's DS1 reference spots, or a markdown doc for a list of levels. |
 | `testing/force_ds1.py` | Test-only: pins a level to one DS1 variant in a slot's installed `lvlprest.txt`. |
 | `testing/example_checks.py` | Five example checks. Copy it and make your own. |
+| `testing/stock_checks.py` | Stock checks that hold for any mod (`slot-savepath`). Turn on with `modules = ["stock_checks"]`. |
 | `testing/testing.example.toml` | The config. Copy it to `modkit-testing.toml`. |
 
 Contents: [Quick start](#quick-start) · [Why slots](#why-slots) · [The config file](#the-config-file) ·
@@ -95,6 +96,14 @@ What makes a slot independent:
 `MODKIT_RUN` and refuses while that slot's game runs; games in other slots may keep running. Plain
 `python -m modkit --game <slot folder> install` refuses a slot folder of the testing config and points you here.
 Set `mods_policy = "copy"` to copy your own mods folder as well.
+
+`tools/install_plugins.ps1 -Game <slot folder> -Project <mod> -Plugins a,b [-Data]` wraps these for a mod with built
+plugins. `-Game` must be a test slot (2 and up) whose lock `MODKIT_RUN` holds, and `D2R.exe` must be version 3.3; both
+are checked first, before anything changes. It copies `<Project>\plugin\build\Release\<name>.dll` into the slot's
+mod-scoped `mods\<Mod>\d2rloader\plugins\`, moves every other file there (stray third-party plugins; not the
+`<name>-off.txt` toggles or the plugins' own files) and any copy of its DLLs in the game-wide `d2rloader\plugins\` to a
+backup folder instead of deleting it (`-KeepExtras` leaves the first kind), and with `-Data` builds first, then
+installs the project's data and `mod.json` plugins through `slot_install.py` (which keeps the slot's own savepath).
 
 ## Slot owners (`~/.d2r-modkit/slots.toml`)
 
@@ -332,9 +341,12 @@ Register the module in the config and run it:
 
 ```toml
 [checks]
-modules = ["example_checks", "my_checks"]
+modules = ["example_checks", "stock_checks", "my_checks"]
 paths = ["my-checks"]
 ```
+
+`stock_checks` is the toolkit's own module of checks any mod can use; `slot-savepath` fails when a slot's modinfo.json
+`savepath` is not the slot's own save folder.
 
 ```sh
 python testing/game_checks.py list                                  # name, tags, first line of the doc string

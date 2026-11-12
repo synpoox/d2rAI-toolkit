@@ -15,6 +15,7 @@ Windows is needed to run the game; everything else (locks, config, checks, relea
 | `menu_layout.py` | Menu click positions (fractions of the window) for `lod_checks`; measured for D2R 3.3 at 1920x1080, re-measure for another version. |
 | `game_checks.py` | Small checks framework: `@check` registry, runner, results JSON, summary, screenshots. |
 | `example_checks.py` | Example checks to copy (`config-sane`, `game-starts`, `main-menu-visible`, `console-echo`, `no-new-crash-files`). |
+| `stock_checks.py` | Stock checks for any mod (`slot-savepath`: each modinfo savepath is the slot's own save folder). List it in `checks.modules` to use it. |
 | `slot_registry.py` | The slot-to-owner table (`~/.d2r-modkit/slots.toml`, machine config): which project may lock which slot. |
 | `warps.py` | `cheat goto` lines (and a markdown doc for a list of levels) for a DS1 map's centre, waypoints and boss presets. |
 | `slot_install.py` | Installs a built mod project into a slot (`modkit install`), keeping the slot's own savepath. |
