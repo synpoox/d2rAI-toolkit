@@ -20,8 +20,8 @@ Read with: [tables.md](tables.md) (how D2R reads tables), [engine-limits.md](eng
 | **Keep an unported list** (section 10) | So "missing" never gets mistaken for "broken" |
 | First milestone: **a new character in Act 1** as early as possible | From then on, work from what breaks in game |
 
-- Fix the port-wide decisions early (game and loader versions, data before code, save format from the first build,
-  what is imported, who approves an approximation): [ai-workflow.md](../docs/ai-workflow.md) "Decisions for a port".
+- Fix the port-wide decisions early (game and loader versions, data before code, save format from the first build):
+  [ai-workflow.md](../docs/ai-workflow.md) "Decisions for a port".
   Terms such as reference install, deviation and table set are in the glossary at the end of this file.
 
 ## 1. Inventory the mod
@@ -260,9 +260,8 @@ A port that starts from Lord of Destruction 1.09d (not 1.13c) needs the 1.09d fa
 | Term | Meaning |
 |---|---|
 | **Reference install** | The frozen, hash-recorded classic game files (for a 1.09d port, Lord of Destruction 1.09d) that every comparison is made against, for every game mode. Not a third-party mod's folder |
-| **Reference behaviour** | How the original version plays, the thing the port is compared with |
-| **Deviation** | Any listed way the port differs from the reference, kept on purpose and checked by the table-diff gate. Not "exception" or "approximation" |
-| **Table set** | One of D2R's two copies of the tables: `excel/base/` (read by Expansion / Lord of Destruction characters) and `excel/` (read by Reign of the Warlock characters). A port writes the same tables into both and keeps them in sync (section 3, "Banks") |
+| **Deviation** | Any listed way the port differs from the reference, kept on purpose and checked by a table diff |
+| **Table set** | One of D2R's two copies of the tables: `excel/base/` (read by Expansion / Lord of Destruction characters) and `excel/` (read by Reign of the Warlock characters). What to write into each is in section 3, "Banks" |
 | **Column map** | The mapping from each column of one classic version's table to the other version's column or columns, with the transform each needs (for example 1.09d to 1.13c). Generated from scripts, never hand-edited |
 | **Rename map** | The short list of columns D2R renamed from 1.13c, used when merging 1.13c-shaped tables onto D2R's. Not the column map |
 | **Placeholder row** | A D2R row with no counterpart in the reference, kept disabled at its row number so the rows after it keep theirs (the Warlock rows, content added after the reference version). Rows a kept convenience needs stay enabled and are listed as deviations |

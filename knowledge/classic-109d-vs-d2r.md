@@ -23,7 +23,7 @@ stay in the port.
 |---|---|---|---|---|---|
 | Skill synergies | none | per-skill synergy calcs | data | schema ([tables](classic-109d-tables.md)) | S |
 | Skill damage per level | 3 brackets (`LevDam1-3`) | 5 brackets, min and max split | data; the 1.09d bracket boundaries were not read from code | schema | S |
-| Skill and missile function bodies | one function per skill, id inside | one generic function per behaviour driven by columns | code, largest item | [engine file](classic-109d-engine.md): 60 different and 148 unresolved of 319 skills | L |
+| Skill and missile function bodies | one function per skill, id inside | one generic function per behaviour driven by columns | code, largest item | [engine file](classic-109d-engine.md): 156 different and 48 not settled of 319 skills (115 same) | L |
 | Experience penalty from level 70 | none | `ExpRatio` curve | data | `experience` has no `ExpRatio` in 1.09d | S |
 | Life and mana leech | rounded integer percent | 1/64 fixed point | both | [Life and mana leech](#life-and-mana-leech) | S |
 | Item events (crushing blow, open wounds, knockback) | hard-coded in `D2Game` | `itemstatcost` `itemevent*` / `itemeventfunc*` | both | schema; see the next two rows | M |

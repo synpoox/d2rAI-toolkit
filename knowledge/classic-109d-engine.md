@@ -8,7 +8,8 @@ differences in [classic-109d-tables.md](classic-109d-tables.md), the stock files
 Evidence: Ghidra on the stock 1.09d DLLs (hashes in [classic-reference-installs.md](classic-reference-installs.md)) and
 on a memory dump of D2R build 93847 (PE timestamp `0x6ab3782c`, D2RLoader 1.3.1; see [engine-re.md](engine-re.md)).
 Nothing here was run in game. 1.09d addresses are virtual addresses at the DLLs' image bases (`D2Game.dll`
-`0x6fc30000`, `D2Client.dll` `0x6faa0000`, `D2Common.dll` `0x6fd40000`); D2R addresses are RVAs of build 93847.
+`0x6fc30000`, `D2Client.dll` `0x6faa0000`, `D2Common.dll` `0x6fd40000`), except in the Monster AI section, which uses
+RVAs; D2R addresses are RVAs of build 93847.
 
 ## Skills and missiles
 
@@ -111,24 +112,39 @@ pair got a score (the share of mapped helpers both call). Pairs now known to be 
 | client create missile | `0x6fb3daf0` | `0x1b7760` |
 | client target point | `0x6fab90d0` | `0x214c80` |
 
-Result, per skill (319) and missile (644): skills 111 same (39 of them with no function on either build), 60
-different, 148 unresolved; missiles 525 same, 11 different, 108 unresolved. "Different" is structural (code on one
+Result, per skill (319) and missile (644), after the source's re-read of the first-pass unresolved skills: skills 115
+same (39 of them with no function on either build), 156 different, 48 not settled; missiles 525 same, 11 different,
+108 unresolved. "Different" is structural (code on one
 build only, a loader thunk, or read by hand) and means "check", not a proven change of effect. **A low score does not
 show a difference**: a score under 0.4 was checked on three pairs and two did the same thing with the missile taken
-from `cltmissile` instead of a constant. "Unresolved" pairs were not read.
+from `cltmissile` instead of a constant. "Unresolved" pairs were not read. A skill counts as "same" only when every one of its pairs was read by hand.
 
 Every skill and missile pair, with both names, addresses, D2R index and verdict, is in
-`shared/classic_import/data/109d-skill-functions.tsv`; this file does not repeat the per-skill list.
+`shared/classic_import/data/109d-skill-functions.tsv`; this file does not repeat the per-skill list. That TSV is still
+the first pass (111 same, 60 different, 148 unresolved); the re-read verdicts above are not in it yet, and a follow-up
+issue will refresh it. Until then, treat its `unresolved` rows as possibly `differs` or `same`.
 
 Not compared: `auraeventfunc`, `srvstopfunc` / `cltstopfunc` (Whirlwind only), `pSrvDmgFunc`, item spells. A "code on
 one build only" verdict usually means D2R added a generic start or client function (Throw's `srvstfunc` 65, Bone
 Wall's `cltstfunc` 22) or drives from data a client effect 1.09d coded.
 
+### Found in the re-read
+
+- **Charge-up skills (Assassin).** 1.09d reads Tiger Strike's record for all six: Param3 = 225 (duration of all
+  progressive skills) and Param4 = 50 (to-hit per charge). D2R `0x56dae0` reads each skill's own `auralencalc` and
+  `aurastatcalc2`, so an import must write 225 and 50 into all six.
+- **"Use function already ran" flag (0x40).** 1.09d runs the use function again while it is clear, so skills 259, 269
+  and 274 hit twice per use with any weapons. D2R `0x570650` leaves it clear only with two claws (type 0x2d) and
+  otherwise hits once.
+- **State 0xc timer.** 6 in 1.09d (`0x6fac46e0`), 7 in D2R (`0x220be0`).
+- **Recurring D2R-only steps.** `0x553e60` and `0x575de0` add owner and skill tagging stats (0x15e, 0x15f, 0xca) and a
+  skill-count gate; `0x2b05d0` clamps the curse radius (offset -3, minimum 2).
+
 ## Monster AI
 
 - **1.09d `D2Game.dll`:** the AI table is at RVA `0xebac8`, 266 records of 16 bytes `{kind, init fn, think fn, next}`,
   absolute 32-bit pointers. A special-state table sits at `0xecb68`. The reader is `0xa38e0` (sets the think function;
-  falls back to `0x9a0d0` / `0x9a3ad0` when the entry is empty). The assert files are `AiThink.cpp`, `AiGeneral.cpp`,
+  falls back to `0x9a0d0` / `0x9a3ad0` when the entry is empty; `0x9a3ad0` is as recorded, lies outside the DLL's image range, and is unchecked). The assert files are `AiThink.cpp`, `AiGeneral.cpp`,
   `AiTatics.cpp`, `AiUtil.cpp`, `AiBaal.cpp`.
 - **1.09d has no `AI` column; the `BaseId` column picks the AI.** The monstats loader (D2Common `0x1ad40`) reads
   `BaseId` as an int into record `+0x168`, which indexes the table above. `BaseId` takes exactly 266 values (0-265),

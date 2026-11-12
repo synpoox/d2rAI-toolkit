@@ -4,7 +4,7 @@ How to tell stock Lord of Destruction 1.09d files from a modded or cracked insta
 what is and is not proven. A port compares against one frozen, hash-recorded set (its **reference install**, see the
 glossary in [porting-classic-mods.md](porting-classic-mods.md)). The per-file SHA-256 list is
 `shared/classic_import/baselines/109d.json` (read by `shared/classic_import/extract.py`, which refuses an archive whose
-hash differs); this file holds the provenance and the traps. Never commit these files (rule 1 in `CLAUDE.md`).
+hash differs); this file holds the provenance and the traps. Never commit these files (they are Blizzard's).
 
 ## Answer
 
@@ -64,7 +64,7 @@ original-`Fog.dll` backup, a mod's own data archive, a game-launcher or error-re
 ## A code-cave patch, for recognising a hooked DLL
 
 A mod's `D2Game.dll` can be stock plus a code-cave hook. One seen: same PE timestamp and sections (`.text .rdata .data
-.reloc`), 435 bytes differing in 3 runs:
+.reloc`), 3 runs of differing bytes, 460 bytes in all (3 + 4 + 453; the 453-byte block may contain bytes equal to the original):
 
 - 3 bytes at file offset `0x0B52EF` and 4 bytes at `0x0B538E` in `.text` change the operand bytes of existing branches
   or calls, which retargets them.

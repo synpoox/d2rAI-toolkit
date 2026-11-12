@@ -72,12 +72,9 @@ decisions the owner approves and the repo records (one short note each, for exam
 
 | Decision | Choice that worked | Why |
 |---|---|---|
-| Game and loader versions | Keep the game on one build (D2R 3.3, build 93847); follow the loader's current release rather than pinning it. Record the exact versions each test used. A loader update that breaks the port leaves it incompatible until fixed: do not freeze the loader or change the game build to hide it | The game build is what engine addresses are tied to; the loader moves, and a silent pin hides breakage |
+| Game and loader versions | Keep the game on one build (D2R 3.3, build 93847); the loader moves on its own schedule. Record the exact versions each test used. A loader update that breaks the port leaves it incompatible until fixed: do not change the game build to hide it | The game build is what engine addresses are tied to; the loader moves, and a silent pin hides breakage |
 | Data or code | Data first; add a plugin only for a gap the data cannot close. Prefer a loader service over a native hook, and isolate each hook with a check of the bytes it patches. Adapt D2R's tables with reproducible transformations that carry the old rules in, instead of replacing D2R's tables with the old files | Data is cheap to review and survives game updates; hooks are build-specific |
 | Saves | Decide the save format at the start. If the port needs the loader's extended saves, use them from the first build: a retail-format start with a later migration costs more. Extended saves do not load in retail D2R, so promise no compatibility outside the mod. Give the mod its own save folder, version the migrations and back up before each one; stop an incompatible setup before it touches a save | Changing the format later breaks every tester's characters |
-| Scope of imports | Support characters created inside the port; a character from another version or mod is not imported unless someone designs and tests it | Old saves carry rules the port may not have |
-| Approximations and cuts | Each needs the owner's approval, recorded against the behaviour it changes | A silent approximation is a bug report later |
-| Release | One versioned package holds the data, plugins, configuration and compatibility metadata. A plugin checks the services and bytes it needs and refuses to run partly | Players get a tested set, not a mix |
 
 None of these decisions shows that a particular rule works; each rule still needs its own check against the original.
 
