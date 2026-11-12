@@ -27,6 +27,9 @@ Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you ar
   saves, HD graphics, reverse engineering, debugging). Read `${CLAUDE_PLUGIN_ROOT}/knowledge/engine-limits.md` before designing anything
   big, and the topic file before working in an area. A whole new game system (for example a mapping system) starts
   with `${CLAUDE_PLUGIN_ROOT}/knowledge/new-game-systems.md`: the data vs plugin split, the hooks, where state lives, the lanes.
+  What D2RLoader 1.3.1 and PluginSDK 0.4.0 can and cannot do is in `${CLAUDE_PLUGIN_ROOT}/knowledge/d2rloader-capabilities.md`
+  (the capability matrix; check it before planning a plugin feature); charged or not-used-up items are in
+  `${CLAUDE_PLUGIN_ROOT}/knowledge/charged-items.md`.
 - `${CLAUDE_PLUGIN_ROOT}/docs/`: how to run a project. `${CLAUDE_PLUGIN_ROOT}/docs/ai-workflow.md` is the method for a mod built with AI
   agents: a coordinator plus parallel lanes, model choice, game slots, the bug list, releases, safety.
 - `${CLAUDE_PLUGIN_ROOT}/templates/`: fill-in files for a new project: coordinator prompt, lane rules, lane prompt,
