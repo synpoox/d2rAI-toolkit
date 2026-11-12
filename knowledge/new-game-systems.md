@@ -4,7 +4,9 @@ How to plan a feature D2R has no rows for: a mapping system, a new crafting benc
 new panel. A new skill or item is one table row and a patch. A new **system** changes what the game does, so it is
 always part data, part engine plugin, and usually a project of several lanes.
 
-Read [engine-limits.md](engine-limits.md) first. Most designs that fail ignore a limit listed there.
+Read [engine-limits.md](engine-limits.md) first. Most designs that fail ignore a limit listed there. Then find each
+part of the design in [d2rloader-capabilities.md](d2rloader-capabilities.md) (what the loader and SDK give you, and
+what they lack on loader 1.3.1).
 
 ## 1. Write it as what the player sees
 
@@ -79,6 +81,13 @@ Never move or resize D2R's save structures or unit state arrays (see plugin-temp
   your plugin knows on the server is invisible to the client unless it maps onto those.
 - Mark the plugin `Shared` (the template does) and bump its version with every release: host and client must run the
   same one in TCP/IP games.
+- Split plugins by multiplayer scope, not by feature: gameplay in a `Shared` plugin, client-only code (panels,
+  pictures, numbers) in a client-only one, which never forces a version match. A system gets **its own** plugin only
+  when a player or mod would switch it on or off as a whole, it shares no hook point or function slot with another
+  plugin, and it never calls another plugin; a large plugin is split into source files instead
+  ([d2rloader.md](d2rloader.md), *Which plugin holds what*). What the loader and SDK can do for each part of a system:
+  [d2rloader-capabilities.md](d2rloader-capabilities.md). Items with charges that are not used up:
+  [charged-items.md](charged-items.md).
 
 ## 6. UI
 

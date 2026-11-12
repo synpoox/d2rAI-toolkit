@@ -42,6 +42,8 @@ The [knowledge base](../knowledge/README.md) is the reference for the engine and
 | HD UI layouts | [ui-layouts.md](../knowledge/ui-layouts.md) |
 | Saves | [saves.md](../knowledge/saves.md) |
 | D2RLoader on players' machines | [d2rloader.md](../knowledge/d2rloader.md) |
+| What the loader and SDK can do (capability matrix) | [d2rloader-capabilities.md](../knowledge/d2rloader-capabilities.md) |
+| Charged or not-used-up items | [charged-items.md](../knowledge/charged-items.md) |
 | Porting a classic mod | [porting-classic-mods.md](../knowledge/porting-classic-mods.md) |
 | Reverse engineering and hooks | [engine-re.md](../knowledge/engine-re.md) |
 | Addresses for build 93847 | [d2r-93847-addresses.md](../knowledge/d2r-93847-addresses.md) |
