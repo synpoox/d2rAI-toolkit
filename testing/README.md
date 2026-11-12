@@ -9,7 +9,7 @@ Windows is needed to run the game; everything else (locks, config, checks, relea
 | `testing_config.py` | Reads the config and does all the path math (slot folders, save folders, lock folders). |
 | `game_slots.py` | Slots = separate copies of the game install. Setup, sync, lock, unlock, status. |
 | `game_ctl.py` | Starts, stops and drives one slot's game: screenshots, keys, clicks, console commands. |
-| `check_helpers.py` | `pair` (warp, light up, HD|legacy side-by-side PNG) and `moved` (did the character move?), run as `game_ctl.py` subcommands. |
+| `check_helpers.py` | `pair` (warp, light up, HD \| legacy side-by-side PNG) and `moved` (did the character move?), run as `game_ctl.py` subcommands; also the shared plugin-log reader (`plugin_log_path`). |
 | `game_checks.py` | Small checks framework: `@check` registry, runner, results JSON, summary, screenshots. |
 | `example_checks.py` | Example checks to copy (`config-sane`, `game-starts`, `main-menu-visible`, `console-echo`, `no-new-crash-files`). |
 | `slot_install.py` | Installs a built mod project into a slot (`modkit install`), keeping the slot's own savepath. |
@@ -17,10 +17,10 @@ Windows is needed to run the game; everything else (locks, config, checks, relea
 | `stats.py` | Rate checks for random outcomes (drop, proc, block): `count`, `tolerance_for`, `assert_rate`. |
 | `lod_checks.py` | Checks and helpers for a Lord of Destruction character: plugin loaded, save read, save and exit, create, reload, delete. |
 | `menu_layout.py` | Where the 3.3 menu buttons are, as fractions of a 1920x1080 client, for `lod_checks.py`. |
-| `image_bytes.py` | Reads the game image's PE stamp and classifies byte spans, so a check can tell a build from another. |
+| `image_bytes.py` | Reads the game image's PE stamp and classifies byte spans, so a check can see that an engine patch is in. The PE stamp tells which build; `classify` tells stock bytes from patched ones. |
 | `save_edit.py` | Edits a `.d2s` save for a test (unlock difficulties, set the current location), checksum fixed. |
 | `d2r_only.py` | Checks that a mod switched off D2R 3.3's Terror Zones, Heralds and Colossal Summit portal: data checks plus in-game purple scans. |
-| `contact_sheet.py` | Turns a folder of HD|legacy pair PNGs into one contact sheet plus brightness and black-pixel numbers. |
+| `contact_sheet.py` | Turns a folder of HD \| legacy pair PNGs into one contact sheet plus brightness and black-pixel numbers. |
 | `warps.py` | `cheat goto` lines for a DS1 map's centre, waypoints and boss presets, from a data folder. |
 | `force_ds1.py` | Pins a level to one DS1 variant in a slot's installed `lvlprest.txt`, so a warp lands on the preset under test. |
 | `stock_checks.py` | Checks any mod can list in `checks.modules`: `slot-savepath`. |
@@ -46,18 +46,23 @@ smallest mod that sets only that rule, installed into a slot for the run.
 
 ```
 tests/game/fixtures/<check name>/
-  mod.json                  name, savepath, title ("<mod> (<check> game check)"), version 0.0.0, plugins []
+  mod.json                  name (= mod.folder), savepath, title ("<mod> (<check> game check)"), version 0.0.0, plugins []
   patches/010-<check>.json  the data change: the rows or values the check needs, nothing else
 ```
 
-- `mod.json` carries the slot's own `savepath` (see `slot-savepath` in `stock_checks.py`), so a fixture character never
-  lands in the user's saves. Give the title the word "check" so a fixture install cannot be mistaken for a release.
+- `mod.json` `name` must equal the testing config's `mod.folder` (the real mod's folder name); `slot_install.py`
+  refuses any other name ("is mod X but mod.folder is Y"). Name the fixture's folder after the check, but keep `name`
+  as the real mod's. Give the title the word "check" so a fixture install cannot be mistaken for a release.
+- What keeps a fixture character out of the user's saves: `slot_install.py` writes the slot's own savepath
+  (`<saves.slot_name>/`) whatever `mod.json` says, and `slot-savepath` in `stock_checks.py` checks it. Use the usual
+  `<name>/` in `mod.json`.
 - One fixture per check, named after the check. The patch holds only the rows that check reads; an empty difference
   from the base data is a fixture that tests nothing.
-- The check builds the fixture over the base data, installs it with `slot_install.py` (the lock is held, the game is
-  stopped), runs, and the next install of the real project puts the real data back. Never install a fixture into
+- The check runs `modkit build <fixture>` (its patch applies to vanilla, the extracted game data, so the patch must carry
+  every row the check reads), installs the result with `slot_install.py` (the lock is held, the game is stopped), runs,
+  and the next install of the real project puts the real data back (both write the same mod folder). Never install a fixture into
   slot 1.
-- Keep the fixture beside the check module, in the repo that owns the check. The toolkit ships the pattern and the
+- Keep fixtures in the repo that owns the check (for example `tests/game/fixtures/`). The toolkit ships the pattern and the
   helpers, not any mod's fixtures.
 
 ## Rules
