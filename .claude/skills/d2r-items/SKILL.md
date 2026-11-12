@@ -5,7 +5,9 @@ description: Create or change Diablo II Resurrected items in a modkit mod - base
 
 # Items, affixes and loot
 
-Read knowledge/tables.md (item tables section) and knowledge/engine-limits.md first in a session. Always start
+Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you are inside the toolkit repo: use its root). Run `python -m modkit` with that folder as the working directory and the mod project as an argument.
+
+Read ${CLAUDE_PLUGIN_ROOT}/knowledge/tables.md (item tables section) and ${CLAUDE_PLUGIN_ROOT}/knowledge/engine-limits.md first in a session. Always start
 from a vanilla row: `python -m modkit show weapons "Crystal Sword"`, `show uniqueitems "The Gnasher"`.
 
 ## Base items (weapons.txt, armor.txt, misc.txt)
@@ -53,9 +55,9 @@ Fara, Lysander, Drognan, Hratli, Alkor, Ormus, Elzix, Asheara, Cain, Halbu, Jame
 
 ## Engine traps
 - itemtypes: keep D2R's own rows at D2R's numbers (`warl` 67); D2R's code tests 75 rune, 77 hpot, 68 h2h ... by
-  number (knowledge/engine-limits.md).
+  number (${CLAUDE_PLUGIN_ROOT}/knowledge/engine-limits.md).
 - A property with function 28 (layer = param) needs `Save Param Bits` on its stat, or the item crashes the client
-  when it drops (knowledge/saves.md).
+  when it drops (${CLAUDE_PLUGIN_ROOT}/knowledge/saves.md).
 - Timed potions (`pSpell` 3): the calc of stats other than life/mana/manarecovery/hpregen is per frame; multiply by
   `len`.
 

@@ -5,6 +5,8 @@ description: Create or change Horadric Cube recipes in a Diablo II Resurrected m
 
 # Cube recipes (cubemain.txt)
 
+Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you are inside the toolkit repo: use its root). Run `python -m modkit` with that folder as the working directory and the mod project as an argument.
+
 `python -m modkit show cubemain "<description>"` shows a vanilla recipe; `find cubemain op=...` finds by column.
 
 ## A recipe row
@@ -23,7 +25,7 @@ D2R checks two kinds of conditions (recipe search 0x529090 and input matcher 0x5
   value). Any other op number here is **ignored (the recipe always passes)**, it does not fail.
 - **Item conditions, ops 15-27+** are checked on each input item (stat comparisons on the item).
 So a recipe gated on something D2R doesn't check (gold cost, a quest flag, a random chance, a second condition)
-needs a plugin hook on the recipe search; see the d2r-engine skill and knowledge/d2r-93847-addresses.md (cube).
+needs a plugin hook on the recipe search; see the d2r-engine skill and ${CLAUDE_PLUGIN_ROOT}/knowledge/d2r-93847-addresses.md (cube).
 Prefer item-based gating (an input token item, a stat on the input) which works in data alone.
 
 ## Build and test

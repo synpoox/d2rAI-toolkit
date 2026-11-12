@@ -5,17 +5,19 @@ description: Ship a new version of a Diablo II Resurrected mod to players - bump
 
 # Release a mod version
 
+Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you are inside the toolkit repo: use its root). Run `python -m modkit` with that folder as the working directory and the mod project as an argument.
+
 Release after **every** batch of merged fixes. Small releases are easier to debug and show players their report was
-answered. Packaging, the installer and hosting live under `release/` and `downloader/` (see CLAUDE.md); the method and
-its reasons are in `docs/ai-workflow.md` section 7. Where the files are served from (own host + downloader, GitHub
-Releases, Nexus Mods, or a mix) is in `docs/distribution.md`: read it when the owner asks how to distribute the mod.
+answered. Packaging, the installer and hosting live under `${CLAUDE_PLUGIN_ROOT}/release/` and `${CLAUDE_PLUGIN_ROOT}/downloader/` (see `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md`); the method and
+its reasons are in `${CLAUDE_PLUGIN_ROOT}/docs/ai-workflow.md` section 7. Where the files are served from (own host + downloader, GitHub
+Releases, Nexus Mods, or a mix) is in `${CLAUDE_PLUGIN_ROOT}/docs/distribution.md`: read it when the owner asks how to distribute the mod.
 
 ## Before you start
 - [ ] **Ask the owner** the first time you publish, and whenever the target or channel changes. Publishing is
       outward-facing.
 - [ ] All fixes for this version are merged on `main` and the targeted checks passed. Player-facing ones were also
       tested on a **release-like install** (the package installed into a slot like a player would).
-- [ ] `python tools/check_public.py` prints nothing.
+- [ ] `py -3 ${CLAUDE_PLUGIN_ROOT}/tools/check_public.py --root <mod repo>` prints nothing.
 - [ ] Nobody (including you) has the release checkout busy. **Do not switch branches, rebase or edit** in the checkout
       while the release runs. Do other work in a separate worktree. Capture the commit first:
       `C=$(git rev-parse HEAD)`.
@@ -24,8 +26,8 @@ Releases, Nexus Mods, or a mix) is in `docs/distribution.md`: read it when the o
 ## Steps
 1. **Pick the version.** Next number after the last release. Bump it in the one place the project keeps it (plugin
    version, and the installer's version if the installer changed). One bump per release.
-   Requirement checks in the installer use the game version (`3.3`), never a build number (knowledge/d2rloader.md).
-2. **Write the changelog section** `### <version> (<date>)` using `templates/CHANGELOG.md`: player wording, one line per
+   Requirement checks in the installer use the game version (`3.3`), never a build number (${CLAUDE_PLUGIN_ROOT}/knowledge/d2rloader.md).
+2. **Write the changelog section** `### <version> (<date>)` using `${CLAUDE_PLUGIN_ROOT}/templates/CHANGELOG.md`: player wording, one line per
    change, bug numbers, and a bold note first if players must restart or update something.
 3. **Commit** the bump and changelog (noreply identity). Generated headers that differ only in line endings are not
    a real change; a real content change must be committed first.
@@ -39,7 +41,7 @@ Releases, Nexus Mods, or a mix) is in `docs/distribution.md`: read it when the o
    To shorten output, write it to a log file and read the file.
 6. **Verify like a player.** Run the release-like install on a slot from the published channel, start the game, check
    the plugin status line shows the new version and `(release)`.
-7. **Mirrors, if the project uses them** (`docs/distribution.md`): only after the version is live. For Nexus Mods,
+7. **Mirrors, if the project uses them** (`${CLAUDE_PLUGIN_ROOT}/docs/distribution.md`): only after the version is live. For Nexus Mods,
    package with `--nexus` and upload `<Folder>-<version>-nexus.7z` as a main file with the version and the changelog
    section (by hand, or the owner's upload Action). Never put the downloader exe on Nexus. The mod page needs an AI
    disclosure tag.
@@ -48,8 +50,8 @@ Releases, Nexus Mods, or a mix) is in `docs/distribution.md`: read it when the o
 
 ## Releases for the Resurrected launcher (GitHub assets)
 When the project sets `[catalog]` in `release.toml`, players install through the Resurrected launcher, which reads
-release assets on GitHub. The steps are in `docs/release.md` "Launcher release (schema 3)":
-`package_release.py --game-exe <real D2R.exe> --notes <notes>`, then `github_release.py <v> --assets dist --dry-run`,
+release assets on GitHub. The steps are in `${CLAUDE_PLUGIN_ROOT}/docs/release.md` "Launcher release (schema 3)":
+`${CLAUDE_PLUGIN_ROOT}/release/package_release.py --game-exe <real D2R.exe> --notes <notes>`, then `${CLAUDE_PLUGIN_ROOT}/release/github_release.py <v> --assets dist --dry-run`,
 then without `--dry-run`, with `RESURRECTED_VALIDATE_RELEASE` pointing at the launcher's `validate-release`. It publishes a draft first and makes it public only after the uploaded files are checked.
 Ask the owner before the run without `--dry-run`. A failure leaves a private draft; never edit or replace a public
 release (a fix is a new version).
@@ -64,4 +66,4 @@ release (a fix is a new version).
 
 ## Public mirror
 If the project has a public mirror, push to it only through the project's scrub-and-mirror script, never directly,
-and only after `check_public.py` is clean. Owner edits made directly on the mirror must be brought back first.
+and only after `${CLAUDE_PLUGIN_ROOT}/tools/check_public.py` is clean on the mod repo. Owner edits made directly on the mirror must be brought back first.
