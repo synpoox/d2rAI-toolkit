@@ -23,15 +23,26 @@ Target: **D2R 3.3.0 build 93847 + D2RLoader 1.3.1, PluginSDK 0.4.0.** Every addr
 
 ## Build
 
-You need CMake 3.29 or newer and Visual Studio with the C++ workload. The PluginSDK comes from
-`../third_party/PluginSDK` (a git submodule of d2r-modkit) and the shared library from `../shared/plugin-common`.
+You need CMake 3.29 or newer and Visual Studio with the C++ workload. The toolkit is found with the shared finder
+(`cmake/FindD2rToolkit.cmake`, `docs/toolkit-finder.md`): `-DMODKIT_TOOLKIT_DIR` / `build.ps1 -Toolkit`, else the
+`D2R_TOOLKIT` environment variable, else the toolkit around the template, else a `d2rAI-toolkit` folder up the tree. The
+PluginSDK comes from its `third_party/PluginSDK` (a git submodule: in a fresh clone or worktree run
+`git submodule update --init third_party/PluginSDK` first) and the shared library from its `shared/plugin-common`.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File build.ps1                    # -> build\Release\mod-core.dll
 powershell -ExecutionPolicy Bypass -File build.ps1 -Name my-mod-core  # another DLL / plugin id / command name
 powershell -ExecutionPolicy Bypass -File build.ps1 -Mod MyMod -SoundRows 5100  # turn on the mod and sound checks
-powershell -ExecutionPolicy Bypass -File build.ps1 -Source C:\mymod\plugin -Sdk C:\mymod\third_party\PluginSDK
+powershell -ExecutionPolicy Bypass -File build.ps1 -Source C:\mymod\plugin -Toolkit C:\tools\d2rAI-toolkit
+powershell -ExecutionPolicy Bypass -File build.ps1 -Name my-mod-core,my-mod-ui   # a project with two plugins (below)
 ```
+
+### Several plugins in one project
+
+`modkit_add_plugin(<id> [VERSION v] [MOD folder] [SOUND_ROWS n] SOURCES ...)` in `CMakeLists.txt` builds one DLL
+`<id>.dll` that links `plugin_common`; call it once per plugin (each with its own `plugin.cpp`, `plugin.rc` and parts
+table). `build.ps1 -Name a,b` checks that every DLL was produced. Each plugin has its own off file, log and console
+command, named by its id.
 
 `build.ps1` does the same as these commands:
 
@@ -44,8 +55,8 @@ CMake variables: `MODKIT_PLUGIN_NAME` (default `mod-core`) sets the DLL name, pl
 off-file name. `MODKIT_PLUGIN_VERSION` (default `0.1.0`) is the plugin version; bump it with every release, because
 shared plugins must match between host and client in multiplayer. `MODKIT_MOD_NAME` is the mod folder the plugin
 ships in (`mods\<name>`); empty skips the mod checks. `MODKIT_SOUND_ROWS` is the row count of the mod's sounds.txt;
-0 means the mod adds no sounds. `MODKIT_SDK_DIR` is the PluginSDK path and
-`MODKIT_COMMON_DIR` the shared library's (pass both after copying the template out of the toolkit). The
+0 means the mod adds no sounds. `MODKIT_SDK_DIR` and
+`MODKIT_COMMON_DIR` override the PluginSDK and shared library paths (normally they come from the toolkit found). The
 build uses the static CRT, so the DLL does not need the VC++ redistributable, and compiles with `/W4 /permissive-
 /utf-8`. `build/` is git-ignored.
 
