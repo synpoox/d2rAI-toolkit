@@ -5,8 +5,10 @@ description: Port a classic Diablo II mod (1.10 / 1.13c era, with or without its
 
 # Port a classic mod to D2R
 
-Read `knowledge/porting-classic-mods.md` first; it has the rules and the worked examples. Then
-`knowledge/tables.md`, `knowledge/engine-limits.md` and `knowledge/d2rloader.md`.
+Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (this repository's root when you work inside it). Toolkit paths below, such as `knowledge/`, `templates/`, `docs/` and `tools/`, are relative to it; run `python -m modkit` and `tools/` scripts with that folder as the working directory and the mod project as an argument.
+
+Read `${CLAUDE_PLUGIN_ROOT}/knowledge/porting-classic-mods.md` first; it has the rules and the worked examples. Then
+`${CLAUDE_PLUGIN_ROOT}/knowledge/tables.md`, `${CLAUDE_PLUGIN_ROOT}/knowledge/engine-limits.md` and `${CLAUDE_PLUGIN_ROOT}/knowledge/d2rloader.md`.
 
 ## Policy (tell the user, then follow it)
 - Follow the original mod, not D2R, when their rules disagree. List every rule you could not follow.
@@ -38,7 +40,7 @@ Read `knowledge/porting-classic-mods.md` first; it has the rules and the worked 
    sound guard), **icons** (read each sheet's real frame layout).
 8. **Validate to 0 errors**, install with the game closed, start twice the first time (D2RLoader's cache-building
    start loads D2R's sounds), read `d2rloader.log`, fix load asserts, get into Act 1.
-9. **Graphics** (`knowledge/hd-graphics.md`): HD item/unique/set entries, missiles.json, HD states for sequence
+9. **Graphics** (`${CLAUDE_PLUGIN_ROOT}/knowledge/hd-graphics.md`): HD item/unique/set entries, missiles.json, HD states for sequence
    skills, overlay folders, model/texture indexes for new paths; ship the classic files the tables reference.
 10. Keep the bug list and TESTING.md current; crashes from players go through the `d2r-crash` skill.
 

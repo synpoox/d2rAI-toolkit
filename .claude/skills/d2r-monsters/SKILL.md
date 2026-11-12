@@ -5,8 +5,10 @@ description: Create or change Diablo II Resurrected monsters, bosses, superuniqu
 
 # Monsters and areas
 
+Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (this repository's root when you work inside it). Toolkit paths below, such as `knowledge/`, `templates/`, `docs/` and `tools/`, are relative to it; run `python -m modkit` and `tools/` scripts with that folder as the working directory and the mod project as an argument.
+
 Start from a vanilla monster: `python -m modkit show monstats zombie1`, `show monstats2 zombie1`,
-`show levels "Blood Moor"`. Read knowledge/tables.md (monster section) and knowledge/engine-limits.md.
+`show levels "Blood Moor"`. Read ${CLAUDE_PLUGIN_ROOT}/knowledge/tables.md (monster section) and ${CLAUDE_PLUGIN_ROOT}/knowledge/engine-limits.md.
 
 ## A new monster = rows in three tables
 1. **monstats.txt** (`clone_row` from a monster with the right behaviour): `Id` (key), `NameStr` (string key),
@@ -22,7 +24,7 @@ Start from a vanilla monster: `python -m modkit show monstats zombie1`, `show mo
 
 HD look: `data/hd/character/monsters.json` maps the monstats `Id` to an HD model; the classic look and the timing
 come from `Code`. Map a new monster's `Id` to the HD model of the monster you borrow from, or it has no HD model.
-New models at new paths also need index entries (knowledge/hd-graphics.md).
+New models at new paths also need index entries (${CLAUDE_PLUGIN_ROOT}/knowledge/hd-graphics.md).
 Colour variations: monstats2 / `Utrans`-style palette shifts only affect classic mode.
 
 ## Bosses and uniques
@@ -43,7 +45,7 @@ New areas: levels.txt rows need a level type (lvltypes, D2R has a fixed list of 
 plugin) and presets/maps (lvlprest, lvlmaze, lvlsub); reuse existing layouts with new monsters/levels first.
 
 New maze levels: leave `Position` empty unless the maze's presets have entry rooms (else the game crashes on
-entry); keep `Layer` below 100 and automap cels at or below 1498 (knowledge/engine-limits.md). Cast-on-death
+entry); keep `Layer` below 100 and automap cels at or below 1498 (${CLAUDE_PLUGIN_ROOT}/knowledge/engine-limits.md). Cast-on-death
 properties need a plugin: D2R never raises a mod's own events. A busy scene (many traps and effects per attack) can
 fill the renderer's 12 MB pool.
 

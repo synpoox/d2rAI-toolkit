@@ -5,11 +5,13 @@ description: Set up d2r-modkit and start, build, install or run a Diablo II Resu
 
 # Set up the toolkit and a mod project
 
+Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (this repository's root when you work inside it). Toolkit paths below, such as `knowledge/`, `templates/`, `docs/` and `tools/`, are relative to it; run `python -m modkit` and `tools/` scripts with that folder as the working directory and the mod project as an argument.
+
 ## One-time setup (Windows)
 1. Prerequisites: D2R installed (default `C:\Program Files (x86)\Diablo II Resurrected`; else set `MODKIT_GAME`),
    Python 3.12+, git, CMake and Visual Studio C++ build tools (for CascLib and plugins). D2RLoader
    (https://github.com/D2RLoader) is needed only for plugins or extended saves.
-2. `git submodule update --init` then `powershell -ExecutionPolicy Bypass -File tools\build_casclib.ps1`
+2. `git submodule update --init` then `powershell -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}/tools/build_casclib.ps1`
    (reads the game's CASC storage).
 3. `python -m modkit fetch` copies the tables, strings, UI layouts and data guide into `d2r-data/<build>/`
    (git-ignored: Blizzard's files are never committed). Other files are fetched on first use.
@@ -18,7 +20,7 @@ description: Set up d2r-modkit and start, build, install or run a Diablo II Resu
 `python -m modkit new <dir> --name <ModName>` creates:
 - `mod.json`: name, savepath (its own save folder), `extendedSaves` (D2RLoader extended save format: needed for
   more than 30 skills per class or wide stat/item IDs), `plugins` (built plugin DLL paths).
-- `patches/`: JSON change lists (knowledge/modkit-ops.md), applied in name order on pristine game files.
+- `patches/`: JSON change lists (${CLAUDE_PLUGIN_ROOT}/knowledge/modkit-ops.md), applied in name order on pristine game files.
 - `assets/`: PNGs etc. that patches use. `files/data/`: files shipped as they are.
 Keep the mod project in its own git repo: patches are text, review them like code.
 
@@ -31,7 +33,7 @@ Keep the mod project in its own git repo: patches are text, review them like cod
 4. Run: with plugins or extended saves, start `D2RLoader.exe` and pick the mod; otherwise `D2R.exe -mod <Name> -txt`
    also works. Fully restart the game after every install. The first start after installing or updating D2RLoader
    or D2R builds D2RLoader's table cache and loads D2R's own sounds: start the game a second time. Set the default
-   mod in D2RLoader's options (gear, Default Mod); see knowledge/d2rloader.md.
+   mod in D2RLoader's options (gear, Default Mod); see ${CLAUDE_PLUGIN_ROOT}/knowledge/d2rloader.md.
 5. Keep a TESTING.md in the project: every installed change gets a row (what, how, expected). The user tests in
    batches; move rows to "Confirmed" when they report back. When something breaks, use the d2r-debug skill.
 

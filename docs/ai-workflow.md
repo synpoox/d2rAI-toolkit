@@ -23,6 +23,7 @@ jobs: `d2r-coordinator` (plan and run lanes) and `d2r-release` (ship a version).
 10. [Writing a good lane prompt](#10-writing-a-good-lane-prompt)
 11. [Common failure modes and fixes](#11-common-failure-modes-and-their-fixes)
 12. [Starter checklist](#12-starter-checklist)
+13. [Using the skills from another project](#13-using-the-skills-from-another-project-local-plugin)
 
 ---
 
@@ -322,3 +323,45 @@ Per bug:
 - [ ] Targeted checks run; release-package test for player-facing fixes.
 - [ ] Merged by the coordinator. Bug row updated with the version.
 - [ ] Released with a changelog entry.
+
+## 13. Using the skills from another project (local plugin)
+
+The `d2r-*` skills live in `.claude/skills/`, so they only load in sessions started inside this repository. To use
+them from a mod project's own repository, register this checkout as a local plugin marketplace once. The checkout is
+both the marketplace (`.claude-plugin/marketplace.json`) and the plugin (`.claude-plugin/plugin.json`, plugin
+`d2r-toolkit`). The plugin manifest points at `.claude/skills/`, so every skill folder in it is exposed, including
+ones added later; there is no list to maintain.
+
+One-time setup, in your user settings (`~/.claude/settings.json`; merge these keys into the file, keep your other
+settings). Replace `<path-to-toolkit>` with the absolute path of your toolkit checkout (use forward slashes on
+Windows):
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "d2r-local": {
+      "source": { "source": "directory", "path": "<path-to-toolkit>" }
+    }
+  },
+  "enabledPlugins": {
+    "d2r-toolkit@d2r-local": true
+  }
+}
+```
+
+The same can be done from a shell: `claude plugin marketplace add <path-to-toolkit>` then
+`claude plugin install d2r-toolkit@d2r-local`. Check the result with `claude plugin list`, and validate the manifests
+after editing them with `claude plugin validate <path-to-toolkit>`.
+
+Notes:
+
+- A marketplace added from a local path is read in place, not copied: pulling the toolkit changes the skills at the
+  next session start or after `/reload-plugins`.
+- Plugin skills are namespaced: `/d2r-toolkit:d2r-skill`. Inside this repository the same skills also load without the
+  prefix; that is harmless.
+- In a skill's text, `${CLAUDE_PLUGIN_ROOT}` is replaced by the absolute path of the toolkit checkout when the skill
+  loads from the plugin. Every toolkit file a skill names (`knowledge/`, `docs/`, `templates/`, `tools/`, `testing/`)
+  is written as `${CLAUDE_PLUGIN_ROOT}/...`, so it resolves from any project. Inside this repository nothing
+  substitutes it, and the placeholder means the repository root. Write new skills the same way.
+- Commands such as `python -m modkit build <project>` still run with the toolkit checkout as the working directory
+  and the mod project as the argument.
