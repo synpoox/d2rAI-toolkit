@@ -467,6 +467,7 @@ do `0x2390e80` (46-53 empty), client missile do `0x2358430` (78-91 empty, 14 unu
 ## Inventory grid widget (build 93847)
 - Vtable of the inventory grid: `0x1CF3800`. Slot `0xC0` is the item info build (`0x2C4AC0`, widget, out, item) and slot `0xF8` is the item placement (`0x2C4B80`, widget, out origin, packed size, visual). The belt has its own vtable, `0x1CE2FA0`.
 - The placement's origin is x, y, width, height in screen px. Writing an entry with `PatchWrite` needs no code bytes and leaves the item draw hook at `0x2A72D0` free for one other plugin.
+- The item draw `0x2A72D0` (widget, item) draws the item picture and is called once per item widget; the first 15 bytes are `48 85 D2 0F 84 D7 00 00 00 56 57 48 83 EC 68`. D2R's text draw is `0x902E20` (text, int32 rect[4] in screen px, font block, scale); the font block is 0xA4 bytes, built with defaults by `0x86D1B0`. A hook on the item draw is the way to draw a number on an item while the loader's overlay draws nothing ([d2rloader.md](d2rloader.md), *Loader gaps*). Read from code, not yet re-checked in a dump.
 - The highlight behind an item is placed one cell at a time, so its size argument is not the item's size.
 - Odd-size centring moves drawing only: clicks and tooltips keep the real cells.
 - `WidgetHandle` from the widget service is an id, not a widget pointer.
@@ -815,4 +816,4 @@ Built into `tools/probe_tables.py` and printed there as "(UNVERIFIED)". No Ghidr
 
 | RVA | Meaning |
 |---|---|
-| `0x2396e90` | Monster AI table: 155 records of 32 bytes `{kind (u64), init fn, think fn, next}`, absolute 64-bit pointers (image base `0x140000000`). Indexed by the row of `monai.txt` (the monstats `AI` column names the row). Examples: Skeleton think `0x5b43a0`, Brute `0x5acc20`, Zombie `0x5ba780`, BloodHawk `0x5aca20`. Read from a memory-layout dump; pairs with 1.09d's AI table in [porting-classic-mods.md](porting-classic-mods.md). The generator `shared/classic_import/gen_109d_monster_ai.py` reads it |
+| `0x2396e90` | Monster AI table: 155 records of 32 bytes `{kind (u64), init fn, think fn, next}`, absolute 64-bit pointers (image base `0x140000000`). Indexed by the row of `monai.txt` (the monstats `AI` column names the row). Examples: Skeleton think `0x5b43a0`, Brute `0x5acc20`, Zombie `0x5ba780`, BloodHawk `0x5aca20`. Read from a memory-layout dump; pairs with 1.09d's AI table in [classic-109d-engine.md](classic-109d-engine.md#monster-ai). The generator `shared/classic_import/gen_109d_monster_ai.py` reads it |

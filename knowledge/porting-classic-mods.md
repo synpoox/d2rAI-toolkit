@@ -56,6 +56,10 @@ Ids that appear in a save are assigned once and are append-only: renumbering a r
 | **Router slot** | One free table slot (for example srvdofunc 190) holding a plugin function that picks among several of the mod's functions by skill id. It is a plugin pattern, not part of D2RLoader |
 | **Companion plugin** | A plugin built outside the port and bundled to stand in for a feature. What it lacks is a deviation |
 
+- Fix the port-wide decisions early (game and loader versions, data before code, save format from the first build):
+  [ai-workflow.md](../docs/ai-workflow.md) "Decisions for a port".
+  Terms such as reference install, deviation and table set are in the glossary at the end of this file.
+
 ## 1. Inventory the mod
 
 Before converting anything, write down:
@@ -142,6 +146,10 @@ a mod added.
 | itemtypes | no Warlock rows | D2R 3.x added rows (`warl` at 67) | Keep D2R's rows at D2R's numbers (section 4) |
 | All tables | `-1` sometimes stored as `4294967295` or `255` | signed | Compare every numeric column with D2R on shared rows to find decode slips (`coldeffect` 236 instead of -20) |
 | Banks | one `excel/` | `excel/` (RotW) and `excel/base/` (classic/LoD) | Write both banks until you know which one the mod's characters load |
+
+Starting from 1.09d tables instead of 1.13c: 1.09d has 75 tables to 1.13c's 92, refers to rows by number where 1.13c
+uses names, and stores skill and missile source damage in eighths (x16 to reach 128ths). The findings and the column
+map are in [classic-109d-tables.md](classic-109d-tables.md).
 
 ### Columns D2R has and 1.13c lacks (D2R 3.3, build 93847)
 
@@ -383,15 +391,26 @@ Without a recorded approval, D2R's content stays on.
 - Reset the test character's quests between runs; finished quests skip their handlers.
 - When a crash comes from a player, go to [crash-triage.md](crash-triage.md).
 
-## Monster AI: 1.09d against D2R (engine facts)
+## Starting from 1.09d (pointers)
 
-- **1.09d D2Game.dll** (stock 1.09d, hashes in `shared/classic_import/baselines/109d.json`): the AI table is at RVA
-  `0xebac8`, 266 records of 16 bytes `{kind, init fn, think fn, next}`, absolute 32-bit pointers (image base
-  `0x6fc30000`). 1.09d's monstats has no `AI` column: its `BaseId` column is the index into this table (not a
-  monstats row number).
-- **D2R build 93847**: the AI table is at RVA `0x2396e90`, 155 records of 32 bytes, same fields, indexed by the
-  `monai.txt` row ([d2r-93847-addresses.md](d2r-93847-addresses.md)).
-- The monstats rows of the two builds line up one to one (the Expansion separator row sits at the same position in
-  both), so a 1.09d monster's D2R `AI` is the `AI` of the same row. `data/109d-monster-ai.tsv` holds the pairing and
-  both think functions; 1.10 moved the `AIParam` slots (verified maps for Skeleton, Brute, Zombie and BloodHawk).
-  Regenerate with `shared/classic_import/gen_109d_monster_ai.py`.
+A port that starts from Lord of Destruction 1.09d (not 1.13c) needs the 1.09d facts:
+
+- Table schemas, number against name references, `SrcDam` x16, row shifts, `.bin` against `.txt`:
+  [classic-109d-tables.md](classic-109d-tables.md).
+- Skill, missile and monster-AI code, class row ranges, the `BaseId` AI index and the moved `AIParam` slots:
+  [classic-109d-engine.md](classic-109d-engine.md).
+- Rules the engine code changed (leech, damage reduction cap, gambling, item generation, breakpoints):
+  [classic-109d-vs-d2r.md](classic-109d-vs-d2r.md).
+- Which files are stock 1.09d: [classic-reference-installs.md](classic-reference-installs.md).
+
+## Glossary
+
+| Term | Meaning |
+|---|---|
+| **Reference install** | The frozen, hash-recorded classic game files (for a 1.09d port, Lord of Destruction 1.09d) that every comparison is made against, for every game mode. Not a third-party mod's folder |
+| **Deviation** | Any listed way the port differs from the reference, kept on purpose and checked by a table diff |
+| **Table set** | One of D2R's two copies of the tables: `excel/base/` (read by Expansion / Lord of Destruction characters) and `excel/` (read by Reign of the Warlock characters). What to write into each is in section 3, "Banks" |
+| **Column map** | The mapping from each column of one classic version's table to the other version's column or columns, with the transform each needs (for example 1.09d to 1.13c). Generated from scripts, never hand-edited |
+| **Rename map** | The short list of columns D2R renamed from 1.13c, used when merging 1.13c-shaped tables onto D2R's. Not the column map |
+| **Placeholder row** | A D2R row with no counterpart in the reference, kept disabled at its row number so the rows after it keep theirs (the Warlock rows, content added after the reference version). Rows a kept convenience needs stay enabled and are listed as deviations |
+| **Classic import** | Turning classic `.txt` tables into D2R's schemas (`shared/classic_import`) |
