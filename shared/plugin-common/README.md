@@ -14,6 +14,7 @@ Target: **D2R 3.3.0 build 93847 + D2RLoader 1.3.1, PluginSDK 0.4.0.** `plugin-te
 | `src/env_guard.*` | Environment guard: another mod running, the DLL outside its mod folder, a second copy, other plugins |
 | `src/off_switch.*` | Reads `<name>-off.txt` beside the path you pass (the DLL or the plugin's config): part words to leave out |
 | `src/parts.*` | The parts table: `{word, engine, install, state}` rows, `InstallAll` (off file, wrong image, log line per part) and `WriteStatus` for the console command |
+| `src/level_palette.*` | `level_palette::Install`: loads a level's own legacy palette when a level change crosses a `levels.txt` Pal (no load screen), through D2R's act palette load; `NeedsLoad`, `Counters` |
 | `src/log.*` | Log helper (`plog::Info/Warn/Error`, `plog::Sample` for hot paths) |
 | `src/crash_guard.h` | Logs a FAULT line when the game faults: address, why, whether this plugin is on the stack |
 
