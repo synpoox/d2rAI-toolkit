@@ -6,7 +6,7 @@ compares them and shows the designs that work.
 
 Contents: [The options](#the-options) · [Comparison](#comparison) · [Self-hosted + CDN + downloader](#self-hosted--cdn--downloader) ·
 [GitHub Releases](#github-releases) · [Nexus Mods](#nexus-mods) · [Combinations](#combinations) ·
-[Choosing](#choosing) · [Sources](#sources)
+[Play modes and policy](#play-modes-and-policy) · [Choosing](#choosing) · [Sources](#sources)
 
 ## The options
 
@@ -234,6 +234,42 @@ The full pipeline stays the main source ([release.md](./release.md)), and every 
 - Costs: you still pay for your host, but the players who come through Nexus don't use your bandwidth.
 
 GitHub Releases mixes in the same way: attach the 7z to the release page as a free mirror.
+
+## Play modes and policy
+
+What Blizzard and the community say about where a mod can be played. Facts and the sources' own wording only: this is
+not legal advice, and none of it was tested in a client. Checked 2026-11-06. Official statements mark a support
+boundary of their date, not a promise.
+
+| Mode | What the sources say |
+|---|---|
+| Offline single player | **Explicit Blizzard support for a bounded modding surface.** Blizzard says specific files can be modified (skill and item values), and patches 2.4 and 2.5 address offline single-player mods and widen data customization. That does not mean every mechanic is possible |
+| Battle.net with a mod | **No supported route.** Blizzard removed TCP/IP from the final game. None of the official sources reviewed gives mod authors custom Battle.net gameplay, realm hosting or private ladders: treat those as unavailable |
+| Multiplayer through a community loader | **A documented community capability, not Blizzard support.** D2RLoader documents TCP/IP multiplayer with compatible mods and local offline characters. Peers need matching loader versions, mods, plugins and game data; the check does not make different mods compatible. A community launcher documents the same loader on Windows only; console feasibility is not established |
+| A league as agreed rules or a fresh start | Possible by agreement, because local saves exist. It gives no enforced resets, verified results, cheat resistance or trusted economy |
+| A league as managed characters | Community precedent exists: a launcher documents ladder schedules and server-stored ladder characters in a separate save folder, with a signed package and a save plugin. It is a documented system, not a tested guarantee of fairness or durability, and not Blizzard's service. Blizzard's own ladder is a separate seasonal feature (fresh characters, end-of-season conversion) |
+
+Constraints that follow:
+
+- **Offline needs the internet now and then.** The launch guide requires occasional access for updates and
+  authentication and gives no interval: do not promise "never needs a connection".
+- **Updates and saves.** Patch 2.4 warns of mod compatibility changes. **Patch 2.5 warns that certain modded save-data
+  changes can corrupt old saves during migration** and recommends backups. Back up before a game patch, and see
+  [saves.md](../knowledge/saves.md) for what a loader update does to extended saves.
+- **Technical existence is not authorization.** Blizzard's EULA text prohibits unauthorized connections, including
+  server emulation and connections using tools it has not expressly authorized. The full page could not be
+  retrieved in the review (HTTP 403), so this is a narrow policy flag, not a license analysis and not a finding about
+  any named project. No explicit Blizzard authorization for the multiplayer or ladder tools was found. Check
+  distribution rights for game assets, modified executables and any online service against the real package and the
+  current terms before committing to one.
+- **Who decides what.** Offline data modding has the clearest official basis. "Impossible" overstates the evidence for
+  community multiplayer, and "officially supported" overstates it too. Decide the player experience and the guarantees
+  you need before choosing a mode.
+
+Sources (accessed 2026-11-06): Blizzard community team post on TCP/IP (2021-09-07); patch 2.4 notes, "Modding Update"
+(2022-04-14); patch 2.5 / ladder season two article, "Modding" and "Save Data Changes"; the September 2021 launch guide
+(saves, offline authentication); D2RLoader's TCP/IP page; a community launcher's README; Blizzard's EULA,
+"Unauthorized Connections".
 
 ## Choosing
 

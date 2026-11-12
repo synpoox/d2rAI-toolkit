@@ -24,6 +24,43 @@ Since 3.0 (dataguide `docs/game-mode-split.html`):
   232; levels 138 vs 137; overlay 334 vs 333; skillcalc 127 vs 121 rows; srvdofunc max 171 vs 152; cltdofunc max
   109 vs 97. Both banks have the Warlock class (30 skills) in skills.txt.
 
+### Warlock rows in the LoD bank (build 93847)
+
+Facts from comparing D2R's own `base/` and `excel/` row by row on each table's first column (files only; the game was
+not launched, and tables with repeated keys such as `itemratio` were not compared). In `base/` the Warlock-era rows
+are **disabled placeholders**: the row exists so row numbers match across modes, but it is switched off.
+
+| Table | `base/` (LoD) | `excel/` (RotW) |
+|---|---|---|
+| charstats | `Warlock` row present | same, plus `HealthPotionPercent` 150 and `TwoHandedOffHandRestrictItemType` `grim` (column absent in base) |
+| skills | all 30 Warlock skills present with `InGame` and `reqlevel` blank; the RotW-only rows `Korlic's Bash` and `HeraldThorns` missing | `InGame` 1 |
+| skilldesc | the 31 Warlock descriptions missing | present |
+| itemtypes | `Warlock Item` and `Grimoire` with no `Class` / `StaffMods` | `Class` `war`; `Crafted Sunder Charm` type added |
+| armor | 15 grimoire bases present with blank stats, level and name | full rows |
+| uniqueitems / setitems / runes | 4 uniques with no `code`, 2 sets (8 items) `disabled` 1, 5 runewords incomplete | spawnable and complete |
+| monstats | Warlock summons and the Colossal set with `enabled` 0 | enabled |
+| objects, levels | Colossal altar and statues unnamed; no Colossal Summit row (137 level rows) | named; `Act 5 - Colossal Summit` at id 137 (138 rows) |
+| misc | Worldstone shards present, not spawnable | spawnable; 91 items flagged `AdvancedStashStackable` (0 in base) |
+| cubemain, treasureclassex | 155 recipes, 1138 classes | 72 and 220 more (Worldstone-shard crafting, Sunder Charm upgrades, Terrorize consumables, Herald charms) |
+
+- **Do not drop the placeholders** when a table replaces the LoD bank: indexed tables are addressed by row number,
+  saves store `uniqueitems` / `setitems` / `runes` indexes, and engine code tests item-type numbers (`warl` at row
+  67). Keep them disabled (blank `InGame`, `enabled` 0, `disabled` 1, not spawnable, no recipe), as D2R does.
+- `sounds.txt` and `soundenviron.txt` are read from `excel/` in every mode. `excel/` holds 18 RotW-only sounds
+  (Warlock skills, Worldstone shards, desecrated-zone cues); they have no gameplay effect.
+- A character converted from LoD to RotW (or opened in RotW mode) reads `excel/`. Blizzard's ladder season 16 notes
+  end online conversion for Expansion characters from 16 November; whether offline conversion remains is not
+  checked. The `expansion` cheat command changes a character's version for good when it saves
+  ([cheat-commands.md](cheat-commands.md)).
+- RotW-only flags: the stackable advanced-stash flag is set only in `excel/`, and `disableChronicle` exists only
+  there. Whether the Chronicle, Loot Filter and stackable stash tabs appear in LoD mode is unverified (they are code
+  and UI features sold with the RotW DLC).
+- Strings, HD art and the skill-tree layout are shared by all modes and not banked: Warlock strings and art stay,
+  unreachable once no table row points at them. Character select refusing a Warlock in LoD is code (owner-confirmed
+  in the source project) and holds while the `Warlock` charstats row stays.
+- The LoD bank is D2R's LoD, not 1.09d: it keeps 1.10-2.6 content (newer uniques and sets, the 2.4/2.6 runewords,
+  Sunder Charm uniques, Desecrated boss treasure classes, the uber-boss rows).
+
 ## The schema source: the dataguide
 
 `data/global/dataguide/` (shipped in CASC) is Blizzard's own documentation: `data/files/<table>.js` per table
@@ -82,6 +119,74 @@ validator from these files: it types every cell, checks references, key lengths 
 7. Keep each key within its `dataLength` (31 missiles/objects Name, 39 lvlwarp, 47 most keys).
 8. Formulas: 255 chars max, 32-byte quoted names, no bare negative literals (`(0-N)`), bracketed ternary
    branches.
+
+## Freeze before release
+
+A character file stores rolled values, ids and bit-packed fields; the tables say how to decode them. After players
+have saves, an edit to a "stored" field misreads old items or moves ids. Decide these before the first release.
+Evidence: fields from `knowledge/saves.md`, the engine-limits notes and a read of a public Rust `.d2s` parser (v96-v105);
+"unverified" means no D2R test was run ([saves.md](saves.md)).
+
+| Table / field | What a save depends on | After release |
+|---|---|---|
+| `itemstatcost` row order (stat id) | item and character stat lists store the id | **Freeze.** Append only, never reorder or delete |
+| `itemstatcost` `Save Bits`, `Save Add`, `Save Param Bits` | width, offset and layer width of every item stat. The `armorclass`, `maxdurability` and `durability` rows also set defense and durability widths | **Freeze** for every row that can appear on an item: the stream is bit-packed, so one wrong width misreads every later field |
+| `itemstatcost` `CSvBits`, `CSvParam` | character stat widths | **Freeze** |
+| `itemstatcost` new stat without `Save Bits` | a stat with no save bits is dropped on reload | give a new item stat its final widths when you add it |
+| `itemstatcost` `Encode`, paired min/max stats, `ValShift` | how a stored value or parameter is split and scaled | treat as frozen (not enumerated; unverified for D2R) |
+| ItemStatCost schema as a whole | recorded in the `.d2rl` sidecar and checked in multiplayer | any change is visible to the loader; the exact warn-or-block rule is not documented |
+| `uniqueitems`, `setitems` row index | stored id (12 bits retail) | **Freeze** in place; append |
+| `runes` row index | stored runeword id (16 bits) | **Freeze**; append |
+| `magicprefix`, `magicsuffix`, `automagic`, `rareprefix`, `raresuffix` row index | stored id (11 or 8 bits retail); the affix tables start with a blank row | **Freeze**; append |
+| `armor` / `weapons` / `misc` `code` | stored as a Huffman-coded item code. The table the code sits in decides whether defense, durability and quantity bits follow | **Freeze** existing codes; never move a code between tables or delete it |
+| Base `invwidth` / `invheight`, `inventory.txt` grids | stored x, y | shrinking can strand stored items; a bad placement on a custom page stops the load (unverified for stock grids) |
+| `itemtypes` | engine code tests numbered types (75 rune, 77 hpot, ...); charm, scroll/book and body-part classification changes which extra bits are read | **Freeze** D2R's rows at D2R's numbers and each existing base's type tree where it changes classification |
+| `skills` row order, `charstats` class | class-skill bytes in skill-id order, hotkey skill ids, skill params on items | **Freeze** the order: inserting a class skill shifts every character's points |
+| `levels` ids and `Layer` | waypoints and quests are stored by index (unverified); the automap per `Layer` (< 100) | append only; keep `Layer` < 100 |
+| `hireling` rows | the mercenary type is stored | treat as frozen (unverified) |
+| Plugin id, scope and `logicalId` of every custom page | page identity in extended saves | **Freeze**; keep the provider installed, or its items are dropped after a Recovery backup |
+| `modinfo.json` `savepath` | which folder holds the characters | **Freeze**: a change hides them ([saves.md](saves.md)) |
+
+**Safe after release** (additive, the decoder is unaffected; unverified as a complete list): appending rows to indexed
+tables after the larger bank's count; new uniques, sets, runewords, affixes and bases within the format's widths;
+drop and spawn data (`spawnable`, rarity, treasure classes, gamble, cube); strings; skill, monster and level balance.
+
+**Retroactive but not stored.** These change what an item already in a character does, without touching the save:
+`sets.txt` partial and full bonuses (only a set item's own masked bonus lists are stored), base weapon damage,
+requirements and other base-row values not listed above, `properties` / `itemstatcost` `op` behaviour and the
+meaning of an existing stat, item names and graphics read from the unique or set row. Stored properties stay fixed
+while the rules around them can change; whether base damage or set bonuses count as an "item property" is a policy
+choice for the mod.
+
+Release gate: keep a few retained test characters and load them in each candidate build; the validator does not
+check widths for you.
+
+## Terror Zones
+
+Terror Zones are data plus engine code (build 93847; offline play has had them since patch 2.6, from secondary
+coverage). The schedule and scaling are in `data/hd/global/excel/desecratedzones.json`; nothing else turns them on.
+
+| Part | Where | What it holds |
+|---|---|---|
+| Schedule | `desecrated_zones[0]` | `seed`, `zone_duration_minutes` 30, `break_duration_minutes` 0, `start_time_utc` 2025-12-05 |
+| Zones | `zones`, `manual_zones`, `warnings` | 34 zones (`id` such as `Act1-BurialGrounds`), each a list of `levels` with `level_id`, optional `waypoint_level_id` and `zone_completion_weight` (its engine reader is not found); 5 manual zones, 4 warnings |
+| Per mode, difficulty | `game_difficulties.expansion` and `.rotw`, each `normal`/`nightmare`/`hell` | `ladder_enabled`, `non_ladder_enabled`, `max_herald_tiers`, `defaults` |
+| Scaling | `defaults` | `bound_incl_min` / `bound_incl_max` 3-45 (Normal), 40-71 (Nightmare), 70-96 (Hell); `boost_level` 2 and `boost_experience_percent` 25 in every mode and difficulty (read from 93847's file) |
+| Heralds (RotW Hell only: `max_herald_tiers` is 5 there, 0 elsewhere) | `defaults.herald_tiers` | 5 tiers; zone chance follows a logistic curve (`zone_chance_slope`, `_midpoint`, `_asymptote`, `_vertical_shift`); health, damage and minion boosts; `unique_mod_chance_boosts` |
+| Drops | `monstats.txt`, `superuniques.txt` | `TreasureClassDesecrated*` / `TreasureClassHerald*`, `CannotDesecrate` / `CannotHerald`, `TC Desecrated`; formulas can test `cond(Desecrated)` |
+| Engine | code | region fields from `+0x2e8` and a monster-level bump `0x35b340` inside `0x508f80` ([d2r-93847-addresses.md](d2r-93847-addresses.md)) |
+
+- There is **no zone API**: no plugin call that sets or reads the active zone was found. The SDK's Herald request
+  fails with `NotTerrorZone` outside a zone. Forcing a zone, adding cloned level ids to `zones`, or calling the
+  bump from your own hook is untried.
+- A level in a Terror Zone is rescaled in place and nothing teleports, so the same-act portal rule does not apply.
+- Strings for an "Enable Terror Zones" game setting exist in `ui.json`; whether the offline create screen shows it on
+  93847 is unverified.
+- Turning the whole feature off is data: set `ladder_enabled` / `non_ladder_enabled` false and `max_herald_tiers` 0
+  for every mode and difficulty, and disable the Colossal portal cube row in `excel/` (`excel/base/` has none). The
+  Sunder Charm uniques are not spawnable and drop through these treasure classes, so they go with it. A ready patch:
+  [examples/patches/no-terror-zones.json](../examples/patches/no-terror-zones.json).
+- Hosting your own maps with this system: [new-game-systems.md](new-game-systems.md), "Map hosting".
 
 ## D2R-only columns worth knowing
 

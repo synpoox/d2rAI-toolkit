@@ -21,6 +21,7 @@ rules) is covered in [porting-classic-mods.md](porting-classic-mods.md).
 | [d2rloader.md](d2rloader.md) | D2RLoader facts and traps: default mod, the cache-building first start, other plugins, version checks, its files |
 | [porting-classic-mods.md](porting-classic-mods.md) | Porting a classic 1.13c-era mod: inventory, table-by-table conversion, ids that must not move, function numbers, events, art order |
 | [modkit-ops.md](modkit-ops.md) | The modkit's patch operations (JSON ops applied by `modkit build`) |
+| [d2r-conveniences.md](d2r-conveniences.md) | D2R 3.3 comforts a classic port can keep or turn off (stash, gold pickup, Quick Cast, Chronicle, Terror Zones): where each lives, what to verify |
 | [cheat-commands.md](cheat-commands.md) | Setting up an in-game test from D2RLoader's console: every cheat command, item spawn lines, what they did in game |
 
 ## Rules that apply to every file
