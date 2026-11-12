@@ -22,7 +22,7 @@ the table below.
 | [distribution.md](distribution.md) | Where players get the files: your own host + CDN + downloader, GitHub Releases, Nexus Mods (archive layout, uploads, API limits, Vortex), and combinations, with a comparison table |
 | [toolkit-finder.md](toolkit-finder.md) | Finding the toolkit from a mod project (also from worktrees) in Python, PowerShell and CMake, and pinning a toolkit commit with `toolkit.version` |
 | [downloader.md](downloader.md) | The player-facing installer and updater: what it does, building your own from one config header |
-| [../templates/](../templates/) | Fill-in files: coordinator prompt, lane rules, lane prompt, `bugs.md`, `PLAN.md`, `CHANGELOG.md`, owner update |
+| [../templates/](../templates/) | Fill-in files: coordinator prompt, lane rules, lane prompt, `bugs.md`, `PLAN.md`, decision record, deviations, research doc, player README, glossary, `changelog.d/`, owner update |
 | [../tools/publish_mirror.md](../tools/publish_mirror.md) | Publishing a scrubbed, squashed public copy of a private repo |
 
 ## How D2R works

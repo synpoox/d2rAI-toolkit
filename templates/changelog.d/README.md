@@ -26,7 +26,7 @@ content is the bullet lines, in player wording, optionally under one `#### <Cate
 
 ## Where they fold
 
-`CHANGELOG.md` keeps a `### Unreleased` section at the top (see `templates/CHANGELOG.md`). Fragments fold into it, or,
+`CHANGELOG.md` keeps a `### Unreleased` section at the top (the skeleton is at the end of this file). Fragments fold into it, or,
 when you have already renamed it for the release, into `### <version> (<date>)`. A release needs that renamed section:
 rename `### Unreleased` to `### <version> (<YYYY-MM-DD>)` in the release commit, then run the stager
 (`release/stage.py --game <D2R folder>`). It folds the fragments in memory first, checks the section exists, packages
@@ -38,3 +38,38 @@ Paths come from `release.toml`: `repos.changelog` (default `CHANGELOG.md`) and `
 
 To fold the fragments yourself (a release workflow may ask for this before it runs), use
 `py -3 release/changelog.py fold --root . --version 1.2.3`: it adds them to the changelog and deletes them.
+
+## The changelog file
+
+Start the project's `CHANGELOG.md` with this skeleton and never edit its sections by hand except to rename
+`### Unreleased` in the release commit. Each released version has exactly one section with the heading
+`### <version> (<YYYY-MM-DD>)` (three `#`: the release scripts look for exactly that, and a section ends at the next
+`###` or `##`). Newest first.
+
+```markdown
+# Changelog
+
+All player-facing changes, newest first.
+
+### Unreleased
+```
+
+A released section looks like this (the fold produces it from the fragments; `####` category headings inside it, a bold
+line first if players must act):
+
+```markdown
+### 0.1.1 (2026-01-12)
+
+**Restart the game after updating.**
+
+#### Fixes
+
+- Fixed a crash when entering the Den of Evil (#1).
+
+#### Changed
+
+- The installer now warns when another mod is set as the loader's default.
+```
+
+Guidelines for fragments, in addition to the rules above: group under `####` categories (`Fixes`, `New`, `Changed`,
+or an area such as `Items`) and leave out empty ones; no internal jargon, addresses or lane names.
