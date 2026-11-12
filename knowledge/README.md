@@ -22,6 +22,10 @@ rules) is covered in [porting-classic-mods.md](porting-classic-mods.md).
 | [d2rloader-capabilities.md](d2rloader-capabilities.md) | Capability matrix for D2RLoader 1.3.1 / PluginSDK 0.4.0: what each system gets (yes, plugin, data, limit), multiplayer, loader vs SDK vs game versions |
 | [charged-items.md](charged-items.md) | Reusable or charged items: triggers, the not-used-up flag, where charges can live (quantity, stat 204, a new stat), recharge, effects, runtime checks |
 | [porting-classic-mods.md](porting-classic-mods.md) | Porting a classic 1.13c-era mod: inventory, table-by-table conversion, ids that must not move, function numbers, events, art order |
+| [classic-109d-tables.md](classic-109d-tables.md) | Starting from Lord of Destruction 1.09d: 75 against 92 tables, number against name references, `SrcDam` x16, row shifts, `.bin` as the widened `.txt` |
+| [classic-109d-engine.md](classic-109d-engine.md) | 1.09d skill and missile code charts against D2R's function tables, class row ranges, loader-thunked slots, the monster AI table and the moved `AIParam` slots |
+| [classic-109d-vs-d2r.md](classic-109d-vs-d2r.md) | Rules the engine code changed since 1.09d, with addresses: leech, damage reduction cap, gambling, item generation, breakpoints, crushing blow, open wounds |
+| [classic-reference-installs.md](classic-reference-installs.md) | Which 1.09d files are stock: hashes, the version tool's store, the NoCD `Game.exe` trap, how to recognise a code-cave patch |
 | [modkit-ops.md](modkit-ops.md) | The modkit's patch operations (JSON ops applied by `modkit build`) |
 | [cheat-commands.md](cheat-commands.md) | Setting up an in-game test from D2RLoader's console: every cheat command, item spawn lines, what they did in game |
 
