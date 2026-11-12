@@ -67,6 +67,8 @@ A project with its own fixes (function numbers D2R reuses, values no table defin
 `diff.gate(..., compare_args=lambda table: {"spell": my_spell, "fix_row": my_fix_row, "fix": my_fix})` so the gate
 reads the source as the merge wrote it.
 
+A project's deviation list keeps each section's count in its heading (`### Cut (3)`): `py -3 tools/check_deviations.py docs/deviations.md` fails when a count drifts from its table. `templates/baseline.example.json` is the baseline file `extract` reads, values stripped.
+
 A project that caches merges by a hash of their inputs must include `shared/classic_import` in that hash.
 
 ### Record the toolkit commit
