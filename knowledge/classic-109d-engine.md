@@ -72,7 +72,7 @@ The range table at `0x6fd03e60` (first row, count):
 
 ### Slots the loader redirects (thunked)
 
-D2RLoader redirects some slots to a thunk area (`0x3e2b6xx`, jumping through pointers outside the image, for example
+Some slots point into a thunk area, likely D2RLoader's, not checked in a live process (`0x3e2b6xx`, jumping through pointers outside the image, for example
 `0x3e2add0`): `srvstfunc` 64, `srvdofunc` 23 (Blaze) and 157, `cltstfunc` 61, `pSrvHitFunc` 49, `pCltDoFunc` 77. The
 running code of these slots is not in a dump, so read it in a live process before calling it the same as 1.09d.
 Four other D2R slots are plain thunks to the real function (`0x4550e0` to `0x463100`, `0x2b39f0` to `0x2b3c20`,

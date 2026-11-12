@@ -7,7 +7,7 @@ description: Diagnose a Diablo II Resurrected mod that crashes, asserts, hangs, 
 
 Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you are inside the toolkit repo: use its root). Run `python -m modkit` with that folder as the working directory and the mod project as an argument.
 
-The user tests; you diagnose from files. Don't ask them to describe a crash: read the logs.
+You run the in-game checks in a game slot (the `d2r-in-game-testing` skill) and diagnose from files. Don't ask the user to describe a crash: read the logs. Ask them only when a check needs a human.
 
 A crash report with an address (`D2R.exe+0x...`, a last-resort report): use the `d2r-crash` skill and
 ${CLAUDE_PLUGIN_ROOT}/knowledge/crash-triage.md. Loader-side surprises (another `default_mod`, the cache-building first start, other
@@ -40,7 +40,7 @@ See ${CLAUDE_PLUGIN_ROOT}/knowledge/debugging.md for the full table. Most common
   rows must keep D2R's numbers (`warl` 67).
 - **Crash when a monster comes into view / all new sounds silent**: sound id -1, or the first start after a
   D2RLoader/D2R update loaded D2R's sounds table. Restart; plugin sound guard.
-- **Write to address 0 at D2R.exe+0xF3D028 in a busy fight**: the Renderer Pool is full (heap fallback plugin).
+- **Write to address 0 at D2R.exe+0xF3D028 in a busy fight**: the Renderer Pool is full (heap fallback or growing the pool: ${CLAUDE_PLUGIN_ROOT}/knowledge/engine-limits.md "Memory").
 - **Fix works on one PC, not another**: `default_mod`, a stray plugin copy, or other plugins. Read the plugin log's
   first lines.
 - **Monsters can't be hovered / overlays gone after a plugin change**: the plugin patched something D2RLoader

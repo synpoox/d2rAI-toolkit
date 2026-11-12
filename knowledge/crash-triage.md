@@ -151,7 +151,7 @@ instance being built. So R15 is the new buffer, and it is null.
 "Failed to allocate from Renderer pool!" (no break without a debugger) and returns null. The caller writes through
 it.
 
-**Why null.** The pool is one fixed **12 MB TLSF arena** made once at renderer start (`0xf6efe0`, `0xc00000`
+**Why null.** The pool starts as one **12 MB TLSF arena** made once at renderer start (the size is its start size, not a hard limit: memory can be added at run time, see [engine-limits.md](engine-limits.md) "Memory") (`0xf6efe0`, `0xc00000`
 bytes, names "Renderer Pool" / "TlsfAlloctor"). A scene with many more models, missiles and overlays than vanilla
 (for example a monster that spawns several traps per attack, each with a missile and an explosion) can fill it. No table row was
 out of range.

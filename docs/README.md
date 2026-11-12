@@ -22,7 +22,7 @@ the table below.
 | [release.md](release.md) | Packaging and publishing: 7z and manifest, content-addressed objects, delta upload, server ingest, CDN mirror, release pages, `release.sh` |
 | [distribution.md](distribution.md) | Where players get the files: your own host + CDN + downloader, GitHub Releases, Nexus Mods (archive layout, uploads, API limits, Vortex), and combinations, with a comparison table |
 | [toolkit-finder.md](toolkit-finder.md) | Finding the toolkit from a mod project (also from worktrees) in Python, PowerShell and CMake, and pinning a toolkit commit with `toolkit.version` |
-| [runtime-qualification.md](runtime-qualification.md) | Qualifying a game build and loader release: the policy for a rolling loader, what to record, the baseline checklist |
+| [runtime-qualification.md](runtime-qualification.md) | Qualifying a game build and loader release: choosing a loader policy (rolling or pinned), what to record, the baseline checklist |
 | [downloader.md](downloader.md) | The player-facing installer and updater: what it does, building your own from one config header |
 | [../templates/](../templates/) | Fill-in files: coordinator prompt, lane rules, lane prompt, `bugs.md`, `PLAN.md`, `CHANGELOG.md`, owner update |
 | [../tools/publish_mirror.md](../tools/publish_mirror.md) | Publishing a scrubbed, squashed public copy of a private repo |

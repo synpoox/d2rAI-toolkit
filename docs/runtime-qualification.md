@@ -71,7 +71,7 @@ them.
 
 | Claim | What the sources show |
 |---|---|
-| First loader with D2R 3.3 support | The loader's official changelog places it in **1.2.0-beta**; an earlier research note said 1.3.0-beta. [d2rloader-capabilities.md](../knowledge/d2rloader-capabilities.md) now follows the changelog reading. The changelog was not re-fetched when this was reconciled |
+| First loader with D2R 3.3 support | The loader's official changelog places it in **1.2.0-beta**; an earlier research note said 1.3.0-beta. [d2rloader-capabilities.md](../knowledge/d2rloader-capabilities.md) now follows the changelog reading. Checked against the [D2RLoader changelog](https://d2rloader.net/changelog.html) on 2026-11-12, which lists "official support for D2R 3.3" under 1.2.0-beta |
 | SDK version of loader 1.3.1-beta | The SDK header reports SDK 0.4.0 / ABI 4; the loader's release notes report SDK 0.3.0 / ABI 4. Observations, not a selection |
 | Game version the loader targets | The loader wiki's overview names an older 3.1 build, which conflicts with newer explicit 3.3 support. The wiki's table research reports testing 3.3.0 build 93847 and leaves other builds unchecked. Neither is a qualification of your mod |
 | A third-party suite's requirements | List build 93847 and a Steam build: evidence for that component, not a guarantee that code and data layouts are identical |

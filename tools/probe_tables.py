@@ -29,7 +29,7 @@ BUILD_93847 = {
     "bounds": {"prgcalc_bound": 0x1D1945C, "cltst": 0x235F7C0, "cltdo": 0x235F7C4, "srvhit": 0x2391404, "clthit": 0x2358A64,
                "prop_bound": 0x2386BD8},
     "tables": [
-        {"name": "srvst", "rva": 0x238E710, "until": 0x238EA00},  # size not confirmed: up to the next table
+        {"name": "srvst", "rva": 0x238E710, "until": 0x238EA00},  # 91 by the dispatcher bound 0x5a; read up to the next table (94)
         {"name": "srvdo", "rva": 0x238EA00, "count": 191},
         {"name": "cltst", "rva": 0x235F590, "bound": 0x235F7C0},
         {"name": "cltdo", "rva": 0x235F7D0, "bound": 0x235F7C4},
