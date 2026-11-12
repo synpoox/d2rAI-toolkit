@@ -97,6 +97,14 @@ What makes a slot independent:
 `python -m modkit --game <slot folder> install` refuses a slot folder of the testing config and points you here.
 Set `mods_policy = "copy"` to copy your own mods folder as well.
 
+`tools/install_plugins.ps1 -Game <slot folder> -Project <mod> -Plugins a,b [-Data]` wraps these for a mod with built
+plugins. `-Game` must be a test slot (2 and up) whose lock `MODKIT_RUN` holds, and `D2R.exe` must be version 3.3; both
+are checked first, before anything changes. It copies `<Project>\plugin\build\Release\<name>.dll` into the slot's
+mod-scoped `mods\<Mod>\d2rloader\plugins\`, moves every other file there (stray third-party plugins; not the
+`<name>-off.txt` toggles or the plugins' own files) and any copy of its DLLs in the game-wide `d2rloader\plugins\` to a
+backup folder instead of deleting it (`-KeepExtras` leaves the first kind), and with `-Data` builds first, then
+installs the project's data and `mod.json` plugins through `slot_install.py` (which keeps the slot's own savepath).
+
 ## Slot owners (`~/.d2r-modkit/slots.toml`)
 
 When several projects share one machine's slots, a table says whose slot is whose. It is machine config, outside every
