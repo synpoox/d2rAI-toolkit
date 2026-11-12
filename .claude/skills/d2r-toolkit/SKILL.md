@@ -57,7 +57,7 @@ Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you ar
   - `d2r-in-game-testing`: run a check in the real game yourself, in a slot (recipe, screenshots, test rules).
   - `d2r-debug`: crashes and wrong behaviour.
   - `d2r-crash`: a player's crash report (with ${CLAUDE_PLUGIN_ROOT}/knowledge/crash-triage.md).
-  - `d2r-port`: porting a classic mod (with ${CLAUDE_PLUGIN_ROOT}/knowledge/porting-classic-mods.md).
+  - `d2r-port`: porting a classic mod (with ${CLAUDE_PLUGIN_ROOT}/knowledge/porting-classic-mods.md; from 1.09d also the knowledge/classic-109d-*.md and classic-reference-installs.md files).
 
   Project skills:
   - `d2r-coordinator`: plan and run a project with several agents (lanes, models, slots, bug list, review).
