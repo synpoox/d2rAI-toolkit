@@ -14,6 +14,12 @@ generic code goes in here: a project's own rules, fixes and command lines stay i
 | `tables.py` | The tables with no id list (`merge/tables.json`): `merge_table` merges a table onto D2R's by name, by position or by key columns, with `source_only_rows`, `repeats`, `d2r_columns`, `move`, `cells` and `only_rows`; `check_options`; `row_keys`; and the plain rule kind `rule`. Format in the module docstring |
 | `diff.py` | The table-diff gate: `gate(src_excel, mod_excel, d2r_excel, deviation_list, ...)` compares every source table with the mod's (or D2R's, not merged yet) by table, row and column name and returns a `Report` of the deviations the deviation list doesn't name; `report()` writes it as markdown, `commit_of()` names the commit. The project picks the tables (`select`), names its deviation statuses (`statuses`, required) and passes its fixes (`compare_args`) |
 
+## Data
+
+| File | What it is |
+| --- | --- |
+| `data/109d-skill-functions.tsv` | Every 1.09d skill and missile function paired with D2R's, one row per function (2,088 rows). **D2R side: build 93847, image base `0x140000000`** (so `FUN_140xxxxxx` in `evidence` is base + `rva_d2r`). **1.09d side:** `addr_109d` is a virtual address at the DLL's default base: server functions are in D2Game.dll (`0x6fc...`), client functions in D2Client.dll (`0x6fa...` / `0x6fb...`); `Ordinal_N` in `evidence` is a 1.09d DLL import by ordinal. Columns: `kind` (skill or missile), `id` (Id in the 1.09d skills.txt / missiles.txt), `name_109d`, `name_d2r`, `function` (srv_start, srv_use, srv_do, srv_hit, clt_start, clt_do, clt_hit; `-` = none), `addr_109d`, `d2r_column` (srvstfunc, srvdofunc, cltstfunc, cltdofunc for skills; pSrvDoFunc, pSrvHitFunc, pCltDoFunc, pCltHitFunc for missiles), `d2r_index` (the function number in that column), `rva_d2r` (that table slot's value; a slot can hold a jmp thunk, as Whirlwind's does), `pair_verdict` (same, different or unresolved), `evidence` (`;`-separated: helper overlap, calls only one build makes), `record_verdict` (the record's worst `pair_verdict`, the same on each of its rows). Shape checked by `tests/test_classic_import_109d_skill_functions.py` |
+
 ## Use it from a project
 
 Put the toolkit root on `PYTHONPATH` (as for `modkit`), then:
