@@ -75,7 +75,7 @@ Only what the moves need. Other housekeeping in the mod repos is out of scope.
 
 | # | Repo | Task |
 |---|---|---|
-| 0.1 | Project Forever | **Done 2026-11-11:** the `docs/research/*` inventories, committed as written, are on branch `docs/research-inventories` (00d1e38), cut from `origin/main`. The local `main` checkout shares no history with origin; re-clone or reset it before other work. |
+| 0.1 | Project Forever | **Done 2026-11-11:** the `docs/research/*` inventories, committed as written, are on branch `docs/research-inventories` (00d1e38), cut from `origin/main`. Local `main` was reset to `origin/main` the same day. |
 | 0.2 | resurrected-09 | Pull (local `main` is 31 commits behind). Nothing uncommitted is a source. |
 | 0.3 | Project Forever, resurrected-09 | Keep the `research/*` and `ticket/*` branches that 5.1, 5.4 and 5.8 read; do not delete them until their content has moved. |
 | 0.4 | toolkit | Add `pd2-data/` to `.gitignore` or move it out of the repo. Delete or move `mpyq-0.2.5.tar.gz`, `hs_err_pid*.log` and `replay_pid*.log`. Commit or drop the uncommitted `tools/ghidra_scripts/{FuncsInRange,RangeAsm}.java`. |
