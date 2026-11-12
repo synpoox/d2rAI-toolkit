@@ -34,10 +34,14 @@ Keep the mod project in its own git repo: patches are text, review them like cod
    also works. Fully restart the game after every install. The first start after installing or updating D2RLoader
    or D2R builds D2RLoader's table cache and loads D2R's own sounds: start the game a second time. Set the default
    mod in D2RLoader's options (gear, Default Mod); see ${CLAUDE_PLUGIN_ROOT}/knowledge/d2rloader.md.
-5. Keep a TESTING.md in the project: every installed change gets a row (what, how, expected). The user tests in
-   batches; move rows to "Confirmed" when they report back. When something breaks, use the d2r-debug skill.
+5. Keep a TESTING.md in the project: every installed change gets a row (what, how, expected). Run the in-game checks
+   yourself, in a game slot (the d2r-in-game-testing skill) and move a row to "Confirmed" with what you saw; hand a row
+   to the human only when its check needs one. When something breaks, use the d2r-debug skill.
 
 ## Test characters
+Every test character is level 99 with experience 3520485254, 490 stat points and 98 skill points (owner rule,
+2026-11-11), made with the Reign of the Warlock game version (the default):
+`save-set <save> level=99 experience=3520485254 statpts=490 newskills=98`.
 `python -m modkit save-info <save.d2s> [--extended] [--project <dir>]` shows stats and class skill points;
 `save-set <save> level=30 strength=100 --skill 12=1` edits them (backs up the save folder first, fixes the
 checksum and D2RLoader's .d2rl hashes). Never hand-write items into saves; use D2R's debug Item Spawner.
