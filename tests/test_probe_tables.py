@@ -72,7 +72,31 @@ class Probe(unittest.TestCase):
 
     def test_builtin_set_is_build_93847(self):
         self.assertEqual(pt.BUILD_93847["build"], 93847)
-        self.assertEqual({t["name"] for t in pt.BUILD_93847["tables"]} >= {"srvdo", "cltdo", "msrvhit"}, True)
+        self.assertTrue({"srvdo", "cltdo", "msrvhit"}.issubset({t["name"] for t in pt.BUILD_93847["tables"]}))
+
+    def test_short_dump_is_a_clear_error(self):
+        self.dump.write_bytes(make_dump()[:0x150])
+        with self.assertRaises(SystemExit) as cm:
+            self.run_cli()
+        self.assertIn("beyond the dump", str(cm.exception))
+
+    def test_empty_anchor_slot_is_refused(self):
+        buf = bytearray(make_dump())
+        struct.pack_into("<Q", buf, 0x108, 0)
+        self.dump.write_bytes(bytes(buf))
+        with self.assertRaises(SystemExit) as cm:
+            self.run_cli()
+        self.assertIn("anchor slot is empty", str(cm.exception))
+
+    def test_unknown_show_warns_and_unverified_is_marked(self):
+        spec = dict(SPEC_JSON, unverified=["c", "b"])
+        self.tables.write_text(json.dumps(spec), encoding="utf-8")
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            out = self.run_cli("--show", "zzz:1")
+        self.assertIn("'zzz'", err.getvalue())
+        self.assertIn("bound b @0x200 = 2 (UNVERIFIED)", out)
+        self.assertIn("c @0x180 n=2 (UNVERIFIED)", out)
 
 
 if __name__ == "__main__":
