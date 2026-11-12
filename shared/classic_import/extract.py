@@ -21,7 +21,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from . import mpq
+from . import cache, mpq
 
 
 def stamp(baseline: bytes) -> bytes:
@@ -88,3 +88,22 @@ def extract(install: Path, out: Path, baseline_file: Path) -> int:
     done.write_bytes(stamp(raw))
     print(f"extracted {count} files to {out}")
     return 0
+
+
+def extract_shared(install: Path, out: Path, baseline_file: Path, cache_root: Path | None = None,
+                   own_folder: bool = False) -> int:
+    """`extract`, under a lock, and shared between worktrees: with a cache root (and unless own_folder: the caller named
+    out itself) out becomes a junction or symlink to the cache's extract for this baseline file, `<root>/extract/<stamp>`,
+    so every worktree reads one extract. An out that is already a real folder is kept as it is. Runs never overlap: they
+    hold `extract.lock` under the cache root (else beside out). Returns extract's code."""
+    with cache.lock((cache_root or out.parent) / "extract.lock"):
+        if own_folder or not cache_root or (out.exists() and not cache.is_link(out)):
+            if not own_folder and cache_root:
+                print(f"{out} is a folder, not the shared extract: delete it to use {cache_root / 'extract'}")
+            return extract(install, out, baseline_file)
+        shared = cache_root / "extract" / hashlib.sha256(stamp(baseline_file.read_bytes())).hexdigest()[:16]
+        rc = extract(install, shared, baseline_file)
+        if rc == 0:
+            cache.point(out, shared)
+            print(f"{out} -> {shared}")
+        return rc
