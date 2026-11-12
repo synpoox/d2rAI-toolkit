@@ -365,6 +365,11 @@ Notes:
   loads from the plugin. Every toolkit file a skill names (`knowledge/`, `docs/`, `templates/`, `tools/`, `testing/`)
   is written as `${CLAUDE_PLUGIN_ROOT}/...`, so it resolves from any project. Inside this repository nothing
   substitutes it, and the placeholder means the repository root. Write new skills the same way.
+- The plugin also registers a `SessionStart` hook (`hooks/hooks.json`, script `hooks/stale_branch.sh`) that runs in
+  every session which loads the plugin. It fetches `origin/main` (capped at 5 seconds, never prompts) and prints a
+  one-line warning when the checkout's HEAD does not contain it, so a lane does not build or open a PR on a stale
+  base. It only warns, always exits 0, and prints nothing outside a git repo or when HEAD is current. Set
+  `D2R_STALE_NO_FETCH=1` to skip the fetch (offline work).
 - `python -m modkit build <project>` still runs with the toolkit checkout as the working directory and the mod
   project as the argument. `tools/check_public.py` scans its `--root` (default: the current directory), so run it
   as `py -3 <path-to-toolkit>/tools/check_public.py --root <mod repo>` or from inside the mod repo.
