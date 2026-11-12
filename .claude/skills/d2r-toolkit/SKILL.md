@@ -46,6 +46,9 @@ Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you ar
   `${CLAUDE_PLUGIN_ROOT}/tools/check_public.py`, the privacy scan (`--root` is the repo to scan).
 - `${CLAUDE_PLUGIN_ROOT}/examples/showcase/`: a small working mod project (a reworked class skill with a new icon and
   HD animation, an item skill with a new missile, a bigger stash).
+- `${CLAUDE_PLUGIN_ROOT}/examples/patches/`: single patches to copy, for example `no-terror-zones.json`. Also
+  `${CLAUDE_PLUGIN_ROOT}/knowledge/d2r-conveniences.md` (D2R 3.3 comforts a port can keep or cut) and
+  `${CLAUDE_PLUGIN_ROOT}/docs/runtime-qualification.md` (testing a game build and loader release).
 - `${CLAUDE_PLUGIN_ROOT}/.claude/skills/`: how to do each kind of job. Use them. Craft skills:
   - `d2r-mod-setup`: setup, build, install, run.
   - `d2r-skill`: skills.

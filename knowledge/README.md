@@ -28,6 +28,7 @@ rules) is covered in [porting-classic-mods.md](porting-classic-mods.md).
 | [classic-109d-vs-d2r.md](classic-109d-vs-d2r.md) | Rules the engine code changed since 1.09d, with addresses: leech, damage reduction cap, gambling, item generation, breakpoints, crushing blow, open wounds |
 | [classic-reference-installs.md](classic-reference-installs.md) | Which 1.09d files are stock: hashes, the version tool's store, the NoCD `Game.exe` trap, how to recognise a code-cave patch |
 | [modkit-ops.md](modkit-ops.md) | The modkit's patch operations (JSON ops applied by `modkit build`) and the validation errors with their causes |
+| [d2r-conveniences.md](d2r-conveniences.md) | D2R 3.3 comforts a classic port can keep or turn off (stash, gold pickup, Quick Cast, Chronicle, Terror Zones): where each lives, what to verify |
 | [cheat-commands.md](cheat-commands.md) | Setting up an in-game test from D2RLoader's console: every cheat command, item spawn lines, what they did in game |
 
 ## Rules that apply to every file
