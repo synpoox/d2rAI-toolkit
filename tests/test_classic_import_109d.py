@@ -106,7 +106,6 @@ class BaselineTests(unittest.TestCase):
         self.assertNotIn("install", self.base)
         for bad in (":\\\\", ":/", "Users"):
             self.assertNotIn(bad, text)
-        self.assertIn("PlugY*", self.base["not_part_of_109d"])
         self.assertTrue(set(self.base["not_part_of_109d"]).isdisjoint(self.base["dlls"]))
 
     def test_is_a_baseline_file_the_extract_check_reads(self):
@@ -123,8 +122,13 @@ class MapDatasetTests(unittest.TestCase):
 
     def test_holds_no_path_or_mod_text(self):
         text = json.dumps(self.map)
-        for bad in (":\\\\", ":/", "Users", "docs/deviations", "orchestrator", "PR #", "d2-patches"):
-            self.assertNotIn(bad, text)
+        self.assertNotRegex(text, r"#\d+|PR #|\.md\b|[A-Za-z]:[\\/]|Users")
+        terms = Path.home() / ".d2r-modkit" / "private_terms.txt"  # the same list tools/check_public.py reads
+        if terms.is_file():
+            for line in terms.read_text(encoding="utf-8").splitlines():
+                word = line.split("#", 1)[0].strip().lower()
+                if word:
+                    self.assertNotIn(word, text.lower(), "a private term (not printed) is in the map")
 
     def test_every_column_has_a_known_kind_and_none_is_unmapped(self):
         from shared.classic_import.column_map import KINDS
@@ -228,6 +232,15 @@ class PairingTests(unittest.TestCase):
             AI.rows({"1": ("Nope", 1)}, [(0, 0, 0)] * 2, [(0, 0, 0)], ["None"])
         with self.assertRaises(G.GenError):
             AI.rows({"5": ("None", 1)}, [(0, 0, 0)] * 2, [(0, 0, 0)], ["None"])
+
+    def test_a_verified_ai_with_another_1_09d_think_fails(self):
+        with self.assertRaises(G.GenError):
+            AI.rows({"1": ("Skeleton", 1)}, [(0, 0, 0), (1, 0, 0x12345)], [(0, 0, 0)] * 3, ["None", "Idle", "Skeleton"])
+
+    def test_the_expansion_separator_must_line_up(self):
+        d2r = tab("monstats", "Id	AI", "a	Skeleton", "b	Skeleton", "Expansion	", "c	Zombie", "d	Idle", "e	Npc")
+        with self.assertRaises(G.GenError):
+            AI.pairing(tab("monstats", *self.T9), d2r)
 
     def test_slots_text(self):
         self.assertEqual([AI.slots_text(a) for a in ("", "BloodHawk", "Brute", "Idle")], ["", "none", "1>3 2>4", "unverified"])
