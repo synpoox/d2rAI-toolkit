@@ -309,10 +309,12 @@ name it ("use d2r-port").
 | [`d2r-ui`](.claude/skills/d2r-ui/SKILL.md) | Inventory, stash and cube grids, panels, widget layouts, skill tree |
 | [`d2r-cube`](.claude/skills/d2r-cube/SKILL.md) | Horadric Cube recipes and their condition limits |
 | [`d2r-engine`](.claude/skills/d2r-engine/SKILL.md) | D2RLoader plugins, new engine functions, Ghidra reverse engineering |
+| [`d2r-in-game-testing`](.claude/skills/d2r-in-game-testing/SKILL.md) | Run a check in the real game in a slot: lock, install, cheats, warp, screenshots that settle it, test character, testing rules |
 | [`d2r-debug`](.claude/skills/d2r-debug/SKILL.md) | Crashes, asserts, lost characters, wrong behaviour: logs, symptom to cause, bisecting |
 | [`d2r-crash`](.claude/skills/d2r-crash/SKILL.md) | A player's crash report: addresses to functions, who caused it, a fix with evidence |
 | [`d2r-port`](.claude/skills/d2r-port/SKILL.md) | Port a classic 1.10 / 1.13c-era mod to D2R (with its creators' permission), table by table, with its DLL rules in a plugin |
 | [`d2r-coordinator`](.claude/skills/d2r-coordinator/SKILL.md) | Plan and run a project with several agents: lanes, models, game slots, bug list, review |
+| [`d2r-project-conventions`](.claude/skills/d2r-project-conventions/SKILL.md) | Issues, PRs, branch names, merge gate, worktree and junction hygiene; agent scaffold in `templates/agents/` |
 | [`d2r-release`](.claude/skills/d2r-release/SKILL.md) | Ship a version: bump, player changelog, fail-fast publish, verify, release pages |
 
 ## Knowledge index

@@ -132,7 +132,7 @@ Env vars: `MODKIT_SLOT`, `MODKIT_RUN`, `MODKIT_TESTING_CONFIG`.
   and key. The legacy toggle is pressed back even when a shot fails. Prints the path and the HD-to-legacy distance beside the noise
   between two HD shots; warns and exits 1 when the shots are identical (within the larger of 0.5 and 3x the noise: the
   toggle did nothing, or not in HD).
-  The game must be in a game; use Hell and a level 90+ character.
+  The game must be in a game; use Hell and the test character (level 99, docs/testing.md "The test character").
 - `game_ctl.py --slot N moved [--wait 1.5] click FX FY [right] | key KEY..`: reads the player position before and after
   and prints whether and how far the character moved (exit 0 = moved, 1 = not, 2 = cannot tell). It needs the plugin to
   write the position into the harness block: set `idx_player_x`/`idx_player_y` (and optionally `idx_player_level`) in

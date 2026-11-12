@@ -36,7 +36,7 @@ Read `${CLAUDE_PLUGIN_ROOT}/knowledge/porting-classic-mods.md` first; it has the
 6. **Behaviour D2R lacks**: events D2R never raises (cast on death: hook the death function), ranged pets
    (a summon `Param` flag), Raven-AI pets (`calc3`), `rightskill 1` on every active and innate skill, timed potions, cube portals.
    Plugin work goes through the `d2r-engine` skill.
-7. **Strings** (namespace, no new numeric ids, keep D2R's placeholders), **sounds** (resolve every name; plugin
+7. **Strings** (namespace, or numeric ids below 65,536 that skip used low-16 values, never 65,536 or more; keep D2R's placeholders), **sounds** (resolve every name; plugin
    sound guard), **icons** (read each sheet's real frame layout).
 8. **Validate to 0 errors**, install with the game closed, start twice the first time (D2RLoader's cache-building
    start loads D2R's sounds), read `d2rloader.log`, fix load asserts, get into Act 1.

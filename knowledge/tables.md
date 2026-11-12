@@ -142,7 +142,7 @@ skills `delay` -> `localdelay`, uniqueitems `enabled` -> `spawnable`, missiles `
   <Mod>.mpq/modinfo.json            {"name": "<Mod>", "savepath": "<Mod>/"}   (own save folder)
   <Mod>.mpq/data/...                folder-style MPQ: global/excel, local/lng, hd/..., global/dataversionbuild.txt
   modinfo.json                      copy (D2RLoader guide layout)
-  d2rloader/metadata.json           {"schemaVersion": 1, "metadata": {...}}  (no "namespace": native strings)
+  d2rloader/metadata.json           {"schemaVersion": 1, "metadata": {...}}  (+ top-level "namespace" when mod.json has one; none = native strings)
   d2rloader/config/d2rloader.toml   [d2rcore.save_format] mode = "extended"   (wider IDs in saves)
   d2rloader/plugins/<plugin>.dll    mod-scoped plugins
 ```

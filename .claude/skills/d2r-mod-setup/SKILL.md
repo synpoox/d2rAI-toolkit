@@ -19,7 +19,8 @@ Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you ar
 ## A new mod
 `python -m modkit new <dir> --name <ModName>` creates:
 - `mod.json`: name, savepath (its own save folder), `extendedSaves` (D2RLoader extended save format: needed for
-  more than 30 skills per class or wide stat/item IDs), `plugins` (built plugin DLL paths).
+  more than 30 skills per class or wide stat/item IDs), `plugins` (built plugin DLL paths). `modkit new` does not write `namespace`; add it yourself to opt in to D2RLoader
+  string namespaces (install writes it to `d2rloader/metadata.json`; 1-256 letters, digits, `-`, `_`, `.`; ${CLAUDE_PLUGIN_ROOT}/knowledge/strings.md).
 - `patches/`: JSON change lists (${CLAUDE_PLUGIN_ROOT}/knowledge/modkit-ops.md), applied in name order on pristine game files.
 - `assets/`: PNGs etc. that patches use. `files/data/`: files shipped as they are.
 Keep the mod project in its own git repo: patches are text, review them like code.
@@ -34,12 +35,16 @@ Keep the mod project in its own git repo: patches are text, review them like cod
    also works. Fully restart the game after every install. The first start after installing or updating D2RLoader
    or D2R builds D2RLoader's table cache and loads D2R's own sounds: start the game a second time. Set the default
    mod in D2RLoader's options (gear, Default Mod); see ${CLAUDE_PLUGIN_ROOT}/knowledge/d2rloader.md.
-5. Keep a TESTING.md in the project: every installed change gets a row (what, how, expected). The user tests in
-   batches; move rows to "Confirmed" when they report back. When something breaks, use the d2r-debug skill.
+5. Keep a TESTING.md in the project: every installed change gets a row (what, how, expected). Run the in-game checks
+   yourself, in a game slot (the d2r-in-game-testing skill) and move a row to "Confirmed" with what you saw; hand a row
+   to the human only when its check needs one. When something breaks, use the d2r-debug skill.
 
 ## Test characters
+Every test character is level 99 with experience 3520485254, 490 stat points and 98 skill points (owner rule,
+2026-11-11), made with the Reign of the Warlock game version (the default):
+`save-set <save> level=99 experience=3520485254 statpts=490 newskills=98`.
 `python -m modkit save-info <save.d2s> [--extended] [--project <dir>]` shows stats and class skill points;
-`save-set <save> level=30 strength=100 --skill 12=1` edits them (backs up the save folder first, fixes the
+`save-set` takes any stat by its itemstatcost name and `--skill <id>=<points>`, for example `save-set <save> strength=100 --skill 12=1`; it edits them (backs up the save folder first, fixes the
 checksum and D2RLoader's .d2rl hashes). Never hand-write items into saves; use D2R's debug Item Spawner.
 
 ## Shipping

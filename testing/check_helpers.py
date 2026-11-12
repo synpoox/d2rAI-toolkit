@@ -178,7 +178,7 @@ def pair(game, name: str, warp: str, out_dir: str, light: int = LIGHT, settle: f
          toggle_key: str = "g", toggle_wait: float = TOGGLE, sleep=time.sleep, log=print) -> tuple[str, bool]:
     """Light up, warp, shoot HD (twice, to measure noise), toggle, shoot legacy, toggle back; save HD|legacy to
     <out_dir>/<name>.png. The toggle is always pressed back, even when the legacy shot fails. Returns (path,
-    identical). The game must be in a game (Hell, level 90+) and in HD."""
+    identical). The game must be in a game (Hell, the level 99 test character) and in HD."""
     level, x, y = parse_warp(warp)
     if light:
         if not game.console(f"cheat stat {LIGHT_STAT},{light}"):

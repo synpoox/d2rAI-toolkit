@@ -134,7 +134,7 @@ A typical order, with one PR each ([docs/ai-workflow.md](../docs/ai-workflow.md)
 
 What the D2R side offers (RVAs in [d2r-93847-addresses.md](d2r-93847-addresses.md) "Maps, regions, portals and item spells"; build 93847):
 
-- **Cube first.** `Red Portal,lvl=<level id>` in the cube output opens a portal to any level of the same act from town, no code needed (the handler takes the level as an argument; untested in game here, the source marks it "not tested"). Try this before any plugin.
+- **Cube first.** `Red Portal,lvl=<level id>` in the cube output opens a portal to any level of the same act from town, no code needed (the handler takes the level as an argument; untested in game here). Try this before any plugin.
 - **From an item.** The item spell table `0x236fe30` has 20 entries and entries 16-19 are empty; an entry's handler indexes are checked (check < 11, use < 16), so a new spell number needs a plugin that fills a free entry and supplies both handlers. The use-item handler `0x4f40c0` frees the item when the entry's flag is 0, so say in the entry whether the item is consumed.
 - **Making the portal.** Call the portal maker `0x432ce0` with its last argument 1 (that lifts the town-portal level whitelist). It creates object 60 and the linked return portal. A portal with no linked partner cannot be operated (operate function 15 needs one).
 - **Moving a player directly.** `0x488180(game, player, level, 0)` warps without a portal. For a party, walk the game's client list (game +0x138, next at +0x628; `0x484c90` gives the client's player).

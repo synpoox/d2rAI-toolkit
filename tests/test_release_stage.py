@@ -173,6 +173,28 @@ class StageTests(unittest.TestCase):
             self.assertIn("item_stat_ranges = true", toml)
             self.assertEqual(sorted(p.name for p in (mod / "d2rloader/plugins").iterdir()), ["one.dll", "two.dll", "x.dll"])
 
+    def test_namespace_from_mod_json_goes_to_the_top_level_of_the_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.project(Path(tmp) / "p")
+            plain = stage.stage(root, Path(tmp) / "s1", config(), read=lambda rel: b"v")
+            self.assertNotIn("namespace", json.loads((plain / "d2rloader/metadata.json").read_text()))
+            mj = json.loads((root / "mod.json").read_text())
+            (root / "mod.json").write_text(json.dumps({**mj, "namespace": "mymod"}))
+            mod = stage.stage(root, Path(tmp) / "s2", config(), read=lambda rel: b"v")
+            meta = json.loads((mod / "d2rloader/metadata.json").read_text())
+            self.assertEqual(meta["namespace"], "mymod")
+            self.assertEqual(meta["schemaVersion"], 1)
+            self.assertNotIn("namespace", meta["metadata"])
+
+    def test_refuses_an_invalid_or_reserved_namespace(self):
+        for ns in ("my mod", "d2r", "d2rloader", "", 5, "x" * 257):
+            with self.subTest(ns=ns), tempfile.TemporaryDirectory() as tmp:
+                root = self.project(Path(tmp) / "p")
+                mj = json.loads((root / "mod.json").read_text())
+                (root / "mod.json").write_text(json.dumps({**mj, "namespace": ns}))
+                with self.assertRaises(stage.ReleaseError):
+                    stage.stage(root, Path(tmp) / "s", config(), read=lambda rel: b"v")
+
     def test_without_companions_only_the_plugins_ship(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.project(Path(tmp) / "p")

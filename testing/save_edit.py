@@ -1,6 +1,6 @@
 """Edit a character save for a game check: unlock difficulties.
 
-A fresh character can only play Normal. A check that needs Hell (level 90+ areas, Hell monsters) opens it in the save
+A fresh character can only play Normal. A check that needs Hell (Hell areas and monsters, for the level 99 test character) opens it in the save
 file, with the game CLOSED (the save is read at character select):
 
     from save_edit import unlock_difficulties
