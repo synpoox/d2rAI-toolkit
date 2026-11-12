@@ -23,7 +23,8 @@ Contents: [Quick start](#quick-start) · [Why slots](#why-slots) · [The config 
 [Slots, locks and the queue](#slots-locks-and-the-queue) · [Controlling the game](#controlling-the-game) ·
 [The harness protocol](#the-harness-protocol) · [Writing and running checks](#writing-and-running-checks) ·
 [Screenshots and results](#screenshots-and-results) · [Test what players get](#test-what-players-get) ·
-[Targeted tests and the full suite](#targeted-tests-and-the-full-suite) · [Troubleshooting](#troubleshooting)
+[Targeted tests and the full suite](#targeted-tests-and-the-full-suite) · [Who runs the check](#who-runs-the-check) ·
+[Evidence levels](#evidence-levels) · [Practical hazards](#practical-hazards) · [Troubleshooting](#troubleshooting)
 
 ## Quick start
 
@@ -429,6 +430,26 @@ Everything a run writes goes to `<runs.dir>/<run id>/`:
 Screenshots show the game. Keep the whole `runs.dir` **outside the repository**, and never commit a screenshot of the
 game, a save or a log. Share a result by its summary text, or by describing what the picture shows.
 
+### Screenshots that settle the question
+
+One shot should answer the question. Before each shot:
+
+- **A quiet spot:** warp to a spot with no monsters, or repeat `cheat killmonster` (or `cheat monfreeze 1`), and shoot
+  once nothing casts or burns near you.
+- **The dark:** structure shots (walls, edges, floors) need light: `cheat stat item_lightradius,25` (`game_ctl.py pair`
+  does it with `--light`). The radius stays raised for the game session, so never raise it for a lighting shot.
+- **Pin the DS1 variant** ([Pin a DS1 variant](#pin-a-ds1-variant)) on every level with several.
+- **Lighting shots:** take several frames with no combat effects (fire, poison and spells skew the brightness) and use the
+  median luma over the frames.
+- **Before and after pairs** for a visual change: the same spot and settings, old build and new, or HD and legacy.
+- A picture that is not blank is not proof of the effect: say what you expected, then what you saw.
+
+### The game-check recipe
+
+Lock a slot, install and check the savepath, pin the DS1 variant if there are several, start the game, set cheats, warp,
+shoot, stop, unlock, report (pass, fail and skip counts). Hold one lock from install to cleanup, and never `lock any`.
+The steps with the commands are in the `d2r-in-game-testing` skill.
+
 ## Reading units (unit_probe)
 
 `testing/unit_probe.py` lists the units the game client holds right now (monsters alive, missiles, by their table row) and
@@ -518,6 +539,66 @@ need no game and no server:
 ```sh
 python -m unittest discover -s tests -p "test_testing_*.py"
 ```
+
+## Who runs the check
+
+Agents run in-game checks themselves, in a slot; the human is asked only when a check needs one (a real-player
+judgement, input the harness cannot send, or the human's own game). The order of work, the screenshot rules and the
+testing rules are in the `d2r-in-game-testing` skill (`.claude/skills/d2r-in-game-testing/SKILL.md`).
+
+### The test character
+
+Every test character is **level 99 with experience 3520485254, 490 stat points and 98 skill points** (owner rule,
+2026-11-11). Make it with the game closed: `python -m modkit save-set <save.d2s> level=99 experience=3520485254
+statpts=490 newskills=98` (backs the folder up first), and open Hell with `save_edit.unlock_difficulties(<save.d2s>)` (a function, no command line; the call is in the `d2r-in-game-testing` skill). The level-99 line has not yet been run on a real save. Create it with the
+Reign of the Warlock game version (the default). A Classic or Lord of Destruction character plays D2R's vanilla base
+tables, not the mod's; see [cheat-commands.md](../knowledge/cheat-commands.md).
+
+## Evidence levels
+
+What a result proves, from weakest to strongest. Say which level you reached.
+
+1. **Offline validation:** the build and the unit tests. Catches data errors; cannot show that a skill renders, an item
+   can be used or a portal works.
+2. **Startup smoke:** the `smoke` tag. Infrastructure evidence, not feature correctness.
+3. **Mechanic checks:** do the action and compare what the game does (and what the plugin's log says) with a stated
+   result. A **prepared** character (a save edited with `save-set`, console-spawned gear, god mode, Hell at level 99) is
+   an efficient fixture for this. It is not evidence of campaign progression or balance.
+4. **Progression checks:** a **fresh** character played through the intended journey. Only this shows that the journey
+   works.
+5. **Persistence checks:** save, exit, reload, and read the real character and item state. A one-session success says
+   nothing about saving.
+6. **Packaged checks:** the artifact players get ([Test what players get](#test-what-players-get)). A developer harness
+   build is useful, but does not replace a smoke check of the unmodified package.
+
+**Exit 0 does not mean nothing was skipped.** `Context.require_harness()` skips when no harness is reachable, and many
+checks skip until a log line exists. The runner counts pass, fail and skip separately and can exit 0 with skips; the
+required behaviour is unverified if its check skipped. Read the counts and the skip messages, not the exit code. A check
+that reads an accumulated plugin log can pass on a line from an earlier session: mark the log offset, do the action
+fresh, and verify the installed data and DLL are the ones under test.
+
+## Practical hazards
+
+What went wrong in real test runs.
+
+- **An acknowledgement is not command output.** The harness's console file says only that the line was handled or
+  refused. What the command printed is in the log of the plugin that ran it. Read that log before you say a cheat worked.
+- **The background flag.** Some world clicks only reach the game with the harness's background flag off. Menu clicks
+  that work do not prove combat clicks do. Check the screenshot after the first world click.
+- **Zero durability after a reload.** Items spawned by the console read `Durability: 0` after the game is saved and
+  loaded again, and a 0-durability item has its stats switched off. Spawn fresh items after every load and hover them
+  before the test. This also means a reload test of spawned gear tests nothing.
+- **A held cursor item** (a red cell behind every inventory item) blocks tooltips and the next click. Look at each
+  screenshot for it. An unidentified item cannot be equipped: `cheat idall`.
+- **`cheat item` and `cheat gold` do not work** as the item or gold source. Use `cheat spawn <code>,inv 0` and
+  `cheat uniques <row>`, with codes and rows from the installed mod's built tables
+  ([cheat-commands.md](../knowledge/cheat-commands.md)). Turn cheats on with `debug_mode` first.
+- **Wait for conditions, not for time.** Prefer a log event or a screen change to a fixed sleep. Take the screenshot
+  before the assertion.
+- **`--no-validate` is debt.** An install or build that skips the validator does not prove the validator is clean.
+  Record the bypass and the errors it hides in the report as a limitation; do not inherit it silently.
+- **Do not kill other people's games.** Clean up only the game you started; the check runner stops games it started and
+  leaves games and manual locks it did not.
 
 ## Troubleshooting
 
