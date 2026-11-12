@@ -117,11 +117,11 @@ Create `AGENTS.md` and `docs/agents/` in the repo from `templates/agents/` and a
 11. Never end a turn while something you started is still running.
 
 <ADD PROJECT-SPECIFIC RULES HERE, e.g. "follow the source mod over vanilla D2R where they differ; unportable gaps go
-into docs/unported.md with a reason".>
+into the deviations ledger (docs/deviations.md) with a reason".>
 
 ## 4. Phases
 
-Keep `docs/PLAN.md` current (a checklist per phase). Phases, in order:
+Keep `docs/PLAN.md` current (a phase outline as guidance, not tick boxes). Phases, in order:
 
 0. **Setup.** Repo, tooling, slots, source inventory, owner decisions.
 1. **Tools.** Extractors, converters, ID mapping, string conversion, validation.
@@ -136,7 +136,7 @@ Keep `docs/PLAN.md` current (a checklist per phase). Phases, in order:
 6. **Release.** Installer/downloader, hosting, changelog fragments, release pages.
 
 The work list is GitHub issues: one per report or job, duplicates closed as `duplicate of #N` before any work starts.
-For a port, also keep `docs/unported.md`.
+For a port, also keep the deviations ledger, `docs/deviations.md`.
 
 ## 5. Game slots and tools
 
