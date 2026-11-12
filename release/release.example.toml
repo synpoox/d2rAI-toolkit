@@ -99,7 +99,7 @@ forgejo_token_file = "~/.d2r-modkit/forgejo_token"
 # feed.json (validated against the launcher's rules), and `github_release.py --assets dist` publishes them to
 # repos.github as a draft first, then public. Files in package.preserve are shipped_default, every other file is managed.
 [catalog]
-product_id = ""                            # e.g. "pd2r": a stable machine ID, never a display name
+product_id = ""                            # e.g. "mymod": a stable machine ID, never a display name
 min_launcher_version = "0.1.0"
 loader_versions = []                       # allowed D2RLoader versions; [] = [d2rloader.version]
 loader_files = []                          # the official loader files to pin by sha256, e.g. [{path = "<D2R folder>/D2RLoader.exe"}]; version defaults to d2rloader.version

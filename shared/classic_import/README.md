@@ -34,7 +34,7 @@ merge.check_extract(root / "extracted", root / "baseline.json")
 merge.merge({"tables.json": my_tables_rule}, root / "merge", root / "extracted" / "data", d2r_data, root / "generated")
 ```
 
-A project converting tables between classic schemas (resurrected-09: 1.09d to 1.13c) supplies its map and the
+A project converting tables between classic schemas (1.09d to 1.13c) supplies its map and the
 functions its `recode`, `moved` and `restructure` columns need:
 
 ```python

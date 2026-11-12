@@ -123,7 +123,7 @@ the sprite build step. See [ui-layouts.md](ui-layouts.md).
   (`data/hd/character/enemy/<model>/...`, with its own `<model>_state_machine.json`).
 - A missing COF crashes ("Could not add cof file"); a monster `Id` missing from monsters.json has no HD model.
 - **IMPORTANT: every JSON key is case-sensitive.** monsters.json is looked up by the monstats `Id` exactly as spelled:
-  a mod monster `hellbovineMap` keyed as `hellbovinemap` is invisible in HD (proven in game, PD2 port, 2026-11-04).
+  a mod monster `hellbovineMap` keyed as `hellbovinemap` is invisible in HD (proven in game, 2026-11-04).
   Vanilla Ids are all lower case, so D2R's own file never shows this. Never lower-case a key D2R builds from a name.
 - Cheapest new monster: reuse a D2R monster's `Code` and monstats2 visual columns, and map its `Id` to that HD model.
   With its own classic files (COF/DCC + `animdata.d2` records) it keeps its own timing and classic art and only

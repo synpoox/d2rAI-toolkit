@@ -29,6 +29,10 @@ Run detached (`GHIDRA_HEADLESS_MAXMEM=8G`); auto-analysis of the ~30 MB code sec
 analyzeHeadless <projectDir> D2R -process <dump.exe> -noanalysis -readOnly -scriptPath <scripts> -postScript <Script.java> <args>
 ```
 
+`tools/ghidra_query.ps1` wraps this. Another analysed project (a mod's own DLLs) is listed in
+`~/.d2r-modkit/ghidra_projects.json` (or the file named by `MODKIT_GHIDRA_PROJECTS`): `{"mymod": "<path>.gpr"}`, or
+`{"gpr": ..., "program": ...}` per entry for a default program; then `-Project mymod`. Details: the script's header.
+
 ## 3. Query scripts (tools/ghidra_scripts)
 
 | Script | Args | Output / use |
