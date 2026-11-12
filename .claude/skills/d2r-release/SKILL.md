@@ -8,7 +8,7 @@ description: Ship a new version of a Diablo II Resurrected mod to players - bump
 Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you are inside the toolkit repo: use its root). Run `python -m modkit` with that folder as the working directory and the mod project as an argument.
 
 Release after **every** batch of merged fixes. Small releases are easier to debug and show players their report was
-answered. Packaging, the installer and hosting live under `${CLAUDE_PLUGIN_ROOT}/release/` and `${CLAUDE_PLUGIN_ROOT}/downloader/` (see `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md`); the method and
+answered. Packaging, the installer and hosting live under `${CLAUDE_PLUGIN_ROOT}/release/` and `${CLAUDE_PLUGIN_ROOT}/downloader/` (see the `d2r-toolkit` skill); the method and
 its reasons are in `${CLAUDE_PLUGIN_ROOT}/docs/ai-workflow.md` section 7. Where the files are served from (own host + downloader, GitHub
 Releases, Nexus Mods, or a mix) is in `${CLAUDE_PLUGIN_ROOT}/docs/distribution.md`: read it when the owner asks how to distribute the mod.
 

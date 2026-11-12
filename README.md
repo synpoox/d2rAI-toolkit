@@ -185,7 +185,7 @@ Start big. This is the kind of change the toolkit is for: a new game system that
 
 This is a multi-lane project, not one prompt and done. A good agent says so, and plans it like this.
 
-**1. Reads the rules and the limits.** [CLAUDE.md](CLAUDE.md) says data before code. The request matches the
+**1. Reads the rules and the limits.** [d2r-toolkit skill](.claude/skills/d2r-toolkit/SKILL.md) says data before code. The request matches the
 [`d2r-engine`](.claude/skills/d2r-engine/SKILL.md) skill and [new-game-systems.md](knowledge/new-game-systems.md).
 [engine-limits.md](knowledge/engine-limits.md) shapes the design before a line is written:
 
@@ -284,7 +284,7 @@ with 0 errors, installs with the game closed, and adds a row to the project's `T
 | [`modkit/`](modkit/) | The Python toolkit (`py -3 -m modkit -h`): CASC reading, tables, strings, UI layouts, sprites/PNG/DC6, HD maps, patch ops, the `skill` op, validator, installer, save editor |
 | [`knowledge/`](knowledge/README.md) | How D2R works for modders: limits, new game systems, tables, HD art, layouts, strings, saves, reverse engineering, addresses, debugging, porting |
 | [`.claude/skills/`](.claude/skills/) | Step-by-step guides the agent follows ([list below](#skills)) |
-| [`CLAUDE.md`](CLAUDE.md) | The agent's standing instructions and rules |
+| [`.claude/skills/d2r-toolkit/SKILL.md`](.claude/skills/d2r-toolkit/SKILL.md) | The agent's standing instructions and rules for a mod; [`CLAUDE.md`](CLAUDE.md) is for working on the toolkit itself |
 | [`docs/`](docs/README.md) | Guides for running a project: AI workflow, testing, releases, [distribution](docs/distribution.md) (own host, GitHub, Nexus Mods), downloader |
 | [`templates/`](templates/) | Fill-in files: coordinator prompt, lane rules, lane prompt, bug list, plan, changelog, owner update |
 | [`plugin-template/`](plugin-template/README.md) | D2RLoader plugin skeleton (C++): guards, off-switch, status command, a new skill function, an inline hook |
@@ -412,7 +412,7 @@ We'd rather tell you now than have you find out later:
 
 No, and it never should. `modkit fetch` reads the game files from your own install into `d2r-data/`, which is
 git-ignored, as are build outputs, dumps and saves. A built mod contains only what you changed. Rule 1 in
-[CLAUDE.md](CLAUDE.md) tells the agent the same.
+[the d2r-toolkit skill](.claude/skills/d2r-toolkit/SKILL.md) tells the agent the same.
 </details>
 
 <details>
@@ -434,8 +434,8 @@ plugins check the image itself.
 <details>
 <summary><b>Can I use another AI tool instead of Claude Code?</b></summary>
 
-Yes. [CLAUDE.md](CLAUDE.md), the skills and the knowledge base are plain Markdown, and `modkit` is a normal CLI.
-Point your agent's instruction file (for example `AGENTS.md`) at `CLAUDE.md` and tell it to read the matching
+Yes. [The d2r-toolkit skill](.claude/skills/d2r-toolkit/SKILL.md), the other skills and the knowledge base are plain Markdown, and `modkit` is a normal CLI.
+Point your agent's instruction file (for example `AGENTS.md`) at `.claude/skills/d2r-toolkit/SKILL.md` and tell it to read the matching
 `SKILL.md` for each job. The workflow guide also covers mixing providers.
 </details>
 

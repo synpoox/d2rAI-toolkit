@@ -8,7 +8,7 @@ the table below.
 | I want to... | Read |
 |---|---|
 | Install the toolkit and build my first mod | [d2r-mod-setup skill](../.claude/skills/d2r-mod-setup/SKILL.md) |
-| Know what the agent is told to do (and not do) | [CLAUDE.md](../CLAUDE.md) |
+| Know what the agent is told to do (and not do) | [d2r-toolkit skill](../.claude/skills/d2r-toolkit/SKILL.md) |
 | See a small mod that builds with 0 errors | [examples/showcase](../examples/showcase/) |
 | Look up a patch operation | [knowledge/modkit-ops.md](../knowledge/modkit-ops.md) |
 
