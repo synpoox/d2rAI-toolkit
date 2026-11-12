@@ -24,6 +24,7 @@ check_options and merge_table; `rule` is the plain one.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable, Iterable
 from pathlib import Path
 
 from . import ids
@@ -133,13 +134,86 @@ def merge_table(table: str, src: Table, d2r: Table, ren: dict[str, dict[str, str
     return merged
 
 
-def rule(rule_file: Path, src_data: Path, d2r_data: Path, out_data: Path, tables: list[str] | None = None) -> None:
+def monster_numbers(src_data: Path, out_data: Path) -> dict[str, str]:
+    """The source's monster number -> the merged monstats' number of the same monster (the game skips `Expansion`
+    rows). Empty without a source monstats; a source monstats without a merged one is an error."""
+    files = [ids.excel(d) / "monstats.txt" for d in (src_data, out_data)]
+    if not files[0].is_file():
+        return {}
+    if not files[1].is_file():
+        raise ValueError("hireling names monstats rows: merge monstats (merge/tables.json) too")
+    merged = {n.lower(): i for i, n in enumerate(Table(files[1]).names())}
+    return {str(i): str(merged[n.lower()]) for i, n in enumerate(Table(files[0]).names()) if n.lower() in merged}
+
+
+def hire_descs(src_data: Path) -> dict[str, str]:
+    """The source's hiredesc code -> its description (English)."""
+    f = ids.excel(src_data) / "hiredesc.txt"
+    return {r[1].lower(): r[0] for r in Table(f).rows if r[1]} if f.is_file() else {}
+
+
+def hire_keys(src_data: Path, d2r_data: Path, own_prefix: str = "hiredesc_", d2r_prefix: str = "strhirespecial"
+              ) -> dict[str, str]:
+    """The source's hiredesc code -> the string key a hireling row names: D2R's hire string of the same English text
+    (a key starting with `d2r_prefix` in its ui.json), else `<own_prefix><code>`, whose text the project's strings
+    rule reads from the source."""
+    ui = d2r_data / "local/lng/strings/ui.json"
+    d2r = {}
+    if ui.is_file():
+        d2r = {e["enUS"]: e["Key"] for e in json.loads(ui.read_text("utf-8-sig")) if e["Key"].startswith(d2r_prefix)}
+    return {code: d2r.get(text, f"{own_prefix}{code}") for code, text in hire_descs(src_data).items()}
+
+
+def sound_names(src_data: Path, d2r_data: Path) -> dict[str, str]:
+    """The source's sound names D2R's sounds table (which ships as it is) lacks -> the D2R sound playing the same
+    file, else blank: no sound until the source's own WAVs are ported. A monsounds name past the table crashes the
+    client."""
+    files = [ids.excel(d) / "sounds.txt" for d in (src_data, d2r_data)]
+    if not all(f.is_file() for f in files):
+        return {}
+    src, d2r = Table(files[0]), Table(files[1])
+    fcol = [c.lower() for c in d2r.header].index("filename")
+    by_file: dict[str, str] = {}
+    for r in d2r.rows:
+        by_file.setdefault(r[fcol].lower(), r[0])
+    scol = [c.lower() for c in src.header].index("filename")
+    names = {r[0].lower() for r in d2r.rows}
+    return {r[0].lower(): by_file.get(r[scol].lower().replace("/", "\\").removesuffix(".wav") + ".flac", "")
+            for r in src.rows if r[0].lower() not in names}
+
+
+def unknown_sounds(monsounds: Table, d2r_data: Path, sound_cols: Iterable[str] = ids.SOUND_COLS) -> list[str]:
+    """The merged monsounds cells ("<row> <column> <sound>") naming a sound D2R's sounds table lacks."""
+    f = ids.excel(d2r_data) / "sounds.txt"
+    if not f.is_file():
+        return []
+    names = {r[0].lower() for r in Table(f).rows}
+    cols = [(j, c) for j, c in enumerate(monsounds.header) if c in set(sound_cols)]
+    return [f"{r[0]} {c} {r[j]}" for r in monsounds.rows for j, c in cols if r[j] and r[j].lower() not in names]
+
+
+Hook = Callable[[Table, Table], None]  # (merged, D2R's table): edit the merged table, or raise ValueError
+
+
+def rule(rule_file: Path, src_data: Path, d2r_data: Path, out_data: Path, tables: list[str] | None = None,
+         hooks: dict[str, Hook] | None = None) -> None:
     """The merge driver's rule kind for merge/tables.json: merge each table it names. `tables` are the project's
-    id-listed tables (bound with functools.partial), whose renames the cells' references follow."""
+    id-listed tables (bound with functools.partial), whose renames the cells' references follow. The source's sounds
+    D2R lacks are renamed to D2R's sound of the same file ("sound"); `hireling` merges last, as it names monstats
+    rows by their merged number ("monster") and hiredesc codes by string key ("hiredesc"). `hooks` maps a table to a
+    function run on its merged table before it is written, for the table-specific steps a project keeps (e.g. the
+    skilldesc rewrite). A monsounds row naming a sound D2R's table lacks fails the merge."""
     cfg = json.loads(rule_file.read_text("utf-8"))
     ren = ids.renames({t: ids.read_list(ids.list_path(rule_file.parent, t)) for t in tables or ()})
-    for table, opts in sorted(cfg.items()):
+    ren["sound"] = sound_names(src_data, d2r_data)
+    for table, opts in sorted(cfg.items(), key=lambda kv: kv[0] == "hireling"):
+        if table == "hireling":
+            ren.update(monster=monster_numbers(src_data, out_data), hiredesc=hire_keys(src_data, d2r_data))
         check_options(table, opts)
-        merged = merge_table(table, Table(ids.excel(src_data) / f"{table}.txt"),
-                             Table(ids.excel(d2r_data) / f"{table}.txt"), ren, **opts)
+        d2r = Table(ids.excel(d2r_data) / f"{table}.txt")
+        merged = merge_table(table, Table(ids.excel(src_data) / f"{table}.txt"), d2r, ren, **opts)
+        if table in (hooks or {}):
+            hooks[table](merged, d2r)
+        if table == "monsounds" and (bad := unknown_sounds(merged, d2r_data)):
+            raise ValueError(f"monsounds names sounds D2R's sounds table lacks (the client crashes): {'; '.join(bad)}")
         ids.write(table, merged, out_data)

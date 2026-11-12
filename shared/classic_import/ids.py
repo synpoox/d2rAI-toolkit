@@ -60,6 +60,10 @@ _SKILL_REFS = ["sumskill1", "sumskill2", "sumskill3", "sumskill4", "sumskill5", 
 _MISSILE_REFS = ["ExplosionMissile", "SubMissile1", "SubMissile2", "SubMissile3", "HitSubMissile1", "HitSubMissile2",
                  "HitSubMissile3", "HitSubMissile4", "CltSubMissile1", "CltSubMissile2", "CltSubMissile3",
                  "CltHitSubMissile1", "CltHitSubMissile2", "CltHitSubMissile3", "CltHitSubMissile4"]
+# monsounds columns naming a sounds row; the source's sounds D2R's table lacks are renamed ("sound"), as D2R's sounds
+# table ships as it is
+SOUND_COLS = ["Attack1", "Weapon1", "Attack2", "Weapon2", "HitSound", "DeathSound", "Skill1", "Skill2", "Skill3",
+              "Skill4", "Footstep", "FootstepLayer", "Neutral", "Init", "Taunt", "Flee"]
 # column -> the table whose row it names by key, from D2R's data guide and modkit's EXPLICIT_REFS
 REFS = {
     "skills": {**{c: "skills" for c in _SKILL_REFS},
@@ -75,8 +79,11 @@ REFS = {
                  **{c: "missiles" for c in ["MissA1", "MissA2", "MissS1", "MissS2", "MissS3", "MissS4", "MissC", "MissSQ"]}},
     "monstats2": {"ResurrectSkill": "skills"},
     "charstats": {"StartSkill": "skills", **{f"Skill {i}": "skills" for i in range(1, 11)}},
-    "hireling": {f"Skill{i}": "skills" for i in range(1, 7)},
-    "monsounds": {f"CvtSk{i}": "skills" for i in range(1, 4)},
+    # Class and Seller name monstats rows by number, HireDesc a hiredesc code, the SOUND_COLS a sounds row: tables.rule
+    # fills the "monster", "hiredesc" and "sound" renames (an absent rename leaves the cell as it is)
+    "hireling": {**{f"Skill{i}": "skills" for i in range(1, 7)}, "Class": "monster", "Seller": "monster",
+                 "HireDesc": "hiredesc"},
+    "monsounds": {**{f"CvtSk{i}": "skills" for i in range(1, 4)}, **{c: "sound" for c in SOUND_COLS}},
     "skilldesc": {f"descmissile{i}": "missiles" for i in range(1, 4)},
 }
 # columns holding another id-listed table's row number -> that table (levels' Warp0-7 hold lvlwarp's Id column, not
