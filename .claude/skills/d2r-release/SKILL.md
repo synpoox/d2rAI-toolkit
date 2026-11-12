@@ -5,10 +5,10 @@ description: Ship a new version of a Diablo II Resurrected mod to players - bump
 
 # Release a mod version
 
-Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (this repository's root when you work inside it). Toolkit paths below, such as `knowledge/`, `templates/`, `docs/` and `tools/`, are relative to it; run `python -m modkit` and `tools/` scripts with that folder as the working directory and the mod project as an argument.
+Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you are inside the toolkit repo: use its root). Run `python -m modkit` with that folder as the working directory and the mod project as an argument.
 
 Release after **every** batch of merged fixes. Small releases are easier to debug and show players their report was
-answered. Packaging, the installer and hosting live under `release/` and `downloader/` (see CLAUDE.md); the method and
+answered. Packaging, the installer and hosting live under `${CLAUDE_PLUGIN_ROOT}/release/` and `${CLAUDE_PLUGIN_ROOT}/downloader/` (see `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md`); the method and
 its reasons are in `${CLAUDE_PLUGIN_ROOT}/docs/ai-workflow.md` section 7. Where the files are served from (own host + downloader, GitHub
 Releases, Nexus Mods, or a mix) is in `${CLAUDE_PLUGIN_ROOT}/docs/distribution.md`: read it when the owner asks how to distribute the mod.
 
@@ -17,7 +17,7 @@ Releases, Nexus Mods, or a mix) is in `${CLAUDE_PLUGIN_ROOT}/docs/distribution.m
       outward-facing.
 - [ ] All fixes for this version are merged on `main` and the targeted checks passed. Player-facing ones were also
       tested on a **release-like install** (the package installed into a slot like a player would).
-- [ ] `python ${CLAUDE_PLUGIN_ROOT}/tools/check_public.py` prints nothing.
+- [ ] `py -3 ${CLAUDE_PLUGIN_ROOT}/tools/check_public.py --root <mod repo>` prints nothing.
 - [ ] Nobody (including you) has the release checkout busy. **Do not switch branches, rebase or edit** in the checkout
       while the release runs. Do other work in a separate worktree. Capture the commit first:
       `C=$(git rev-parse HEAD)`.
@@ -51,7 +51,7 @@ Releases, Nexus Mods, or a mix) is in `${CLAUDE_PLUGIN_ROOT}/docs/distribution.m
 ## Releases for the Resurrected launcher (GitHub assets)
 When the project sets `[catalog]` in `release.toml`, players install through the Resurrected launcher, which reads
 release assets on GitHub. The steps are in `${CLAUDE_PLUGIN_ROOT}/docs/release.md` "Launcher release (schema 3)":
-`package_release.py --game-exe <real D2R.exe> --notes <notes>`, then `github_release.py <v> --assets dist --dry-run`,
+`${CLAUDE_PLUGIN_ROOT}/release/package_release.py --game-exe <real D2R.exe> --notes <notes>`, then `${CLAUDE_PLUGIN_ROOT}/release/github_release.py <v> --assets dist --dry-run`,
 then without `--dry-run`, with `RESURRECTED_VALIDATE_RELEASE` pointing at the launcher's `validate-release`. It publishes a draft first and makes it public only after the uploaded files are checked.
 Ask the owner before the run without `--dry-run`. A failure leaves a private draft; never edit or replace a public
 release (a fix is a new version).
@@ -66,4 +66,4 @@ release (a fix is a new version).
 
 ## Public mirror
 If the project has a public mirror, push to it only through the project's scrub-and-mirror script, never directly,
-and only after `check_public.py` is clean. Owner edits made directly on the mirror must be brought back first.
+and only after `${CLAUDE_PLUGIN_ROOT}/tools/check_public.py` is clean on the mod repo. Owner edits made directly on the mirror must be brought back first.

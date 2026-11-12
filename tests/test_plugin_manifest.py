@@ -27,10 +27,10 @@ class PluginManifestTest(unittest.TestCase):
         self.assertTrue(list((ROOT / ".claude" / "skills").glob("*/SKILL.md")))
 
     def test_skill_links_use_plugin_root(self):
-        bare = re.compile(r"(?<![\w/.${}-])(knowledge|templates|testing|tools)/\w")
+        bare = re.compile(r"(?<![\w/.${}-])(knowledge|templates|testing|tools|plugin-template|release|downloader|modkit|examples|third_party)/\w")
         for skill in (ROOT / ".claude" / "skills").glob("*/SKILL.md"):
             text = skill.read_text(encoding="utf-8")
-            body = text.split("\n---", 2)[-1]
+            body = text.split("\n---", 1)[1]
             for line in body.splitlines():
                 if line.startswith("Toolkit root:"):
                     continue

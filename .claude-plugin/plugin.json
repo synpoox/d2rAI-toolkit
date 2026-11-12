@@ -2,5 +2,6 @@
   "name": "d2r-toolkit",
   "displayName": "D2R Toolkit",
   "description": "Skills for building Diablo II: Resurrected mods with modkit: skills, items, monsters, UI, cube recipes, engine work, debugging, porting, projects and releases.",
+  "author": { "name": "synpoox" },
   "skills": ["./.claude/skills/"]
 }

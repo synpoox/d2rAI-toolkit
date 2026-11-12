@@ -5,7 +5,7 @@ description: Change Diablo II Resurrected engine behaviour that game data cannot
 
 # Engine work: D2RLoader plugins and reverse engineering
 
-Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (this repository's root when you work inside it). Toolkit paths below, such as `knowledge/`, `templates/`, `docs/` and `tools/`, are relative to it; run `python -m modkit` and `tools/` scripts with that folder as the working directory and the mod project as an argument.
+Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you are inside the toolkit repo: use its root). Run `python -m modkit` with that folder as the working directory and the mod project as an argument.
 
 Data first: check ${CLAUDE_PLUGIN_ROOT}/knowledge/engine-limits.md and the vanilla function catalogs (`python -m modkit functions`)
 before writing code. When code is needed, read ${CLAUDE_PLUGIN_ROOT}/knowledge/engine-re.md and ${CLAUDE_PLUGIN_ROOT}/knowledge/d2r-93847-addresses.md, and
@@ -15,7 +15,7 @@ ${CLAUDE_PLUGIN_ROOT}/knowledge/new-game-systems.md first (player steps, data vs
 lives), then build it part by part with this skill.
 
 ## The plugin
-1. Copy `plugin-template/` into the mod project (e.g. `<project>/plugin/`), build with
+1. Copy `${CLAUDE_PLUGIN_ROOT}/plugin-template/` into the mod project (e.g. `<project>/plugin/`), build with
    `powershell -ExecutionPolicy Bypass -File plugin\build.ps1 -Name <mod>-core` (point `-Sdk` at this repo's
    `${CLAUDE_PLUGIN_ROOT}/third_party/PluginSDK`). Add the DLL path to mod.json `plugins`; `modkit install` copies it to
    `<game>/mods/<Mod>/d2rloader/plugins/`. Players run the mod through D2RLoader. Keep `src/plugin.rc` (the ABI

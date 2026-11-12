@@ -5,7 +5,7 @@ description: Create a new Diablo II Resurrected skill, or rework an existing one
 
 # Make a D2R skill
 
-Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (this repository's root when you work inside it). Toolkit paths below, such as `knowledge/`, `templates/`, `docs/` and `tools/`, are relative to it; run `python -m modkit` and `tools/` scripts with that folder as the working directory and the mod project as an argument.
+Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you are inside the toolkit repo: use its root). Run `python -m modkit` with that folder as the working directory and the mod project as an argument.
 
 You turn a skill idea into a `skill` op in a modkit project, build it, check it, and hand the user a test list.
 Read `${CLAUDE_PLUGIN_ROOT}/knowledge/engine-limits.md` once per session if you haven't; it lists what D2R hard-codes.
@@ -23,7 +23,7 @@ cltstopfunc) plus columns those functions read. You cannot invent behaviour in d
   functions match the idea is the `clone`. Its columns tell you which ones the function reads (Param1-8, calc1-4,
   aurastate, srvmissile*, sumskill*, ...).
 - Behaviour no vanilla function has (e.g. a fan of missiles with a twist) needs a plugin function: use the
-  d2r-engine skill (plugin-template/src/skill_functions.cpp shows one in free slot 172), then set srvdofunc to
+  d2r-engine skill (${CLAUDE_PLUGIN_ROOT}/plugin-template/src/skill_functions.cpp shows one in free slot 172), then set srvdofunc to
   that slot. Prefer data whenever a vanilla function is close enough.
 
 ## 3. Class skills: replace, don't add

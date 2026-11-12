@@ -5,7 +5,7 @@ description: Diagnose a Diablo II Resurrected mod that crashes, asserts, hangs, 
 
 # Debug a D2R mod
 
-Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (this repository's root when you work inside it). Toolkit paths below, such as `knowledge/`, `templates/`, `docs/` and `tools/`, are relative to it; run `python -m modkit` and `tools/` scripts with that folder as the working directory and the mod project as an argument.
+Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you are inside the toolkit repo: use its root). Run `python -m modkit` with that folder as the working directory and the mod project as an argument.
 
 The user tests; you diagnose from files. Don't ask them to describe a crash: read the logs.
 

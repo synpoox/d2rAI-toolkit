@@ -358,10 +358,13 @@ Notes:
 - A marketplace added from a local path is read in place, not copied: pulling the toolkit changes the skills at the
   next session start or after `/reload-plugins`.
 - Plugin skills are namespaced: `/d2r-toolkit:d2r-skill`. Inside this repository the same skills also load without the
-  prefix; that is harmless.
+  prefix, so each skill loads twice there (about 1.2k always-on tokens per copy). To turn the plugin off in the
+  toolkit repo only, put `{ "enabledPlugins": { "d2r-toolkit@d2r-local": false } }` in the toolkit's
+  `.claude/settings.local.json`.
 - In a skill's text, `${CLAUDE_PLUGIN_ROOT}` is replaced by the absolute path of the toolkit checkout when the skill
   loads from the plugin. Every toolkit file a skill names (`knowledge/`, `docs/`, `templates/`, `tools/`, `testing/`)
   is written as `${CLAUDE_PLUGIN_ROOT}/...`, so it resolves from any project. Inside this repository nothing
   substitutes it, and the placeholder means the repository root. Write new skills the same way.
-- Commands such as `python -m modkit build <project>` still run with the toolkit checkout as the working directory
-  and the mod project as the argument.
+- `python -m modkit build <project>` still runs with the toolkit checkout as the working directory and the mod
+  project as the argument. `tools/check_public.py` scans its `--root` (default: the current directory), so run it
+  as `py -3 <path-to-toolkit>/tools/check_public.py --root <mod repo>` or from inside the mod repo.

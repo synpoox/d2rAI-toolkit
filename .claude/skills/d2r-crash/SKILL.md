@@ -5,7 +5,7 @@ description: Triage a Diablo II Resurrected crash from a player's files - read t
 
 # Triage a crash
 
-Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (this repository's root when you work inside it). Toolkit paths below, such as `knowledge/`, `templates/`, `docs/` and `tools/`, are relative to it; run `python -m modkit` and `tools/` scripts with that folder as the working directory and the mod project as an argument.
+Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you are inside the toolkit repo: use its root). Run `python -m modkit` with that folder as the working directory and the mod project as an argument.
 
 Read `${CLAUDE_PLUGIN_ROOT}/knowledge/crash-triage.md` (the method and a worked example), `${CLAUDE_PLUGIN_ROOT}/knowledge/d2rloader.md` (environment traps)
 and the symptom table in `${CLAUDE_PLUGIN_ROOT}/knowledge/debugging.md`.

@@ -5,7 +5,7 @@ description: Create or change Diablo II Resurrected monsters, bosses, superuniqu
 
 # Monsters and areas
 
-Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (this repository's root when you work inside it). Toolkit paths below, such as `knowledge/`, `templates/`, `docs/` and `tools/`, are relative to it; run `python -m modkit` and `tools/` scripts with that folder as the working directory and the mod project as an argument.
+Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you are inside the toolkit repo: use its root). Run `python -m modkit` with that folder as the working directory and the mod project as an argument.
 
 Start from a vanilla monster: `python -m modkit show monstats zombie1`, `show monstats2 zombie1`,
 `show levels "Blood Moor"`. Read ${CLAUDE_PLUGIN_ROOT}/knowledge/tables.md (monster section) and ${CLAUDE_PLUGIN_ROOT}/knowledge/engine-limits.md.

@@ -5,7 +5,7 @@ description: Plan and run a Diablo II Resurrected mod project with several AI ag
 
 # Coordinate a D2R mod project
 
-Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (this repository's root when you work inside it). Toolkit paths below, such as `knowledge/`, `templates/`, `docs/` and `tools/`, are relative to it; run `python -m modkit` and `tools/` scripts with that folder as the working directory and the mod project as an argument.
+Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you are inside the toolkit repo: use its root). Run `python -m modkit` with that folder as the working directory and the mod project as an argument.
 
 You plan, brief, review, merge and report. You do not do the big implementation work yourself. The full method is in
 `${CLAUDE_PLUGIN_ROOT}/docs/ai-workflow.md`; the fill-in files are in `${CLAUDE_PLUGIN_ROOT}/templates/`. Read the workflow doc once at the start of a project.
@@ -17,7 +17,7 @@ You plan, brief, review, merge and report. You do not do the big implementation 
 2. Copy `${CLAUDE_PLUGIN_ROOT}/templates/lane-rules.txt` to the runs folder and adapt it. Create `docs/PLAN.md`, `docs/bugs.md` and
    `CHANGELOG.md` from the templates.
 3. Make the private-words list **outside** the repo (`~/.d2r-modkit/private_terms.txt` or similar) and run
-   `python ${CLAUDE_PLUGIN_ROOT}/tools/check_public.py` before every commit.
+   `py -3 ${CLAUDE_PLUGIN_ROOT}/tools/check_public.py --root <mod repo>` before every commit (it scans `--root`, default the current directory, so never run it from the toolkit folder).
 4. Set up game slots (frozen copies of the install, each with its own saves) and mark the owner's real game
    untouchable. Slots are queued, never added.
 5. Secrets: the owner puts tokens in files in their home folder. Never ask for them in chat.
@@ -54,7 +54,7 @@ If a cheap lane fails twice on the same prompt, re-brief with what it tried or p
 
 ## Reviewing and merging
 1. When a PR arrives, read the diff. Is it in scope? Is the claimed test real (output pasted)? Are docs and the bug
-   row updated? Does `check_public.py` pass?
+   row updated? Does `${CLAUDE_PLUGIN_ROOT}/tools/check_public.py --root <mod repo>` pass?
 2. Merge in a **separate worktree** (`git worktree add --detach ../merge-wt origin/main`), never in a checkout a
    release is using.
 3. Run the targeted checks for what you merged.
