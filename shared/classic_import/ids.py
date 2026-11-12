@@ -231,6 +231,9 @@ def renames(lists: dict[str, list[Line]]) -> dict[str, dict[str, str]]:
 def follow(lines: list[Line], src_keys: list[str], d2r: list[str], src: list[str]) -> list[Line]:
     """Lines for a table whose rows are another table's row for row (objtype: objects): source row k takes the id of
     the other list's line for source row k, and D2R's name on a merged row."""
+    if len(src_keys) != len(src):
+        raise IdError(f"follow: the source table has {len(src)} rows but the table it follows has {len(src_keys)}; "
+                      "the two must match row for row")
     at = {p.lower(): (i, n) for p, i, n in lines}
     out = []
     for key, name in zip(ident(src_keys), ident(src)):
@@ -377,11 +380,13 @@ PROPS = {"uniqueitems", "setitems", "sets", "runes", "magicprefix", "magicsuffix
          "qualityitems"}
 # tables written by the rule of the table they follow row for row (follow): objtype's rows are objects'
 FOLLOWERS = {"objects": "objtype"}
-# D2R columns computed from the source row (the column dict a Finish gets), where D2R's own rows all hold the value
-# but a 1.13c table has no such column. skills rightskill: D2R sets it to "not passive" on every class skill;
-# setitems spawnable and the itemtypes socket level thresholds: the value D2R gives every one of its own rows
-# (D2R 3.3 build 93847). Pass a table's entry to derive().
-DERIVED = {"skills": {"rightskill": lambda src: "0" if src.get("passive") == "1" else "1"},
+# D2R columns computed from the source row (the column dict a Finish gets), where D2R's own rows hold the value
+# but a 1.13c table has no such column. A function returns None to leave the cell as it is. skills rightskill: D2R
+# sets it to "not passive" on its class skills only (its non-class, monster skills hold 0), so a non-class source row
+# keeps the cell; setitems spawnable and the itemtypes socket level thresholds: the value D2R gives (nearly) every
+# one of its own rows (D2R 3.3 build 93847, knowledge/porting-classic-mods.md). Pass a table's entry to derive().
+DERIVED = {"skills": {"rightskill": lambda src: None if not src.get("charclass") else
+                      "0" if src.get("passive") == "1" else "1"},
            "setitems": {"spawnable": lambda src: "1"},
            "itemtypes": {"MaxSocketsLevelThreshold1": lambda src: "25", "MaxSocketsLevelThreshold2": lambda src: "40"}}
 # itemstatcost's description strings and the display columns that print them (stat_display)
@@ -411,12 +416,23 @@ def make_spell(funcs: Funcs, refs: dict[str, dict[str, str]] | None = None,
 Fixes = dict[str, dict[tuple[str, str], dict[str, str]]]  # table -> (column, bad value) -> the row's new cells
 
 
+def is_prop_column(name: str) -> bool:
+    """Whether a PROPS-table column holds a property code: prop1, mod 1 code, a1mod2code, ... (not index, *ID, par,
+    min or max)."""
+    low = name.lower()
+    return "par" not in low and bool(re.fullmatch(r"prop\d*|mod ?\d+ ?code|a\d+mod\d+code|\w*code\d*", low))
+
+
 def fix_cells(fixes: Fixes, words: dict[str, str] | None = None, word_tables: set[str] = PROPS) -> FixRow:
     """A FixRow for values no table defines, which D2R's loader refuses: a source row whose `column` holds `bad`
     (quotes aside) gets the new cells (a column the table lacks is skipped). `words`: cell value -> its spelling in
-    every table of `word_tables` (a property code in another letter case, say)."""
+    the property-code columns (is_prop_column) of every table of `word_tables` (a property code in another letter
+    case, say); other columns, such as index and *ID, are left alone."""
     def fix(table: str, header: list[str], row: list[str]) -> list[str]:
-        row = [words.get(v.replace('"', ""), v) for v in row] if words and table in word_tables else list(row)
+        row = list(row)
+        if words and table in word_tables:
+            row = [words.get(v.replace('"', ""), v) if is_prop_column(c) else v for c, v in zip(header, row)] \
+                + row[len(header):]
         for (col, bad), cells in fixes.get(table, {}).items():
             if col in header and row[header.index(col)].replace('"', "") == bad:
                 for c, v in cells.items():
@@ -436,13 +452,14 @@ def finishes(*fs: Finish | None) -> Finish:
     return run
 
 
-def derive(columns: dict[str, Callable[[dict[str, str]], str]]) -> Finish:
+def derive(columns: dict[str, Callable[[dict[str, str]], str | None]]) -> Finish:
     """A Finish setting each column (that the mod's header has) to fn(source row by column name): DERIVED[table]
-    plus the project's own."""
+    plus the project's own. A function that returns None leaves the cell."""
     def run(header: list[str], row: list[str], src: dict[str, str], own: list[str] | None) -> None:
         for c, fn in columns.items():
-            if c in header:
-                row[header.index(c)] = fn(src)
+            v = fn(src) if c in header else None
+            if v is not None:
+                row[header.index(c)] = v
     return run
 
 
@@ -479,6 +496,10 @@ def missile_funcs(rules: list[tuple[str, str, str, str]]) -> Finish:
     def run(header: list[str], row: list[str], src: dict[str, str], own: list[str] | None) -> None:
         for func, number, col, fallback in rules:
             if func in header and row[header.index(func)] == number:
+                missing = [c for c in (col, fallback) if c not in header]
+                if missing:
+                    raise IdError(f"missile_funcs: the table has no column {', '.join(missing)} "
+                                  f"(function {number} in {func})")
                 f, m, a = header.index(func), header.index(col), header.index(fallback)
                 row[f] = ""
                 if not row[m]:
@@ -548,6 +569,11 @@ def property_kinds(properties: Table, monster_stats: str | None = None) -> dict[
 def monstats_ids(src: Table, d2r: Table) -> dict[str, str]:
     """Source monstats id -> the mod's, for monstats merged by name (tables.py): D2R's rows keep their ids, source-only
     rows follow D2R's last."""
+    for who, t in (("D2R", d2r), ("source", src)):
+        low = [n.lower() for n in t.names()]
+        dup = sorted({n for n in low if low.count(n) > 1})
+        if dup:  # D2R's last duplicate would win and a source duplicate would reuse the first id
+            raise IdError(f"monstats_ids: {who} monstats names used twice (letter case aside): {', '.join(dup)}")
     mod = {n.lower(): i for i, n in enumerate(d2r.names())}
     added = len(d2r.names())
     for n in src.names():
@@ -647,20 +673,21 @@ def seed_lists(merge_dir: Path, tables: list[str], src_data: Path, d2r_data: Pat
     return added
 
 
-def apply(rule: Path, src_data: Path, d2r_data: Path, out_data: Path, tables: list[str]) -> None:
+def apply(rule: Path, src_data: Path, d2r_data: Path, out_data: Path, tables: list[str],
+          followers: dict[str, str] | None = None) -> None:
     """The merge driver's rule kind for merge/ids-<table>.tsv: check the project's lists (`tables`, bound with
     functools.partial) and write that table, references to the listed tables renamed and NUM_REFS columns in the
-    mod's ids. A table in FOLLOWERS (objects) also writes the table that follows it (objtype), when both games have
-    it. A project with its own fixes calls merge_table with its hooks instead."""
+    mod's ids. A table in `followers` (opt-in; pass FOLLOWERS: objects -> objtype) also writes the table that follows
+    it, when both games have it; a project with its own rule for that table leaves it out. A project with its own fixes calls merge_table with its hooks instead."""
     table = rule.stem[len("ids-"):]
     lists = lists_for(rule.parent, tables, src_data, d2r_data)
     nums = {t for refs in NUM_REFS.values() for t in refs.values()} & set(tables)
     ids = ids_of(lists, {t: load(src_data, t).names() for t in nums})
     ren = renames(lists)
-    write(table, merge_table(table, load(src_data, table), load(d2r_data, table), lists[table], ren, ids)[0],
-          out_data)
-    f = FOLLOWERS.get(table)
+    src_table = load(src_data, table)
+    write(table, merge_table(table, src_table, load(d2r_data, table), lists[table], ren, ids)[0], out_data)
+    f = (followers or {}).get(table)
     if f and all((excel(d) / f"{f}.txt").is_file() for d in (src_data, d2r_data)):
         src, d2r = load(src_data, f), load(d2r_data, f)
-        lines = follow(lists[table], load(src_data, table).names(), d2r.names(), src.names())
+        lines = follow(lists[table], src_table.names(), d2r.names(), src.names())
         write(f, merge_table(f, src, d2r, lines, ren)[0], out_data)

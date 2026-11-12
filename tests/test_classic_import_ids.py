@@ -270,9 +270,15 @@ class ListFileTests(unittest.TestCase):
                     p.write_text(text, "latin-1")
             (root / "merge").mkdir()
             (root / "merge" / "ids-objects.tsv").write_text("chest\t0\tchest\nwell\t1\twell\nnew\t2\tnew\n", "utf-8")
-            ids.apply(root / "merge" / "ids-objects.tsv", root / "src", root / "d2r", root / "out", ["objects"])
+            rule = root / "merge" / "ids-objects.tsv"
+            ids.apply(rule, root / "src", root / "d2r", root / "out", ["objects"])
+            self.assertFalse((root / "out/global/excel/objtype.txt").exists())  # opt-in: a project may have its own
+            ids.apply(rule, root / "src", root / "d2r", root / "out", ["objects"], followers=ids.FOLLOWERS)
             # objtype follows objects row for row: D2R's names on merged rows, the source's on the appended one
             self.assertEqual((root / "out/global/excel/objtype.txt").read_text("latin-1"), "Name\nCasket\nWell\nNew\n")
+            (root / "src/global/excel/objtype.txt").write_text("Name\nChest\n", "latin-1")
+            with self.assertRaisesRegex(ids.IdError, "match row for row"):
+                ids.apply(rule, root / "src", root / "d2r", root / "out", ["objects"], followers=ids.FOLLOWERS)
 
 
 def table(text: str, key: str | None = None) -> ids.Table:
@@ -312,16 +318,30 @@ class HookTests(unittest.TestCase):
         self.assertEqual(fix("misc", h, ["a", '"toolong"']), ["a", "tool"])
         self.assertEqual(fix("misc", h, ["Mixed-Case", "ok"]), ["Mixed-Case", "ok"])  # misc has no properties
         self.assertEqual(fix("uniqueitems", ["index", "prop1"], ["u", "Mixed-Case"]), ["u", "mixed-case"])
+        # only property-code columns are respelled, not a name, an id or a parameter
+        h = ["index", "*ID", "prop1", "par1", "mod 1 code", "a1mod1code"]
+        self.assertEqual(fix("sets", h, ["Mixed-Case", "Mixed-Case", "Mixed-Case", "Mixed-Case", "Mixed-Case",
+                                         "Mixed-Case"]),
+                         ["Mixed-Case", "Mixed-Case", "mixed-case", "Mixed-Case", "mixed-case", "mixed-case"])
 
     def test_derive_and_finishes_in_order(self):
-        d2r = table("skill|passive|rightskill|x\nA|0|1|\n")
-        src = table("skill|passive|x\nA|1|\nB|0|\n")
+        d2r = table("skill|charclass|passive|rightskill|x\nA|ama|0|1|\n")
+        src = table("skill|charclass|passive|x\nA|ama|1|\nB|ama|0|\n")
         seen = []
         finish = ids.finishes(ids.derive(ids.DERIVED["skills"]), None,
-                              lambda h, row, s, own: seen.append((row[2], own is None)))
+                              lambda h, row, s, own: seen.append((row[3], own is None)))
         merged, _ = ids.merge_table("skills", src, d2r, [("A", 0, "A"), ("B", 1, "B")], {}, finish=finish)
-        self.assertEqual([r[2] for r in merged.rows], ["0", "1"])  # passive: no right-mouse slot
+        self.assertEqual([r[3] for r in merged.rows], ["0", "1"])  # passive: no right-mouse slot
         self.assertEqual(seen, [("0", False), ("1", True)])
+
+    def test_derived_rightskill_leaves_non_class_skills_alone(self):
+        d2r = table("skill|charclass|passive|rightskill\nMonSkill||0|0\nD2RMon||0|0\nClassSk|ama|0|1\n")
+        src = table("skill|charclass|passive\nMonSkill||\nClassSk|ama|\nNewMon||\n")
+        lines = [("MonSkill", 0, "MonSkill"), ("ClassSk", 2, "ClassSk"), ("NewMon", 3, "NewMon")]
+        merged, _ = ids.merge_table("skills", src, d2r, lines, {}, finish=ids.derive(ids.DERIVED["skills"]))
+        # a merged monster skill keeps D2R's 0, a class skill is set, an appended non-class row stays blank
+        self.assertEqual([r[3] for r in merged.rows], ["0", "0", "1", ""])
+        self.assertIsNone(ids.DERIVED["skills"]["rightskill"]({"charclass": ""}))
 
     def test_stat_display_follows_the_string(self):
         d2r = table("Stat|descfunc|descval|descstrpos|descstrneg\nst_a|19||StrA|StrA\nst_a_time|17||StrA|StrA\n"
@@ -353,6 +373,12 @@ class HookTests(unittest.TestCase):
                                                                           ("other", 2, "other")], {},
                                     finish=ids.missile_funcs([("srvdofunc", "99", "srvmissile", "srvmissilea")]))
         self.assertEqual(merged.rows, [["bolt", "", "jav", ""], ["kept", "", "own", "jav"], ["other", "5", "", "jav"]])
+
+    def test_missile_funcs_name_a_missing_column(self):
+        src = table("skill|srvdofunc|srvmissile\nbolt|99|\n")
+        with self.assertRaisesRegex(ids.IdError, "no column srvmissilea"):
+            ids.merge_table("skills", src, table("skill|srvdofunc|srvmissile\n"), [("bolt", 0, "bolt")], {},
+                            finish=ids.missile_funcs([("srvdofunc", "99", "srvmissile", "srvmissilea")]))
 
     def test_hit_params_take_the_mods_ids(self):
         cols = "Missile|pSrvHitFunc|sHitPar1|sHitPar3"
@@ -397,6 +423,10 @@ class HookTests(unittest.TestCase):
         d2r = table("Id|x\nm_a|\nExpansion|\nm_d2r|\nm_b|\n")
         src = table("Id|x\nm_a|\nExpansion|\nm_b|\nm_new1|\nm_new2|\n")
         self.assertEqual(ids.monstats_ids(src, d2r), {"0": "0", "1": "2", "2": "3", "3": "4"})
+        with self.assertRaisesRegex(ids.IdError, "source monstats names used twice.*m_a"):
+            ids.monstats_ids(table("Id\nm_a\nM_A\n"), d2r)
+        with self.assertRaisesRegex(ids.IdError, "D2R monstats names used twice"):
+            ids.monstats_ids(src, table("Id\nm_a\nm_a\n"))
         lines = {"levels": [("A", 0, "A"), ("Cut", ids.LEFT_OUT, "cut"), ("B", 2, "B")]}
         self.assertEqual(ids.left_out_of(lines, {"levels": ["A", "Cut", "B"]}), {"levels": {"1": ""}})
 
