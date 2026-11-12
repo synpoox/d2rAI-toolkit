@@ -37,6 +37,8 @@ analyzeHeadless <projectDir> D2R -process <dump.exe> -noanalysis -readOnly -scri
 | `Disasm.java` | rva... | `ASM <rva>: <instr>`; defines functions the analysis missed. Use for entry bytes |
 | `Refs.java` | rva... | `REF <target> <- <from> <function@entry>`: who calls / reads it |
 | `NearRefs.java` | [scalar] before after rva... | instructions addressing anything in [rva-before, rva+after]: data reached at an offset (assert descriptors), or with `scalar` plain numbers (sizes) |
+| `FuncsInRange.java` | lo hi | `FN <rva> <name> size <n> callers <rva,...>`: functions whose entry lies in [lo, hi) with their callers: map a source file's code block |
+| `RangeAsm.java` | startRva endRva | `ASM <rva>: <instr>` for every instruction in [startRva, endRva), disassembling on the fly: read a range the analysis left as data |
 | `StringXrefs.java` | substring [max] | functions referencing strings containing the text |
 | `FindDisp.java` | displacement [mnemonic] | every instruction with that memory displacement, by function: all users of a record field or data-table offset |
 | `FindDispRange.java` | lo hi | displacements in [lo, hi), non-stack: users of a struct region |

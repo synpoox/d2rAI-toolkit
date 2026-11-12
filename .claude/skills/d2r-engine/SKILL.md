@@ -46,7 +46,8 @@ lives), then build it part by part with this skill.
    dump is the in-memory image, RVA = address - image base). Analyse once: `tools/ghidra_analyze.ps1` (hours).
 2. Query read-only: `powershell -ExecutionPolicy Bypass -File tools/ghidra_query.ps1 <Script>.java args`:
    `StringXrefs <text>`, `NearRefs`, `Refs <rva>`, `Decompile <rva>`, `Disasm <rva>`, `FindDisp <offset>`
-   (users of a struct field), `FindSwitch <bound>` (switches with N cases), `FindPtrTables` (dispatch tables).
+   (users of a struct field), `FindSwitch <bound>` (switches with N cases), `FindPtrTables` (dispatch tables). `FuncsInRange <lo> <hi>` (functions in a range, with callers),
+   `RangeAsm <lo> <hi>` (instructions in a range).
 3. Fastest lead: D2R keeps its source paths in asserts (`D2Game\src\Player\PlrTrade.cpp`,
    `D2Common\src\DataTbls\HoradricCube.cpp`): StringXrefs the file name -> NearRefs the descriptor -> Refs the
    tiny assert stub -> the functions of that source file. Then decompile and match by constants, switch shapes and
