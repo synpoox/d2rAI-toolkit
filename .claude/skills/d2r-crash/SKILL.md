@@ -5,8 +5,10 @@ description: Triage a Diablo II Resurrected crash from a player's files - read t
 
 # Triage a crash
 
-Read `knowledge/crash-triage.md` (the method and a worked example), `knowledge/d2rloader.md` (environment traps)
-and the symptom table in `knowledge/debugging.md`.
+Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you are inside the toolkit repo: use its root). Run `python -m modkit` with that folder as the working directory and the mod project as an argument.
+
+Read `${CLAUDE_PLUGIN_ROOT}/knowledge/crash-triage.md` (the method and a worked example), `${CLAUDE_PLUGIN_ROOT}/knowledge/d2rloader.md` (environment traps)
+and the symptom table in `${CLAUDE_PLUGIN_ROOT}/knowledge/debugging.md`.
 
 ## 1. Get the files (ask once, same session)
 - `<game>\d2rloader\crashes\*` (crash and last-resort reports)
@@ -18,7 +20,7 @@ and the symptom table in `knowledge/debugging.md`.
 1. Module: `Allocation Base 0x140000000` = D2R.exe; RVA = RIP - 0x140000000. Another base: a DLL (yours,
    D2RCore, a driver).
 2. Exception parameter 0 = read (0) / write (1); parameter 1 = address. Small address = null + field offset.
-3. Disassemble the RVA (`tools/ghidra_query.ps1 Disasm.java 0x<rva>`): which register was bad? Its value is in the
+3. Disassemble the RVA (`${CLAUDE_PLUGIN_ROOT}/tools/ghidra_query.ps1 Disasm.java 0x<rva>`): which register was bad? Its value is in the
    report.
 4. Map the RIP and every image value on the stack to functions (the script in crash-triage.md, on a dump of the
    same image). Trust a caller chain that makes sense, not every stale slot.
@@ -38,4 +40,4 @@ and the symptom table in `knowledge/debugging.md`.
   checked hooks, counted and logged, an off word and a status line.
 - Write the cause and evidence (report lines, instruction, register) in the bug list; add a check that would
   catch it again. If you could not reproduce it, say so, and say what the log will show if it returns.
-- New engine facts go into `knowledge/` (addresses with the build number).
+- New engine facts go into `${CLAUDE_PLUGIN_ROOT}/knowledge/` (addresses with the build number).

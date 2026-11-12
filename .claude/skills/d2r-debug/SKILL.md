@@ -5,11 +5,13 @@ description: Diagnose a Diablo II Resurrected mod that crashes, asserts, hangs, 
 
 # Debug a D2R mod
 
+Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you are inside the toolkit repo: use its root). Run `python -m modkit` with that folder as the working directory and the mod project as an argument.
+
 The user tests; you diagnose from files. Don't ask them to describe a crash: read the logs.
 
 A crash report with an address (`D2R.exe+0x...`, a last-resort report): use the `d2r-crash` skill and
-knowledge/crash-triage.md. Loader-side surprises (another `default_mod`, the cache-building first start, other
-plugins, stored key bindings): knowledge/d2rloader.md.
+${CLAUDE_PLUGIN_ROOT}/knowledge/crash-triage.md. Loader-side surprises (another `default_mod`, the cache-building first start, other
+plugins, stored key bindings): ${CLAUDE_PLUGIN_ROOT}/knowledge/d2rloader.md.
 
 ## Where to look (newest first)
 - `<game>/d2rloader/logs/d2rloader.log`: load steps and **asserts after "startup complete"** (data errors name
@@ -22,7 +24,7 @@ plugins, stored key bindings): knowledge/d2rloader.md.
 - Hangs: dump the busy thread (MiniDumpWriteDump) a few times; repeated instruction pointers mark the loop.
 
 ## Symptom -> usual cause
-See knowledge/debugging.md for the full table. Most common:
+See ${CLAUDE_PLUGIN_ROOT}/knowledge/debugging.md for the full table. Most common:
 - **Skill plays the knockback/get-hit animation**: `anim` = `GH` (get hit) instead of `SQ`; or plrmode Code changed.
 - **Crash the moment a sequence skill is used**: anim `SQ` but the mode lookup failed (plrmode/monmode codes must
   stay D2R's: SQ, KB).
@@ -32,7 +34,7 @@ See knowledge/debugging.md for the full table. Most common:
 - **Item picture missing / vendor crash**: base item code missing from data/hd/items/items.json - `item_hd` op.
 - **Character missing from character select**: the save no longer matches (checksum, .d2rl hashes, or more class
   skills than the save format holds). Restore the backup; edit saves only with `modkit save-set`.
-- **Load assert about states or level types**: engine limits (knowledge/engine-limits.md); needs a plugin or fewer rows.
+- **Load assert about states or level types**: engine limits (${CLAUDE_PLUGIN_ROOT}/knowledge/engine-limits.md); needs a plugin or fewer rows.
 - **Strings crash on a message**: a key D2R formats itself got different `%s/%d` placeholders.
 - **Crash or hang on picking up / wearing one item type** (assert ItemMode.cpp:676): itemtypes ids shifted; D2R's
   rows must keep D2R's numbers (`warl` 67).

@@ -5,8 +5,10 @@ description: Create a new Diablo II Resurrected skill, or rework an existing one
 
 # Make a D2R skill
 
+Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you are inside the toolkit repo: use its root). Run `python -m modkit` with that folder as the working directory and the mod project as an argument.
+
 You turn a skill idea into a `skill` op in a modkit project, build it, check it, and hand the user a test list.
-Read `knowledge/engine-limits.md` once per session if you haven't; it lists what D2R hard-codes.
+Read `${CLAUDE_PLUGIN_ROOT}/knowledge/engine-limits.md` once per session if you haven't; it lists what D2R hard-codes.
 
 ## 1. Pin the design down
 Ask only what changes the build: class (or item/monster-only), which existing skill it replaces (if a class skill:
@@ -21,7 +23,7 @@ cltstopfunc) plus columns those functions read. You cannot invent behaviour in d
   functions match the idea is the `clone`. Its columns tell you which ones the function reads (Param1-8, calc1-4,
   aurastate, srvmissile*, sumskill*, ...).
 - Behaviour no vanilla function has (e.g. a fan of missiles with a twist) needs a plugin function: use the
-  d2r-engine skill (plugin-template/src/skill_functions.cpp shows one in free slot 172), then set srvdofunc to
+  d2r-engine skill (${CLAUDE_PLUGIN_ROOT}/plugin-template/src/skill_functions.cpp shows one in free slot 172), then set srvdofunc to
   that slot. Prefer data whenever a vanilla function is close enough.
 
 ## 3. Class skills: replace, don't add
@@ -46,7 +48,7 @@ Add it to `<project>/patches/NNN-<topic>.json`:
   "hdSequenceLike": "Whirlwind"
 }]}
 ```
-All fields are documented at the top of `modkit/skill.py`. Rules that bite:
+All fields are documented at the top of `${CLAUDE_PLUGIN_ROOT}/modkit/skill.py`. Rules that bite:
 - **Damage**: `EType` / `EMin` / `EMax` / `EMinLev1-5` / `EMaxLev1-5` (elemental), `MinDam`/`MaxDam` +
   `MinLevDam1-5` (physical), all scaled by `HitShift` (8 = whole points, lower = fractions of a point; keep the
   clone's), `ELen` + `ELevLen1-3` in frames (25 per second) for cold/poison/burn lengths, `SrcDam` = share of weapon
@@ -76,9 +78,9 @@ other tables name it (`python -m modkit find monstats Skill1=<old>`, charstats S
 ## Traps from ports
 - `rightskill 1` on every active skill, innate charstats skills too, or it can't go on the right button.
 - Raven-AI pets read their attack count from `calc3`; empty = the pet dies at once.
-- New server do functions at 172-190; classic 153-171 and 109 are D2R's now (knowledge/engine-limits.md).
+- New server do functions at 172-190; classic 153-171 and 109 are D2R's now (${CLAUDE_PLUGIN_ROOT}/knowledge/engine-limits.md).
 - Hit-6 missiles spawn the monstats row in `sHitPar1`.
-- Class-less skills share one 62-icon HD sheet (knowledge/hd-graphics.md).
+- Class-less skills share one 62-icon HD sheet (${CLAUDE_PLUGIN_ROOT}/knowledge/hd-graphics.md).
 
 ## 6. Hand over
 Install only with the game closed (`python -m modkit install <project>`), then give the user a short test list in

@@ -5,7 +5,9 @@ description: Change Diablo II Resurrected's HD user interface in a modkit mod - 
 
 # HD UI: layouts, panels and grids
 
-Read knowledge/ui-layouts.md first. D2R's HD UI = layout files `data/global/ui/layouts/*hd.json` (widget trees)
+Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you are inside the toolkit repo: use its root). Run `python -m modkit` with that folder as the working directory and the mod project as an argument.
+
+Read ${CLAUDE_PLUGIN_ROOT}/knowledge/ui-layouts.md first. D2R's HD UI = layout files `data/global/ui/layouts/*hd.json` (widget trees)
 + sprites under `data/hd/global/ui/`. Controller layouts are separate files (`*controller*` / `*hd.json` pairs):
 change both if the mod supports controllers.
 

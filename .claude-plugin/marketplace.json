@@ -1,0 +1,12 @@
+{
+  "name": "d2r-local",
+  "description": "Local marketplace for the D2R toolkit checkout.",
+  "owner": { "name": "synpoox" },
+  "plugins": [
+    {
+      "name": "d2r-toolkit",
+      "source": "./",
+      "description": "D2R modkit skills; their links to knowledge/, docs/ and templates/ resolve from any project."
+    }
+  ]
+}

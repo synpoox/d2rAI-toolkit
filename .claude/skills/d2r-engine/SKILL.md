@@ -5,20 +5,22 @@ description: Change Diablo II Resurrected engine behaviour that game data cannot
 
 # Engine work: D2RLoader plugins and reverse engineering
 
-Data first: check knowledge/engine-limits.md and the vanilla function catalogs (`python -m modkit functions`)
-before writing code. When code is needed, read knowledge/engine-re.md and knowledge/d2r-93847-addresses.md, and
-knowledge/d2rloader.md for what the loader does on players' machines. Porting a classic engine DLL: the `d2r-port`
+Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you are inside the toolkit repo: use its root). Run `python -m modkit` with that folder as the working directory and the mod project as an argument.
+
+Data first: check ${CLAUDE_PLUGIN_ROOT}/knowledge/engine-limits.md and the vanilla function catalogs (`python -m modkit functions`)
+before writing code. When code is needed, read ${CLAUDE_PLUGIN_ROOT}/knowledge/engine-re.md and ${CLAUDE_PLUGIN_ROOT}/knowledge/d2r-93847-addresses.md, and
+${CLAUDE_PLUGIN_ROOT}/knowledge/d2rloader.md for what the loader does on players' machines. Porting a classic engine DLL: the `d2r-port`
 skill first. A whole new game system (a mapping system, a new crafting bench, a new panel): plan it with
-knowledge/new-game-systems.md first (player steps, data vs plugin split, an RE spike for every hook, where state
+${CLAUDE_PLUGIN_ROOT}/knowledge/new-game-systems.md first (player steps, data vs plugin split, an RE spike for every hook, where state
 lives), then build it part by part with this skill.
 
 ## The plugin
-1. Copy `plugin-template/` into the mod project (e.g. `<project>/plugin/`), build with
+1. Copy `${CLAUDE_PLUGIN_ROOT}/plugin-template/` into the mod project (e.g. `<project>/plugin/`), build with
    `powershell -ExecutionPolicy Bypass -File plugin\build.ps1 -Name <mod>-core` (point `-Sdk` at this repo's
-   `third_party/PluginSDK`). Add the DLL path to mod.json `plugins`; `modkit install` copies it to
+   `${CLAUDE_PLUGIN_ROOT}/third_party/PluginSDK`). Add the DLL path to mod.json `plugins`; `modkit install` copies it to
    `<game>/mods/<Mod>/d2rloader/plugins/`. Players run the mod through D2RLoader. Keep `src/plugin.rc` (the ABI
    manifest resource) in every plugin, including one written from scratch: without it D2RLoader rejects the DLL as
-   "an old alpha plugin" (knowledge/d2rloader.md).
+   "an old alpha plugin" (${CLAUDE_PLUGIN_ROOT}/knowledge/d2rloader.md).
 2. The plugin only hooks the exact game image it was written for (PE timestamp check, 0x6ab3782c = D2R 3.3.0
    build 93847 under D2RLoader 1.3.1). After a game or loader update: re-dump, re-find every address, update.
 3. Keep the template's guards on: build guard (image stamp, off on mismatch), environment guard (other plugins,
@@ -42,9 +44,9 @@ lives), then build it part by part with this skill.
   with the slot's current bytes as expected (zero for empty slots).
 
 ## Finding code (Ghidra)
-1. With the game running through D2RLoader: `python tools/dump_image.py` (D2R's code is encrypted on disk; the
-   dump is the in-memory image, RVA = address - image base). Analyse once: `tools/ghidra_analyze.ps1` (hours).
-2. Query read-only: `powershell -ExecutionPolicy Bypass -File tools/ghidra_query.ps1 <Script>.java args`:
+1. With the game running through D2RLoader: `python ${CLAUDE_PLUGIN_ROOT}/tools/dump_image.py` (D2R's code is encrypted on disk; the
+   dump is the in-memory image, RVA = address - image base). Analyse once: `${CLAUDE_PLUGIN_ROOT}/tools/ghidra_analyze.ps1` (hours).
+2. Query read-only: `powershell -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}/tools/ghidra_query.ps1 <Script>.java args`:
    `StringXrefs <text>`, `NearRefs`, `Refs <rva>`, `Decompile <rva>`, `Disasm <rva>`, `FindDisp <offset>`
    (users of a struct field), `FindSwitch <bound>` (switches with N cases), `FindPtrTables` (dispatch tables),
    `FuncsInRange <lo> <hi>` (functions in a range, with callers), `RangeAsm <startRva> <endRva>` (instructions in a
@@ -53,7 +55,7 @@ lives), then build it part by part with this skill.
    `D2Common\src\DataTbls\HoradricCube.cpp`): StringXrefs the file name -> NearRefs the descriptor -> Refs the
    tiny assert stub -> the functions of that source file. Then decompile and match by constants, switch shapes and
    record offsets (FindDisp on a data-table offset lists every reader of a table).
-4. Record every confirmed address in knowledge/d2r-93847-addresses.md (or your build's file) with its signature
+4. Record every confirmed address in ${CLAUDE_PLUGIN_ROOT}/knowledge/d2r-93847-addresses.md (or your build's file) with its signature
    and entry bytes.
 
 ## Debug
