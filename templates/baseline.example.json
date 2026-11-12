@@ -1,0 +1,20 @@
+{
+  "note": "Copy to your project as baseline.json and fill in every value. It pins the classic install the port is measured against: shared/classic_import/extract.py refuses any other archives (the DLLs are for reference only and only warn). Changing archives or dlls is a re-baseline, a deliberate commit. extract names the files taken from each archive (lower-case path patterns, fnmatch); changing it only extracts again. Get the hashes with: py -3 -c \"import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],'rb').read()).hexdigest())\" <file>",
+  "install": "<folder of the classic install>",
+  "archives": {
+    "<archive-1>.mpq": "<sha256 of the file>",
+    "<archive-2>.mpq": "<sha256 of the file>"
+  },
+  "dlls": {
+    "<engine>.dll": "<sha256 of the file>"
+  },
+  "extract": {
+    "<archive-1>.mpq": [
+      "*"
+    ],
+    "<archive-2>.mpq": [
+      "data/global/missiles/*.dcc",
+      "data/global/items/*.dc6"
+    ]
+  }
+}

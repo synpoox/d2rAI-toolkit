@@ -9,18 +9,30 @@ Windows is needed to run the game; everything else (locks, config, checks, relea
 | `testing_config.py` | Reads the config and does all the path math (slot folders, save folders, lock folders). |
 | `game_slots.py` | Slots = separate copies of the game install. Setup, sync, lock, unlock, status. |
 | `game_ctl.py` | Starts, stops and drives one slot's game: screenshots, keys, clicks, console commands. |
-| `check_helpers.py` | `pair` (warp, light up, HD|legacy side-by-side PNG) and `moved` (did the character move?), run as `game_ctl.py` subcommands. |
+| `check_helpers.py` | `pair` (warp, light up, HD \| legacy side-by-side PNG) and `moved` (did the character move?), run as `game_ctl.py` subcommands; also the shared plugin-log reader (`plugin_log_path`). |
 | `check_helpers.py` (`plugin_log`, `plugin_log_path`) | A plugin's log since its last load line, from the mod, game-wide or configured log, for checks to read. |
 | `lod_checks.py` | Reusable Lord of Destruction checks: plugin loaded, read and verify a `.d2s`, Save and Exit, create / save / reload a character. Plugin, mod and character are parameters. |
 | `menu_layout.py` | Menu click positions (fractions of the window) for `lod_checks`; measured for D2R 3.3 at 1920x1080, re-measure for another version. |
 | `game_checks.py` | Small checks framework: `@check` registry, runner, results JSON, summary, screenshots. |
 | `example_checks.py` | Example checks to copy (`config-sane`, `game-starts`, `main-menu-visible`, `console-echo`, `no-new-crash-files`). |
+| `d2r_only.py` | Checks for content the mod switches off (Terror Zones, Heralds, the Colossal Summit portal). Its in-game parts leave town: tag them `leaves-town` and run them only on a slot locked for out-of-town checks. |
+| `stock_checks.py` | Stock checks for any mod (`slot-savepath`: each modinfo savepath is the slot's own save folder). List it in `checks.modules` to use it. |
 | `slot_registry.py` | The slot-to-owner table (`~/.d2r-modkit/slots.toml`, machine config): which project may lock which slot. |
 | `warps.py` | `cheat goto` lines (and a markdown doc for a list of levels) for a DS1 map's centre, waypoints and boss presets. |
 | `slot_install.py` | Installs a built mod project into a slot (`modkit install`), keeping the slot's own savepath. |
 | `force_ds1.py` | Test-only: pins a level to one DS1 variant in a slot's installed `lvlprest.txt`, so a warp lands on the preset under test. |
 | `unit_probe.py` | Reads the client's units (monsters, missiles) from a running game, read-only, build 93847 only. |
 | `release_install.py` | Installs the PUBLISHED release into a slot, as a player would get it. |
+| `stats.py` | Rate checks for random outcomes (drop, proc, block): `count`, `tolerance_for`, `assert_rate`. |
+| `lod_checks.py` | Checks and helpers for a Lord of Destruction character: plugin loaded, save read, save and exit, create, reload, delete. |
+| `menu_layout.py` | Where the 3.3 menu buttons are, as fractions of a 1920x1080 client, for `lod_checks.py`. |
+| `image_bytes.py` | Reads the game image's PE stamp and classifies byte spans, so a check can see that an engine patch is in. The PE stamp tells which build; `classify` tells stock bytes from patched ones. |
+| `save_edit.py` | Edits a `.d2s` save for a test (unlock difficulties, set the current location), checksum fixed. |
+| `d2r_only.py` | Checks that a mod switched off D2R 3.3's Terror Zones, Heralds and Colossal Summit portal: data checks plus in-game purple scans. |
+| `contact_sheet.py` | Turns a folder of HD \| legacy pair PNGs into one contact sheet plus brightness and black-pixel numbers. |
+| `warps.py` | `cheat goto` lines for a DS1 map's centre, waypoints and boss presets, from a data folder. |
+| `force_ds1.py` | Pins a level to one DS1 variant in a slot's installed `lvlprest.txt`, so a warp lands on the preset under test. |
+| `stock_checks.py` | Checks any mod can list in `checks.modules`: `slot-savepath`. |
 
 ## Quick start
 
@@ -35,6 +47,32 @@ MODKIT_RUN=my-lane python testing/game_slots.py unlock 2 my-lane
 
 `python testing/game_checks.py list` shows the checks. Results: `<runs.dir>/<run id>/results.json`,
 `summary.txt` and `screenshots/`. Exit code 0 = no failures, 1 = a check failed, 2 = bad usage or slot not available.
+
+## Fixture pattern: one tiny mod per check
+
+A check that needs a game rule in a known state does not depend on the real mod's data. It ships a **fixture**: the
+smallest mod that sets only that rule, installed into a slot for the run.
+
+```
+tests/game/fixtures/<check name>/
+  mod.json                  name (= mod.folder), savepath, title ("<mod> (<check> game check)"), version 0.0.0, plugins []
+  patches/010-<check>.json  the data change: the rows or values the check needs, nothing else
+```
+
+- `mod.json` `name` must equal the testing config's `mod.folder` (the real mod's folder name); `slot_install.py`
+  refuses any other name ("is mod X but mod.folder is Y"). Name the fixture's folder after the check, but keep `name`
+  as the real mod's. Give the title the word "check" so a fixture install cannot be mistaken for a release.
+- What keeps a fixture character out of the user's saves: `slot_install.py` writes the slot's own savepath
+  (`<saves.slot_name>/`) whatever `mod.json` says, and `slot-savepath` in `stock_checks.py` checks it. Use the usual
+  `<name>/` in `mod.json`.
+- One fixture per check, named after the check. The patch holds only the rows that check reads; an empty difference
+  from the base data is a fixture that tests nothing.
+- The check runs `modkit build <fixture>` (its patch applies to vanilla, the extracted game data, so the patch must carry
+  every row the check reads), installs the result with `slot_install.py` (the lock is held, the game is stopped), runs,
+  and the next install of the real project puts the real data back (both write the same mod folder). Never install a fixture into
+  slot 1.
+- Keep fixtures in the repo that owns the check (for example `tests/game/fixtures/`). The toolkit ships the pattern and the
+  helpers, not any mod's fixtures.
 
 ## Rules
 

@@ -4,6 +4,10 @@ What each file is
 -----------------
 release.example.toml   The one config every script reads. Copy it to release.toml and edit it. Every key is documented in it.
 release_config.py      Loads the config. `py -3 release/release_config.py get site.url`, `... check`.
+stage.py               The project half of a release: folds changelog.d/ fragments, checks the game image and item type
+                       ids, lays out the installed mod folder ([stage] in release.toml), runs package_release.py and
+                       writes the changelog section as the notes. Fragments go only after a successful run.
+changelog.py           Fragment folding and the `### <version> (<date>)` notes section (used by stage.py).
 package_release.py     Mod folder -> dist/: <Folder>-<v>.7z, downloader-manifest.json (schema 2), notes, SHA256SUMS;
                        with [catalog] also release-manifest.json + feed.json (schema 3, the Resurrected launcher).
                        Also importable: find_7z, write_7z, file_list, empty_dirs, forbidden_files, sha256.

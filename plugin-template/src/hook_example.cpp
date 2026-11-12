@@ -1,7 +1,7 @@
 // Inline hook example: D2R's Whirlwind hit delay (build 93847), passed through unchanged and counted.
 //
-// 0x56ac00 (unit, weapon) -> frames until Whirlwind's next hit. Only Whirlwind's do function (0x568f40) calls it, so
-// the hook runs whenever a Whirlwind is in progress (the status command shows the count). To change behaviour (for
+// 0x56ac00 (unit, weapon) -> frames until Whirlwind's next hit. Only Whirlwind's do function calls it (its body is at 0x568f40; slot 76 of the do table holds a jmp thunk at
+// 0x568f30), so the hook runs whenever a Whirlwind is in progress (the status command shows the count). To change behaviour (for
 // example a classic mod's own hit delays), return your own value.
 //
 // The pattern, for any function:

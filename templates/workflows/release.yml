@@ -1,0 +1,134 @@
+name: release
+
+# Template: copy to .github/workflows/release.yml in a mod repository.
+# The full build and the release package, run by hand (Actions > release > Run workflow) from the default branch (other
+# branches are refused). It runs only on the owner's self-hosted runner: it needs the game's files, which never go to
+# GitHub (README.md in this folder). Two jobs: "build" (read-only token) validates, packages and uploads the package as
+# a workflow artifact; "publish" (needs build, the only job with write access) turns it into a GitHub release
+# v<version> marked Latest, with the package and its checksums. Validation must pass: a failing validation stops the run.
+# The release is made from the build, so the version in VERSION_FILE must be new: the publish job fails if the tag
+# v<version> already exists (as a release or as a bare tag).
+# Changelog: fold the fragments (release/changelog.py) and commit before releasing. The build fails while changelog.d/
+# still has fragments, because folding them only on the runner would repeat them in the next release.
+# Repository variables: RUNNER_LABELS, D2R_TOOLKIT, D2R_GAME, MODKIT_CACHE_DIR, VERSION_FILE, RELEASE_TITLE
+# (README.md has the defaults; D2R_TOOLKIT and D2R_GAME have none and must be set).
+on:
+  workflow_dispatch:
+
+# Least privilege by default; only the publish job may write (to create the release).
+permissions:
+  contents: read
+
+# One release at a time.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["self-hosted","windows"]') }}
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    env:
+      PYTHONPATH: ${{ vars.D2R_TOOLKIT }}
+      MODKIT_CACHE: ${{ vars.MODKIT_CACHE_DIR || format('{0}\d2r-data', vars.D2R_TOOLKIT) }}
+      MODKIT_GAME: ${{ vars.D2R_GAME }}
+      D2R_TOOLKIT: ${{ vars.D2R_TOOLKIT }}
+      VERSION_FILE: ${{ vars.VERSION_FILE || 'mod.json' }}
+    steps:
+      - name: Check the repository variables
+        run: |
+          if (-not $env:D2R_TOOLKIT -or -not $env:MODKIT_GAME) { throw "set the D2R_TOOLKIT and D2R_GAME repository variables" }
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Changelog is folded
+        run: |
+          # EDIT: the fragments folder, if the mod's release.toml changes it
+          $frag = @(Get-ChildItem changelog.d -Filter *.md -ErrorAction SilentlyContinue | Where-Object Name -ne 'README.md')
+          if ($frag.Count) { throw "changelog.d/ still has $($frag.Count) fragment(s): fold the changelog (release/changelog.py) and commit before releasing" }
+      - name: Version
+        id: version
+        run: |
+          $v = (Get-Content $env:VERSION_FILE -Raw | ConvertFrom-Json).version
+          if (-not $v) { throw "no version in $env:VERSION_FILE" }
+          "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+      - name: Update the toolkit checkout
+        run: git -C "$env:D2R_TOOLKIT" pull -q --ff-only
+        continue-on-error: true  # a dirty or diverged checkout, or another job's pull, must not fail the run
+      - name: Python packages
+        # EDIT: the packages the mod's tools import
+        run: py -3 -m pip install --quiet --disable-pip-version-check numpy Pillow
+      - name: Tool tests
+        run: py -3 -m unittest discover -s tests   # EDIT: the mod's test folder
+      - name: Plugins
+        # EDIT: the mod's plugin build, or delete the step for a data-only mod
+        run: powershell -ExecutionPolicy Bypass -File plugin\build.ps1
+      - name: Merged data
+        run: |
+          # EDIT: the mod's extract, merge, companion-plugin fetch and build commands, in order, each followed by an
+          # exit-code check, for example
+          #   py -3 -m modkit fetch --prefix data/global/; if ($LASTEXITCODE) { throw "modkit fetch failed" }
+          #   py -3 release\companions.py fetch --game $env:MODKIT_GAME --root . --manifest companions.json; if ($LASTEXITCODE) { throw "companions fetch failed" }
+          #   py -3 -m modkit build . --no-validate; if ($LASTEXITCODE) { throw "modkit build failed" }
+          throw "EDIT: fill in the Merged data step"
+      - name: Validation
+        run: py -3 -m modkit validate .
+      - name: Package
+        # The toolkit's stager checks the game image and builds the package (release/stage.py), for the version read
+        # above; use the mod's own packaging command here instead if it has one.
+        run: |
+          py -3 "$env:D2R_TOOLKIT\release\stage.py" --game "$env:MODKIT_GAME" --root . --out dist --version "${{ steps.version.outputs.version }}"
+          if ($LASTEXITCODE) { throw "stage.py failed" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: |
+            dist/*.7z
+            dist/*.zip
+            dist/RELEASE_NOTES-*.md
+            dist/release-manifest.json
+            dist/feed.json
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: validation
+          path: out/validation.md
+          if-no-files-found: ignore
+          retention-days: 14
+
+  publish:
+    needs: build
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["self-hosted","windows"]') }}
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TITLE: ${{ vars.RELEASE_TITLE || 'Release' }}
+      VERSION: ${{ needs.build.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+          path: release-files
+      - name: GitHub release
+        run: |
+          $v = $env:VERSION
+          # the tag must be new: gh would attach a release to an existing bare tag, maybe on another commit
+          gh api "repos/$env:GITHUB_REPOSITORY/git/ref/tags/v$v" --silent 2>$null
+          if ($LASTEXITCODE -eq 0) { throw "tag v$v already exists: bump the version to publish again" }
+          $sums = Get-ChildItem release-files -Recurse -Filter SHA256SUMS | Select-Object -First 1
+          if (-not $sums) { throw "no SHA256SUMS in the build artifact" }
+          $d = $sums.DirectoryName
+          # the assets are what SHA256SUMS lists, plus SHA256SUMS itself
+          $files = @(Get-Content $sums.FullName | Where-Object { $_ } | ForEach-Object { Join-Path $d ($_ -split '  ', 2)[1] }) + $sums.FullName
+          foreach ($f in $files) { if (-not (Test-Path $f)) { throw "missing release asset $f" } }
+          gh release create "v$v" @files --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "$env:RELEASE_TITLE $v" --notes-file (Join-Path $d "RELEASE_NOTES-$v.md") --latest
+          if ($LASTEXITCODE) { throw "gh release create failed" }

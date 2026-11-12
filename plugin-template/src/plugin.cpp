@@ -16,8 +16,8 @@
 //  - installs each part and logs one line per part;
 //  - registers the console command "<plugin>" that prints the state of every part.
 //
-// Adding a part: write Install<Part>(context, report, size) in its own file, add a row to g_parts with a one-word name
-// (the word the off-file uses) and whether it needs the expected image. It shows up in the log and the status command.
+// Adding a part: write Install<Part>(context, report, size) in its own file, add a row to g_parts (parts.h in plugin-common) with a one-word
+// name (the word the off-file uses), whether it needs the expected image and, if wanted, a live state line. It shows up in the log and the status command.
 #include <D2RLPlugin/api.h>
 
 #include "build_guard.h"
@@ -28,12 +28,14 @@
 #include "item_type_check.h"
 #include "log.h"
 #include "off_switch.h"
+#include "parts.h"
 #include "skill_functions.h"
 #include "sound_guard.h"
 
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <iterator>
 
 #ifndef MODKIT_PLUGIN_NAME
 #define MODKIT_PLUGIN_NAME "mod-core"
@@ -68,16 +70,7 @@ constexpr D2RL::PluginInfo Info {
 	.flags       = D2RL::PluginFlags::Shared | D2RL::PluginFlags::ModScopedOnly | D2RL::PluginFlags::NativeHooks,
 };
 
-// --- Parts --------------------------------------------------------------------------------------------------------
-using InstallFn = void (*)(const D2RL::PluginContext* context, char* report, size_t size) noexcept;
-
-struct Part {
-	const char* word;   // off-file word and status label
-	bool engine;        // uses game addresses: installed only on the expected image
-	InstallFn install;
-	char report[512];
-};
-
+// --- Parts (the table and its install/status code are parts.h in plugin-common) ----------------------------------
 void InstallSkills(const D2RL::PluginContext* context, char* report, size_t size) noexcept {
 	char slots[400];
 	const int n = InstallSkillFunctions(context, slots, sizeof(slots));
@@ -101,26 +94,31 @@ void InstallEnvironment(const D2RL::PluginContext* context, char* report, size_t
 	EnvironmentStatus(report, size);
 }
 
-Part g_parts[] = {
-	{"envguard", false, InstallEnvironment, ""},
-	{"soundguard", true, InstallSounds, ""},
-	{"typeids", true, InstallTypeIds, ""},
-	{"skills", true, InstallSkills, ""},
-	{"hook", true, InstallHook, ""},
-};
-
-void InstallParts(const D2RL::PluginContext* context, bool imageOk) noexcept {
-	for (Part& p : g_parts) {
-		if (off_switch::Off(p.word)) {
-			std::snprintf(p.report, sizeof(p.report), "off: left out by %s-off.txt", PluginName);
-		} else if (p.engine && !imageOk) {
-			std::snprintf(p.report, sizeof(p.report), "off: game image differs from the one this plugin was built for");
-		} else {
-			p.install(context, p.report, sizeof(p.report));
-		}
-		plog::Info("%s %s", p.word, p.report);
-	}
+void EnvironmentState(const parts::Part&, char* out, size_t size) noexcept {
+	EnvironmentStatus(out, size);
 }
+
+void SoundState(const parts::Part& part, char* out, size_t size) noexcept {
+	char live[300];
+	SoundGuardStatus(live, sizeof(live));
+	std::snprintf(out, size, "%s | %s", part.report, live);
+}
+
+void HookState(const parts::Part& part, char* out, size_t size) noexcept {
+	if (std::strncmp(part.report, "on", 2) != 0) {
+		std::snprintf(out, size, "%s", part.report);
+		return;
+	}
+	std::snprintf(out, size, "%s (%lld calls)", part.report, static_cast<long long>(HookExampleCalls()));
+}
+
+parts::Part g_parts[] = {
+	{"envguard", false, InstallEnvironment, EnvironmentState},
+	{"soundguard", true, InstallSounds, SoundState},
+	{"typeids", true, InstallTypeIds},
+	{"skills", true, InstallSkills},
+	{"hook", true, InstallHook, HookState},
+};
 
 // --- Console command ----------------------------------------------------------------------------------------------
 auto StatusCommand(D2R::Game::Client* client, const D2RL::ConsoleCommandContext* command, void* userData) noexcept
@@ -140,23 +138,7 @@ auto StatusCommand(D2R::Game::Client* client, const D2RL::ConsoleCommandContext*
 		std::snprintf(line, sizeof(line), "off-file: %s", off_switch::Words());
 		command->plugin->WriteConsoleMessage(line);
 	}
-	for (const Part& p : g_parts) {
-		// live state where the part has one, else its install report
-		char state[sizeof(p.report) + 64];
-		if (std::strcmp(p.word, "envguard") == 0 && !off_switch::Off(p.word)) {
-			EnvironmentStatus(state, sizeof(state));
-		} else if (std::strcmp(p.word, "soundguard") == 0 && std::strncmp(p.report, "off", 3) != 0) {
-			char live[300];
-			SoundGuardStatus(live, sizeof(live));
-			std::snprintf(state, sizeof(state), "%s | %s", p.report, live);
-		} else if (std::strcmp(p.word, "hook") == 0 && std::strncmp(p.report, "on", 2) == 0) {
-			std::snprintf(state, sizeof(state), "%s (%lld calls)", p.report, static_cast<long long>(HookExampleCalls()));
-		} else {
-			std::snprintf(state, sizeof(state), "%s", p.report);
-		}
-		std::snprintf(line, sizeof(line), "%s %s", p.word, state);
-		command->plugin->WriteConsoleMessage(line);
-	}
+	parts::WriteStatus(g_parts, std::size(g_parts), command);
 	OtherPlugins(line, sizeof(line));
 	command->plugin->WriteConsoleMessage(line);
 	plog::Info("%s", line);  // also in the plugin log, for crash reports
@@ -191,7 +173,7 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 	if (!imageOk) {
 		plog::Warn("not the expected game image: every engine part stays off");
 	}
-	InstallParts(context, imageOk);
+	parts::InstallAll(g_parts, std::size(g_parts), context, PluginName, imageOk);
 	return context->RegisterConsoleCommand(PluginName, StatusCommand, "Status of this mod's engine plugin and its guards.");
 }
 

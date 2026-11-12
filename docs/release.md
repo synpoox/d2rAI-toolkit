@@ -380,14 +380,15 @@ The project's own settings for a companion (a filter file, plugin configs) are l
 those files in `d2rloader/config/`. `d2rloader.toml` is refused there: use `loader_settings`, which merges. A top-level
 or per-entry `game` (`"3.3"`, major.minor only, never a build number) is compared with the Version in
 `<game>/.build.info` before `install` copies anything; a mismatch refuses, and an unreadable `.build.info` (Steam) only
-warns. Bump one companion per change, after a
-coexistence check in a test slot. `fetch` never commits anything: `generated/` stays out of the repository.
+warns. Bump one companion per change, after a coexistence check in a test slot. `fetch` never commits anything:
+`generated/` stays out of the repository. The [release stager](#changelog-fragments-and-the-stager) installs the same
+companions into the staged folder.
 
 ## Release notes
 
 `release.sh` and `github_release.py` read the **`### <version>` section** of `CHANGELOG.md` (`repos.changelog`). The
 heading may carry a date after the version (`### 1.0.1 (2026-01-12)`). `### 1.0.1-rc1` is not the section of `1.0.1`.
-The section ends at the next `###` or `##` heading, so use bold labels or `####` inside it:
+The section ends at the next `###` or `##` heading, so use `####` category headings (or bold labels) inside it:
 
 ```markdown
 ## Releases
@@ -396,15 +397,50 @@ The section ends at the next `###` or `##` heading, so use bold labels or `####`
 
 **Restart the game after updating.**
 
-**Fixes**
+#### Fixes
+
 - Fixed a crash when entering the Den of Evil (#17).
 
-**Changed**
+#### Changed
+
 - The downloader now warns when another mod is the loader's default.
 ```
 
 Write for the person playing: one line per change, start with a verb, give the bug number, put what the player must do
 first in bold. No file names, no internal names.
+
+### Changelog fragments and the stager
+
+Pull requests do not edit `CHANGELOG.md`: each adds a small file to `changelog.d/` (format and rules in
+`templates/changelog.d/README.md`), so two PRs never conflict on the changelog. The changelog keeps a `### Unreleased`
+section; in the release commit rename it to `### <version> (<date>)`. `release/stage.py` then does the project half of
+a release in one fail-fast run:
+
+```sh
+py -3 release/stage.py --root path/to/mod --game <D2R folder> [--version 1.2.3] [--out dist]
+```
+
+It folds the fragments in memory and checks the version's section exists, checks the game image (D2R.exe's PE
+timestamp against `game.image_timestamp`, when set) and the item type ids of `out/data`, lays out the installed mod
+folder (`out/data`, modinfo, loader metadata, `stage.plugins` from `stage.plugin_build_dir`, and with
+`stage.companions` the [companion plugins](#companion-plugins) and the vanilla tables they read), runs
+`package_release.py`, and writes the changelog section as the release notes. The fragments are deleted only after all of
+that succeeded. The `[stage]` and `repos.fragments` keys are in `release/release.example.toml`.
+
+The stager refuses a `mod.json` `name` that is not a single plain folder name or differs from `mod.folder`, and it
+runs `package_release.py` in the project folder, so `--root` works from any folder. It leaves only the release assets
+in the output folder (the staged mod folder is removed). `repos.fragments` must be a folder below the project, not the
+changelog's own folder. Fragments fold into the `### <version> (<date>)` section when it exists, else into
+`### Unreleased`.
+
+To fold the fragments into the changelog yourself (for example before the release commit, or because a workflow
+refuses to run while `changelog.d/` has fragments), run:
+
+```sh
+py -3 release/changelog.py fold --root path/to/mod --version 1.2.3
+```
+
+It adds each fragment to the version's section (else `### Unreleased`) and deletes the fragments; commit the result.
 
 ## Release manifest
 
