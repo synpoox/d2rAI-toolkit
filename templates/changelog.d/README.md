@@ -35,3 +35,6 @@ changelog and the fragments are exactly as before.
 
 Paths come from `release.toml`: `repos.changelog` (default `CHANGELOG.md`) and `repos.fragments` (default
 `changelog.d`).
+
+To fold the fragments yourself (a release workflow may ask for this before it runs), use
+`py -3 release/changelog.py fold --root . --version 1.2.3`: it adds them to the changelog and deletes them.

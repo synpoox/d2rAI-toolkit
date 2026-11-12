@@ -20,6 +20,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import re
 import shutil
 import struct
 import subprocess
@@ -75,12 +76,36 @@ def check_item_types(out_data: Path) -> None:
         raise ReleaseError("itemtypes.txt does not keep D2R's item type ids:\n  " + "\n  ".join(problems))
 
 
+def read_mod_json(root: Path) -> dict:
+    """mod.json as a dict; a missing or broken file is a ReleaseError."""
+    try:
+        mod = json.loads((Path(root) / "mod.json").read_text("utf-8"))
+    except (OSError, ValueError) as e:
+        raise ReleaseError(f"cannot read {Path(root) / 'mod.json'}: {e}")
+    if not isinstance(mod, dict):
+        raise ReleaseError(f"{Path(root) / 'mod.json'} is not a JSON object")
+    return mod
+
+
+def check_name(mod: dict, cfg: dict) -> str:
+    """mod.json's name as a single plain folder name that equals mod.folder (the folder the release ships)."""
+    name = mod.get("name")
+    if not isinstance(name, str) or not name.strip():
+        raise ReleaseError("mod.json has no name")
+    if name in (".", "..") or name != name.strip() or any(c in name for c in "/\\:") or not name.isprintable():
+        raise ReleaseError(f"mod.json name {name!r} must be a single plain folder name (no /, \\, : and not . or ..)")
+    folder = cfg["mod"]["folder"]
+    if name != folder:
+        raise ReleaseError(f"mod.json is mod {name!r} but mod.folder is {folder!r}")
+    return name
+
+
 def stage(root: Path, out: Path, cfg: dict, read: Callable[[str], bytes] | None = None) -> Path:
     """Lay out the installed mod folder in out/<name>/ (emptied first), as modkit install and companions install do."""
     root = Path(root)
     s = cfg["stage"]
-    mod = json.loads((root / "mod.json").read_text("utf-8"))
-    name = mod["name"]
+    mod = read_mod_json(root)
+    name = check_name(mod, cfg)  # before anything is deleted: the name is a folder under `out`
     build_dir = root / s["plugin_build_dir"]
     dlls = [build_dir / f"{p}.dll" for p in s["plugins"]]
     needed = [root / "out" / "data", *dlls]
@@ -141,33 +166,53 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--config", type=Path, help="release.toml (default: <root>/release.toml)")
     a = ap.parse_args(argv)
     root = a.root.resolve()
+    config_path = (a.config or root / "release.toml").resolve()
     try:
-        cfg = release_config.load(a.config or root / "release.toml", required=True)
+        cfg = release_config.load(config_path, required=True)
     except release_config.ConfigError as e:
         print(f"release: {e}", file=sys.stderr)
         return 1
-    out = a.out or root / cfg["package"]["dist"]
-    mod_json = json.loads((root / "mod.json").read_text("utf-8"))
-    version = a.version or mod_json["version"]
+    out = (a.out or root / cfg["package"]["dist"]).resolve()
+    try:
+        try:
+            return run(a, root, out, config_path, cfg)
+        except (cl.ChangelogError, ReleaseError, comp.CompanionError) as e:
+            print(f"release: {e}", file=sys.stderr)
+            return 1
+    finally:
+        shutil.rmtree(out / "mod", ignore_errors=True)  # the staged copy; the release assets stay
+
+
+def run(a, root: Path, out: Path, config_path: Path, cfg: dict) -> int:
+    mod_json = read_mod_json(root)
+    version = str(a.version or mod_json.get("version") or "").strip().lstrip("v")
+    if not re.fullmatch(r"\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?", version):
+        raise ReleaseError(f"version {version!r} is not like 1.2.3 or 1.2.3-rc1 (give --version, or set it in mod.json)")
+    check_name(mod_json, cfg)
     log = root / cfg["repos"]["changelog"]
     frag = cfg["repos"]["fragments"]
-    before = log.read_text("utf-8")
     exe = a.game / "D2R.exe"
+    text, fragments = cl.pending(root, version, cfg["repos"]["changelog"], frag)
+    before = log.read_text("utf-8")
+    section = cl.notes_section(text, version)  # checked before anything is written or deleted
+    if exe.is_file():
+        check_game_image(cfg, exe)
+    elif cfg["game"].get("image_timestamp"):
+        raise ReleaseError(f"{exe} missing: the game image cannot be checked")
+    if cfg["stage"]["item_type_check"]:
+        check_item_types(root / "out" / "data")
+    base = []
+
+    def read(rel: str) -> bytes:  # the game storage is opened only when a companion reads vanilla tables
+        if not base:
+            sys.path.insert(0, str(TOOLKIT))
+            from modkit.base import Base  # this toolkit
+            base.append(Base(a.game))
+        return base[0].bytes(rel)
     try:
-        text, fragments = cl.pending(root, version, cfg["repos"]["changelog"], frag)
-        section = cl.notes_section(text, version)  # checked before anything is written or deleted
-        if exe.is_file():
-            check_game_image(cfg, exe)
-        elif cfg["game"].get("image_timestamp"):
-            raise ReleaseError(f"{exe} missing: the game image cannot be checked")
-        if cfg["stage"]["item_type_check"]:
-            check_item_types(root / "out" / "data")
-        sys.path.insert(0, str(TOOLKIT))
-        from modkit.base import Base  # this toolkit
-        mod = stage(root, out / "mod", cfg, Base(a.game).bytes)
-    except (cl.ChangelogError, ReleaseError, comp.CompanionError) as e:
-        print(f"release: {e}", file=sys.stderr)
-        return 1
+        mod = stage(root, out / "mod", cfg, read)
+    except OSError as e:  # no game storage, no cache, a locked file
+        raise ReleaseError(f"cannot stage the mod folder: {e}")
     folded = bool(fragments)
     if folded:  # package_release reads the changelog, so fold it now; the fragments go only once the release is done
         log.write_text(text, "utf-8", newline="\n")
@@ -177,10 +222,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         try:
             cmd = [sys.executable, str(HERE / "package_release.py"), "--mod-dir", str(mod), "--version", version,
-                   "--config", str(a.config or root / "release.toml"), "--out", str(out)]
+                   "--config", str(config_path), "--out", str(out)]
             if exe.is_file():
                 cmd += ["--game-exe", str(exe)]  # [catalog] (schema 3) pins the game build from it
-            code = subprocess.run(cmd).returncode
+            code = subprocess.run(cmd, cwd=root).returncode  # its relative paths (changelog, dist) are the project's
             if not code:
                 finish_notes(out, version, section)
         except ReleaseError as e:

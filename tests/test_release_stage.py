@@ -2,6 +2,7 @@
 Run: python -m unittest discover tests"""
 import hashlib
 import json
+import os
 import struct
 import sys
 import tempfile
@@ -46,6 +47,33 @@ class FoldTests(unittest.TestCase):
         self.assertIn("- C.\n", cl.fold(RELEASE_LOG, "0.2.0", ["#### Maps\n- C.\n"]))
         with self.assertRaises(cl.ChangelogError):
             cl.fold(LOG.replace("Unreleased", "Soon"), "0.2.0", ["- C.\n"])
+
+    def test_the_versions_section_wins_over_an_unreleased_one(self):
+        both = "### Unreleased\n\n- Soon.\n\n" + RELEASE_LOG.split("# Changelog\n\n", 1)[1]
+        out = cl.fold("# Changelog\n\n" + both, "0.2.0", ["#### Maps\n- C.\n"])
+        self.assertEqual(cl.notes_section(out, "0.2.0").count("- C."), 1)
+        self.assertNotIn("- C.", out.split("### 0.2.0")[0])
+
+    def test_the_changelog_is_never_its_own_fragment(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "CHANGELOG.md").write_text(LOG, "utf-8")
+            (root / "x.md").write_text("- Z.\n", "utf-8")
+            self.assertEqual([f.name for f in cl.fragment_files(root, ".", "CHANGELOG.md")], ["x.md"])
+
+    def test_the_command_line_folds_and_reports_a_missing_section(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "changelog.d").mkdir()
+            (root / "CHANGELOG.md").write_text(LOG, "utf-8")
+            (root / "changelog.d" / "1.md").write_text("- Z.\n", "utf-8")
+            self.assertEqual(cl.main(["fold", "--root", str(root), "--version", "v0.2.0"]), 0)
+            self.assertIn("- Z.", (root / "CHANGELOG.md").read_text("utf-8"))
+            self.assertEqual(list((root / "changelog.d").iterdir()), [])
+            (root / "CHANGELOG.md").write_text("# nothing\n", "utf-8")
+            (root / "changelog.d" / "2.md").write_text("- Y.\n", "utf-8")
+            self.assertEqual(cl.main(["fold", "--root", str(root), "--version", "0.2.0"]), 1)
+            self.assertTrue((root / "changelog.d" / "2.md").exists())
 
     def test_folding_fragments_deletes_them_in_file_order(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -101,6 +129,7 @@ class NotesTests(unittest.TestCase):
 
 def config(**stage_over):
     cfg = release_config.defaults()
+    cfg["mod"]["folder"] = "Mod"
     cfg["stage"].update({"plugins": ["one", "two"], **stage_over})
     return cfg
 
@@ -163,6 +192,25 @@ class StageTests(unittest.TestCase):
             with self.assertRaises(stage.ReleaseError):
                 stage.stage(root, Path(tmp) / "stage", config(companions=True), read=lambda rel: b"")
 
+    def test_refuses_an_unsafe_or_mismatched_name_before_deleting_anything(self):
+        for name in ("..", ".", "", "../x", "a/b", "a\\b", "C:x", "/abs"):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp:
+                root = self.project(Path(tmp) / "p")
+                (root / "mod.json").write_text(json.dumps({"name": name, "version": "1.0.0"}))
+                out = Path(tmp) / "out"
+                (out / "mod").mkdir(parents=True)
+                keep = out / "keep.txt"
+                keep.write_text("x")
+                with self.assertRaises(stage.ReleaseError):
+                    stage.stage(root, out / "mod", config(), read=None)
+                self.assertTrue(keep.exists())
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.project(Path(tmp) / "p")
+            cfg = config()
+            cfg["mod"]["folder"] = "Other"
+            with self.assertRaisesRegex(stage.ReleaseError, "is mod 'Mod' but mod.folder is 'Other'"):
+                stage.stage(root, Path(tmp) / "stage", cfg, read=None)
+
     def test_restaging_starts_clean(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.project(Path(tmp) / "p")
@@ -201,24 +249,32 @@ class GuardTests(unittest.TestCase):
 
 
 class MainTests(unittest.TestCase):
-    def run_main(self, run, with_fragment=True, version_section=True):
+    def run_main(self, run, with_fragment=True, version_section=True, args=(), cwd=None, mod_name="M", changelog=True):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         root = Path(tmp.name) / "p"
         root.mkdir()
         log = RELEASE_LOG if version_section else LOG.replace("Unreleased", "Soon")
         (root / "changelog.d").mkdir()
-        (root / "CHANGELOG.md").write_text(log, "utf-8")
-        (root / "mod.json").write_text('{"name": "M", "version": "0.2.0"}', "utf-8")
-        (root / "release.toml").write_text('[stage]\nitem_type_check = false\n', "utf-8")
+        self.root = root
+        self.log = log
+        if changelog:
+            (root / "CHANGELOG.md").write_text(log, "utf-8")
+        (root / "mod.json").write_text(json.dumps({"name": mod_name, "version": "0.2.0"}), "utf-8")
+        (root / "release.toml").write_text('[mod]\nfolder = "M"\n[stage]\nitem_type_check = false\n', "utf-8")
         if with_fragment:
             (root / "changelog.d" / "1-a.md").write_text("#### Items\n- X.\n", "utf-8")
         game = Path(tmp.name) / "game"
         game.mkdir()
-        with mock.patch.object(stage, "stage", return_value=root / "mod"), \
+        if cwd:
+            old = os.getcwd()
+            os.chdir(cwd)
+            self.addCleanup(os.chdir, old)
+        with mock.patch.object(stage, "stage", return_value=root / "mod") as staged, \
                 mock.patch.dict(sys.modules, {"modkit": mock.MagicMock(), "modkit.base": mock.MagicMock()}), \
                 mock.patch.object(stage.subprocess, "run", side_effect=run):
-            code = stage.main(["--game", str(game), "--root", str(root), "--out", str(root / "dist")])
+            code = stage.main(["--game", str(game), "--root", str(root), "--out", str(root / "dist"), *args])
+        self.staged = staged
         return root, code, log
 
     def assert_restored(self, root, log):
@@ -243,6 +299,62 @@ class MainTests(unittest.TestCase):
     def test_a_raising_package_release_restores_the_changelog_and_propagates(self):
         with self.assertRaises(FileNotFoundError):
             self.run_main(FileNotFoundError("no python"))
+        self.assert_restored(self.root, self.log)
+
+    def test_runs_package_release_in_the_project_from_any_folder(self):
+        seen = []
+
+        def run(cmd, **k):
+            seen.append((k.get("cwd"), cmd[cmd.index("--out") + 1], cmd[cmd.index("--config") + 1]))
+            return mock.Mock(returncode=3)
+        elsewhere = tempfile.TemporaryDirectory()
+        self.addCleanup(elsewhere.cleanup)
+        root, code, log = self.run_main(run, cwd=elsewhere.name)
+        self.assertEqual(len(seen), 1)
+        cwd, out, config_path = seen[0]
+        self.assertEqual(Path(cwd).resolve(), root.resolve())
+        self.assertTrue(Path(out).is_absolute() and Path(config_path).is_absolute())
+
+    def test_a_leading_v_in_the_version_is_dropped_and_a_bad_version_refused_early(self):
+        seen = []
+
+        def run(cmd, **k):
+            seen.append(cmd[cmd.index("--version") + 1])
+            return mock.Mock(returncode=3)
+        self.run_main(run, args=["--version", "v0.2.0"])
+        self.assertEqual(seen, ["0.2.0"])
+        root, code, log = self.run_main(run, args=["--version", "banana"])
+        self.assertEqual((code, seen), (1, ["0.2.0"]))
+        self.assert_restored(root, log)
+
+    def test_bad_inputs_are_clean_errors(self):
+        ok = lambda *a, **k: mock.Mock(returncode=0)  # noqa: E731
+        root, code, log = self.run_main(ok, changelog=False)  # no changelog
+        self.assertEqual(code, 1)
+        for name in ("..", "Other"):  # unsafe name, name != mod.folder: nothing staged
+            root, code, log = self.run_main(ok, mod_name=name)
+            self.assertEqual(code, 1)
+            self.staged.assert_not_called()
+            self.assert_restored(root, log)
+
+    def test_a_broken_mod_json_is_a_clean_error(self):
+        root, code, log = self.run_main(lambda *a, **k: mock.Mock(returncode=0))
+        (root / "mod.json").write_text("{not json", "utf-8")
+        self.assertRaises(stage.ReleaseError, stage.read_mod_json, root)
+        with mock.patch.object(stage, "read_mod_json", side_effect=stage.ReleaseError("bad")):
+            code = stage.main(["--game", str(root), "--root", str(root)])
+        self.assertEqual(code, 1)
+
+    def test_the_staged_copy_is_removed_after_success(self):
+        def run(cmd, **k):
+            out = Path(cmd[cmd.index("--out") + 1])
+            (out / "mod").mkdir(parents=True, exist_ok=True)
+            (out / "RELEASE_NOTES-0.2.0.md").write_text(SKELETON)
+            (out / "SHA256SUMS").write_text(f"{'0' * 64}  RELEASE_NOTES-0.2.0.md\n")
+            return mock.Mock(returncode=0)
+        root, code, log = self.run_main(run)
+        self.assertEqual(code, 0)
+        self.assertFalse((root / "dist" / "mod").exists())
 
     def test_success_folds_then_deletes_the_fragments_and_writes_the_notes(self):
         def run(cmd, **k):
@@ -259,6 +371,19 @@ class MainTests(unittest.TestCase):
 
 
 class ConfigTests(unittest.TestCase):
+    def test_fragments_must_be_a_folder_below_the_project(self):
+        for bad in (".", "", "../x", "a/../..", "/abs", "C:/x"):
+            cfg = release_config.defaults()
+            cfg["repos"]["fragments"] = bad
+            with self.subTest(bad=bad), self.assertRaises(release_config.ConfigError):
+                release_config.validate(cfg)
+        cfg = release_config.defaults()
+        cfg["repos"].update({"changelog": "docs/CHANGELOG.md", "fragments": "docs"})
+        with self.assertRaises(release_config.ConfigError):
+            release_config.validate(cfg)
+        cfg["repos"]["fragments"] = "docs/changelog.d"
+        release_config.validate(cfg)
+
     def test_stage_defaults_and_plugin_names(self):
         cfg = release_config.defaults()
         self.assertEqual(cfg["stage"]["plugins"], [])

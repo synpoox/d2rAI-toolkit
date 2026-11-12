@@ -427,6 +427,21 @@ folder (`out/data`, modinfo, loader metadata, `stage.plugins` from `stage.plugin
 `package_release.py`, and writes the changelog section as the release notes. The fragments are deleted only after all of
 that succeeded. The `[stage]` and `repos.fragments` keys are in `release/release.example.toml`.
 
+The stager refuses a `mod.json` `name` that is not a single plain folder name or differs from `mod.folder`, and it
+runs `package_release.py` in the project folder, so `--root` works from any folder. It leaves only the release assets
+in the output folder (the staged mod folder is removed). `repos.fragments` must be a folder below the project, not the
+changelog's own folder. Fragments fold into the `### <version> (<date>)` section when it exists, else into
+`### Unreleased`.
+
+To fold the fragments into the changelog yourself (for example before the release commit, or because a workflow
+refuses to run while `changelog.d/` has fragments), run:
+
+```sh
+py -3 release/changelog.py fold --root path/to/mod --version 1.2.3
+```
+
+It adds each fragment to the version's section (else `### Unreleased`) and deletes the fragments; commit the result.
+
 ## Release manifest
 
 `release-manifest.json`, `schemaVersion` **2**. The packager writes it; the publisher adds `objectsBase` and `launcher`;
