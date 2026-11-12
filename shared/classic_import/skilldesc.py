@@ -16,8 +16,8 @@ part of the toolkit. `Mapping` fields:
               lays the key out; "swap" is text b, then text a (format, then skill name); "b" is text b alone; "copy" is the
               skill's own D2R line naming the key, calcs included (D2R function and calc are None). `calc(a, b)` rebuilds
               calc a/b from the classic ones
-    fixed     (classic function, text a) -> the whole line [function, text a, text b, calc a, calc b]; a calc of None keeps
-              the classic calc a
+    fixed     (classic function, text a) -> the whole line [function, text a, text b, calc a, calc b]; a calc (a or b) of
+              None keeps the classic calc
     keys      classic function -> {classic string key: the D2R key that took its place with another layout}
     builtins  classic function -> {skill element (skills EType, "" any): D2R label} for lines with no text (the game picks
               the label from the skill): the skill's own D2R line with one of the function's labels is copied, else D2R's
@@ -56,6 +56,8 @@ def hide_off_tree(t: Table) -> None:
     """SkillPage 0 for each row the source keeps out of the tree (SkillRow 0): a classic client hides those, D2R draws
     them in the page's first cell."""
     col = {c.lower(): j for j, c in enumerate(t.header)}
+    if "skillpage" not in col or "skillrow" not in col:
+        raise ValueError("hide_off_tree: the table has no SkillPage and SkillRow columns (is it skilldesc?)")
     page, row = col["skillpage"], col["skillrow"]
     for r in t.rows:
         if r[row] in ("", "0"):
@@ -145,6 +147,7 @@ def rewrite(t: Table, d2r: Table, fmt: set[str], mapping: Mapping, elements: dic
         if (f, a) in mapping.fixed:
             new = list(mapping.fixed[(f, a)])
             new[3] = ca if new[3] is None else new[3]
+            new[4] = cb if new[4] is None else new[4]
         elif f in mapping.builtins and not a:
             labels = mapping.builtins[f]
             label = labels.get(elements.get(r[0].lower(), ""), labels.get(""))
@@ -158,7 +161,7 @@ def rewrite(t: Table, d2r: Table, fmt: set[str], mapping: Mapping, elements: dic
             if how == "copy":  # a source-only skill takes D2R's most common line for the key
                 common = Counter(tuple(x) for ls in d2r_lines.values() for x in ls if key in x[1:3])
                 new = next((x for x in d2r_lines.get(r[0].lower(), []) if key in x[1:3]),
-                           common and list(common.most_common(1)[0][0]))
+                           list(common.most_common(1)[0][0]) if common else None)
             elif how == "swap":
                 new = [to, b, a, *calc(ca, cb)]
             elif how == "b":
@@ -179,7 +182,10 @@ def rewrite(t: Table, d2r: Table, fmt: set[str], mapping: Mapping, elements: dic
         if any(r[ps[0]] == label for k, _, ps in lines(t) if k == i):
             continue
         common = Counter(tuple(x) for ls in d2r_lines.values() for x in ls if x[1] == label)
-        new = next((x for x in d2r_lines.get(r[0].lower(), []) if x[1] == label), common.most_common(1)[0][0])
+        if not common and not any(x[1] == label for x in d2r_lines.get(r[0].lower(), [])):
+            missing.append(f"{r[0]} {t.header[j]}: no D2R line with {label}")
+            continue
+        new = next((x for x in d2r_lines.get(r[0].lower(), []) if x[1] == label), None) or common.most_common(1)[0][0]
         p, n = LINE.match(t.header[j]).groups()
         col = {c: k for k, c in enumerate(t.header)}
         last = max(int(m[2]) for c in t.header if (m := LINE.match(c)) and m[1] == p)

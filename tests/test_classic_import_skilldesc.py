@@ -122,6 +122,29 @@ class SkilldescTests(unittest.TestCase):
                           ["75", "StrSkillSmiteDamage", "", "pnma", "pxma", "7", "StrWeaponDmg", "", "75", ""]])
 
 
+    def test_a_copy_rule_with_no_d2r_line_fails_naming_the_line(self):
+        merged = table(("only mine", [["19", "OnlyMine", "", "ln12", ""], [], [], [], [], []]))
+        mapping = S.Mapping(lines={"19": (None, "copy", None)})
+        with self.assertRaisesRegex(ValueError, "only mine descline1 19 OnlyMine"):
+            S.rewrite(merged, D2R, FMT, mapping, strings={"OnlyMine": "%d things"})
+
+    def test_a_below_label_d2r_never_prints_fails_naming_the_label(self):
+        merged = table(("poison nova", [["14", "", "", "", ""], [], [], [], [], []]))
+        mapping = S.Mapping(builtins={"14": {"": "StrSkill8"}}, below={"14": "NoSuchLabel"})
+        with self.assertRaisesRegex(ValueError, "poison nova descline1: no D2R line with NoSuchLabel"):
+            S.rewrite(merged, D2R, FMT, mapping)
+
+    def test_a_fixed_line_with_no_calc_b_keeps_the_classic_calc_b(self):
+        merged = table(("x", [["49", "ItemStats1o", "", "ca", "cb"], [], [], [], [], []]))
+        mapping = S.Mapping(fixed={("49", "ItemStats1o"): ("75", "StrSkillSmiteDamage", "", None, None)})
+        S.rewrite(merged, D2R, FMT, mapping, strings={"ItemStats1o": "+%d"})
+        self.assertEqual(merged.rows[0][1:6], ["75", "StrSkillSmiteDamage", "", "ca", "cb"])
+
+    def test_hide_off_tree_needs_the_skill_columns(self):
+        with self.assertRaisesRegex(ValueError, "SkillPage"):
+            S.hide_off_tree(D2R)  # the synthetic table has no SkillPage column
+
+
 class StringsTests(unittest.TestCase):
     def test_texts_and_formatted_read_the_string_files(self):
         import json

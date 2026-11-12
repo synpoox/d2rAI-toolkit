@@ -76,6 +76,19 @@ Anything that has no D2R column goes to an overflow report. Nothing is dropped s
 | All tables | `-1` sometimes stored as `4294967295` or `255` | signed | Compare every numeric column with D2R on shared rows to find decode slips (`coldeffect` 236 instead of -20) |
 | Banks | one `excel/` | `excel/` (RotW) and `excel/base/` (classic/LoD) | Write both banks until you know which one the mod's characters load |
 
+### Columns D2R has and 1.13c lacks (D2R 3.3, build 93847)
+
+`shared/classic_import/ids.py` fills these on a merged table (`DERIVED`, `derive`, `stat_display`). Counts are from
+D2R 3.3's own tables, build 93847.
+
+| Table.column | D2R's rows | Rule for a merged row |
+|---|---|---|
+| skills.`rightskill` | class skills (`charclass` set): 210 hold 1 and are not passive, 30 passive ones hold 0. Non-class skills (monster skills): 155 hold 0, 33 hold 1, 1 is blank | Set it on class skills only (1, or 0 when `passive` is 1). Leave a non-class row's cell: forcing 1 on a monster skill changes D2R's value |
+| setitems.`spawnable` | 136 rows hold 1, 5 are blank | 1 |
+| itemtypes.`MaxSocketsLevelThreshold1` / `2` | 109 rows hold 25 / 40, 1 is blank | 25 / 40 |
+| itemstatcost.`descstrpos` / `descstrneg` | The strings carry the value's format code (`%+d to Strength`); a 1.13c `descfunc` / `descval` prints the value before the text | A row whose strings D2R already uses takes that D2R row's `descfunc` / `descval` (its own row when the strings are unchanged, else the D2R row with the same `descfunc`, else the first) |
+| itemstatcost `descfunc` 27 / 28 | 1.13c hard-codes their text (class skills, all skills of a class); D2R reads it from `descstrpos` / `descstrneg` | A merged row with no strings and its D2R row's `descfunc` keeps D2R's strings |
+
 ### Row limits
 
 A big overhaul can have several times D2R's row counts in skills, missiles, monstats and cubemain and still stay
@@ -221,3 +234,16 @@ Keep a table of what the original mod has and the port does not, with the reason
 - Test with mortal characters too: a god-mode character skips the damage path where many crashes live.
 - Reset the test character's quests between runs; finished quests skip their handlers.
 - When a crash comes from a player, go to [crash-triage.md](crash-triage.md).
+
+## Monster AI: 1.09d against D2R (engine facts)
+
+- **1.09d D2Game.dll** (stock 1.09d, hashes in `shared/classic_import/baselines/109d.json`): the AI table is at RVA
+  `0xebac8`, 266 records of 16 bytes `{kind, init fn, think fn, next}`, absolute 32-bit pointers (image base
+  `0x6fc30000`). 1.09d's monstats has no `AI` column: its `BaseId` column is the index into this table (not a
+  monstats row number).
+- **D2R build 93847**: the AI table is at RVA `0x2396e90`, 155 records of 32 bytes, same fields, indexed by the
+  `monai.txt` row ([d2r-93847-addresses.md](d2r-93847-addresses.md)).
+- The monstats rows of the two builds line up one to one (the Expansion separator row sits at the same position in
+  both), so a 1.09d monster's D2R `AI` is the `AI` of the same row. `data/109d-monster-ai.tsv` holds the pairing and
+  both think functions; 1.10 moved the `AIParam` slots (verified maps for Skeleton, Brute, Zombie and BloodHawk).
+  Regenerate with `shared/classic_import/gen_109d_monster_ai.py`.
