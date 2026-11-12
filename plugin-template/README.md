@@ -41,7 +41,7 @@ powershell -ExecutionPolicy Bypass -File build.ps1 -Name my-mod-core,my-mod-ui  
 
 `modkit_add_plugin(<id> [VERSION v] [MOD folder] [SOUND_ROWS n] SOURCES ...)` in `CMakeLists.txt` builds one DLL
 `<id>.dll` that links `plugin_common`; call it once per plugin (each with its own `plugin.cpp`, `plugin.rc` and parts
-table). `build.ps1 -Name a,b` checks that every DLL was produced. Each plugin has its own off file, log and console
+table). `build.ps1 -Name a,b` (also under `-File`, where the list arrives as one string and is split) checks that every DLL was produced. `-Mod` and `-SoundRows` reach only the first plugin; the others take theirs from their own `modkit_add_plugin(... MOD ... SOUND_ROWS ...)` call. Each plugin has its own off file, log and console
 command, named by its id.
 
 `build.ps1` does the same as these commands:

@@ -21,6 +21,9 @@ if(MODKIT_TOOLKIT_DIR)
 	set(ENV{D2R_TOOLKIT} "${MODKIT_TOOLKIT_DIR}")
 endif()
 if(DEFINED ENV{D2R_TOOLKIT})
+	if(NOT EXISTS "$ENV{D2R_TOOLKIT}/cmake/FindD2rToolkit.cmake")
+		message(FATAL_ERROR "MODKIT_TOOLKIT_DIR / D2R_TOOLKIT=$ENV{D2R_TOOLKIT} is not a d2rAI-toolkit checkout (cmake/FindD2rToolkit.cmake is missing)")
+	endif()
 	list(APPEND CMAKE_MODULE_PATH "$ENV{D2R_TOOLKIT}/cmake")
 elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/FindD2rToolkit.cmake")
 	list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../cmake")  # this template, still inside the toolkit
@@ -37,10 +40,18 @@ else()
 endif()
 find_package(D2rToolkit REQUIRED)  # sets D2R_TOOLKIT_DIR, checks the mod's toolkit.version pin
 
-set(MODKIT_SDK_DIR "${D2R_TOOLKIT_DIR}/third_party/PluginSDK" CACHE PATH "D2RLoader PluginSDK directory")
-set(MODKIT_COMMON_DIR "${D2R_TOOLKIT_DIR}/shared/plugin-common" CACHE PATH "The toolkit's shared plugin library")
-if(NOT EXISTS "${MODKIT_SDK_DIR}/CMakeLists.txt")
-	message(FATAL_ERROR "PluginSDK not found at ${MODKIT_SDK_DIR}: run `git submodule update --init third_party/PluginSDK` in the toolkit")
+set(MODKIT_SDK_DIR "" CACHE PATH "D2RLoader PluginSDK directory (empty = <toolkit>/third_party/PluginSDK)")
+set(MODKIT_COMMON_DIR "" CACHE PATH "The toolkit's shared plugin library (empty = <toolkit>/shared/plugin-common)")
+set(_sdk "${MODKIT_SDK_DIR}")
+if(NOT _sdk)
+	set(_sdk "${D2R_TOOLKIT_DIR}/third_party/PluginSDK")
+endif()
+set(_common "${MODKIT_COMMON_DIR}")
+if(NOT _common)
+	set(_common "${D2R_TOOLKIT_DIR}/shared/plugin-common")
+endif()
+if(NOT EXISTS "${_sdk}/CMakeLists.txt")
+	message(FATAL_ERROR "PluginSDK not found at ${_sdk}: run `git submodule update --init third_party/PluginSDK` in the toolkit")
 endif()
 
 set(MODKIT_PLUGIN_NAME "mod-core" CACHE STRING "Plugin id, DLL name, console command and <name>-off.txt prefix (the template's own plugin)")
@@ -50,8 +61,8 @@ set(MODKIT_SOUND_ROWS "0" CACHE STRING "Rows of the mod's sounds.txt (0 = no new
 
 set(D2RLPLUGIN_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
-add_subdirectory(${MODKIT_SDK_DIR} PluginSDK EXCLUDE_FROM_ALL)
-add_subdirectory(${MODKIT_COMMON_DIR} plugin-common)
+add_subdirectory(${_sdk} PluginSDK EXCLUDE_FROM_ALL)
+add_subdirectory(${_common} plugin-common)
 
 # modkit_add_plugin(<id> [VERSION <v>] [MOD <mod folder>] [SOUND_ROWS <n>] SOURCES <files...>)
 # One plugin DLL <id>.dll in <build>/<config>/. The sources are the plugin's own (it needs a main file like plugin.cpp
