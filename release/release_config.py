@@ -76,6 +76,13 @@ DEFAULTS = {
         "feed_repo": "",              # with feed_url: the GitHub repository whose release holds the shared feed.json ...
         "feed_tag": "",               # ... and that release's tag
     },
+    "stage": {                        # release/stage.py: how the installed mod folder is laid out for the release
+        "plugins": [],                # built plugin names (no .dll) copied into d2rloader/plugins/
+        "plugin_build_dir": "plugin/build/Release",   # where those DLLs are built, relative to the project
+        "companions": False,          # install generated/companions/ (release/companions.py fetch) with the mod
+        "companions_manifest": "",    # "" = companions/manifest.json
+        "item_type_check": True,      # run plugin-template/tools/item_type_ids.py on out/data's itemtypes.txt
+    },
     "site": {
         "url": "https://files.example.com/mymod/",   # what players' downloaders read (HTTPS, ends in '/')
         "target": "sftp://modrelease@<your-server>/mymod",  # where publish uploads (or dir:<path> for a local test)
@@ -101,6 +108,7 @@ DEFAULTS = {
     },
     "repos": {                        # release pages
         "changelog": "CHANGELOG.md",
+        "fragments": "changelog.d",   # release/stage.py folds the *.md files here into the changelog
         "github": "your-name/your-mod",
         "github_token_env": "MODKIT_GITHUB_TOKEN",
         "github_token_file": "~/.d2r-modkit/github_token",
@@ -148,6 +156,17 @@ def load(path=None, required=False) -> dict:
     return cfg
 
 
+def check_fragments(fragments, changelog, where="config"):
+    """repos.fragments (or changelog.py's --fragments) must be a folder below the project and not the changelog's own."""
+    frag = str(fragments).replace("\\", "/")
+    parts = [x for x in frag.split("/") if x not in ("", ".")]
+    if not parts or frag.startswith("/") or ".." in parts or ":" in frag:
+        raise ConfigError(f"{where}: repos.fragments {frag!r} must be a folder below the project, like \"changelog.d\"")
+    log_dir = [x for x in str(changelog).replace("\\", "/").split("/")[:-1] if x not in ("", ".")]
+    if parts == log_dir:
+        raise ConfigError(f"{where}: repos.fragments {frag!r} is the changelog's own folder: use a folder of its own")
+
+
 def validate(cfg: dict, where="config"):
     mod = cfg["mod"]
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", str(mod["folder"])):
@@ -182,6 +201,10 @@ def validate(cfg: dict, where="config"):
                               "launcher's self-update); keep the feed in another repository")
     elif cat["feed_repo"] or cat["feed_tag"]:
         raise ConfigError(f"{where}: catalog.feed_repo and catalog.feed_tag need catalog.feed_url (the launchers' feed URL)")
+    check_fragments(cfg["repos"]["fragments"], cfg["repos"]["changelog"], where)
+    for p in cfg["stage"]["plugins"]:
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", str(p)) or str(p).lower().endswith(".dll"):
+            raise ConfigError(f"{where}: stage.plugins entry {p!r} must be a plain plugin name without .dll")
     for pat in cfg["package"]["forbidden"]:
         try:
             re.compile(pat)

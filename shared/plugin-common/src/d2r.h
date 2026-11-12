@@ -8,9 +8,151 @@
 
 #include "rvas_93847.h"
 
+#include <cstddef>
 #include <cstdint>
+#include <cstring>
 
 namespace d2r {
+
+// --- Structures ---------------------------------------------------------------------------------------------------
+// Missile creation parameters for rva::CreateMissile. 1.10's 0x5c-byte block, shifted by 0x10 after the three pointers.
+struct MissileParams {
+	uint32_t flags;           // 0x00 (seen: 0x820/0x420 caster -> point, 0x21 start at x/y, 1 placed at x/y)
+	uint32_t pad04;
+	Unit* owner;              // 0x08
+	Unit* origin;             // 0x10 (start at this unit's position when x/y are 0)
+	Unit* target;             // 0x18
+	int32_t missile;          // 0x20 missiles.txt row
+	int32_t x, y;             // 0x24 start (0: the origin's position)
+	int32_t targetX, targetY; // 0x2c aim point
+	int32_t gfxArg;           // 0x34
+	int32_t velocity;         // 0x38
+	int32_t skill;            // 0x3c
+	int32_t skillLevel;       // 0x40
+	int32_t loops;            // 0x44
+	int32_t unk48;            // 0x48
+	int32_t frame;            // 0x4c
+	int32_t activateFrame;    // 0x50
+	int32_t activation;       // 0x54 frames before the missile starts (skills.txt calc2 in Multiple Shot)
+	int32_t pad58;
+	int32_t range;            // 0x5c frames the missile lives (Inferno's calc1)
+	uint8_t pad60[0x68 - 0x60];
+	int32_t sourceKey;        // 0x68 unit state key of the missile a chain starts from (Chain Lightning's srvhit 12)
+	int32_t pad6c;
+	int32_t callback;         // 0x70 create callback run on the new missile with callbackArg (0: none)
+	int32_t callbackArg;      // 0x74 (Firestorm's 1 and DiabWall's 7 take the maker's index and seed it from that)
+	uint8_t rest[0xa0 - 0x78];
+};
+static_assert(sizeof(MissileParams) == 0xa0);
+static_assert(offsetof(MissileParams, missile) == 0x20);
+static_assert(offsetof(MissileParams, targetX) == 0x2c);
+static_assert(offsetof(MissileParams, skill) == 0x3c);
+static_assert(offsetof(MissileParams, activation) == 0x54);
+static_assert(offsetof(MissileParams, range) == 0x5c);
+static_assert(offsetof(MissileParams, sourceKey) == 0x68);
+static_assert(offsetof(MissileParams, callback) == 0x70);
+
+// Pet summon parameters for rva::SummonPet (1.10's block with an 8-byte owner pointer).
+struct SummonParams {
+	uint32_t flags;    // 0x00: 1 = at x/y (else at the owner)
+	uint32_t pad04;
+	Unit* owner;       // 0x08
+	uint16_t monster;  // 0x10 monstats row
+	uint16_t pad12;
+	int32_t aiState;   // 0x14
+	int32_t mode;      // 0x18 monmode
+	int32_t x, y;      // 0x1c
+	int32_t petType;   // 0x24
+	int32_t petMax;    // 0x28
+	int32_t pad2c;
+};
+static_assert(sizeof(SummonParams) == 0x30);
+static_assert(offsetof(SummonParams, x) == 0x1c);
+static_assert(offsetof(SummonParams, petMax) == 0x28);
+
+
+// Argument of rva::NewStateList, laid out as Frozen Armor fills it on its stack.
+struct StateListRequest {
+	Unit* owner;               // 0x00
+	Unit* unit;                // 0x08
+	int32_t skill;             // 0x10
+	int32_t level;             // 0x14
+	int32_t frames;            // 0x18 how long the list lasts
+	int32_t stat;              // 0x1c a stat the new list gets, -1 none (D2R's open wounds: hpregen)
+	int32_t value;             // 0x20 its value, set only on a new list
+	int32_t state;             // 0x24
+	void (*expired)();         // 0x28 called when the list runs out (rva::SkillStateExpired)
+};
+static_assert(sizeof(StateListRequest) == 0x30);
+static_assert(offsetof(StateListRequest, state) == 0x24);
+
+// rva::AreaUnits: the centre (x, y 0 = the unit's position) and what its callback receives.
+struct AreaCenter {
+	void* room;  // rva::UnitRoom of the unit
+	int32_t x, y;
+};
+struct AreaContext {
+	void* game;
+	Unit* unit;
+	int64_t count;  // units the callback returned non-zero for
+	void* arg;      // AreaUnits' arg
+};
+static_assert(sizeof(AreaContext) == 0x20);
+// The client's (rva::ClientAreaUnits)
+struct ClientAreaContext {
+	Unit* center;
+	int32_t count;  // units the callback returned non-zero for
+	void* arg;
+};
+static_assert(offsetof(ClientAreaContext, arg) == 0x10);
+
+// Argument of rva::CrushingBlowApply, as D2R's event 16 fills it on its stack (0x583223)
+struct CrushingBlowArgs {
+	void* damage;           // 0x00 the event's damage block
+	int32_t divisors[3];    // 0x08 4, 10, 10
+	uint8_t missile;        // 0x14 the event is 6 (domissiledamage)
+};
+static_assert(offsetof(CrushingBlowArgs, divisors) == 0x08);
+static_assert(offsetof(CrushingBlowArgs, missile) == 0x14);
+
+// The damage block D2R's Leap (srvdo 77) hands rva::AreaKnockback, filled as it fills it on its stack: hit flags 0,
+// result flags 9, an empty inline list at +0x40 (data pointer, size, capacity 16 with the inline bit) and an empty
+// tagged pointer at +0x158. The callback copies the block, so it stays as built and needs no cleanup.
+struct LeapKnockback {
+	uint32_t hitFlags = 0;     // 0x00
+	uint32_t resultFlags = 9;  // 0x04
+	uint8_t pad08[0x40 - 0x08] {};
+	void* listData = inlineList;                          // 0x40
+	uint64_t listSize = 0;                                 // 0x48
+	uint64_t listCapacity = 0x8000000000000010ull;        // 0x50
+	uint8_t inlineList[0xc0] {};                           // 0x58
+	uint8_t pad118[0x158 - 0x118] {};
+	uint64_t tagged[5] = {1, 0, 0, 0, 0};                  // 0x158
+	LeapKnockback() = default;
+	LeapKnockback(const LeapKnockback&) = delete;  // listData points into this object
+};
+static_assert(sizeof(LeapKnockback) == 0x180);
+static_assert(offsetof(LeapKnockback, listData) == 0x40);
+static_assert(offsetof(LeapKnockback, tagged) == 0x158);
+// The same block as a plain hit's damage, for callers that build one
+using DamageBlock = LeapKnockback;
+// Argument of rva::ApplyCurse, as the curse srvdo (0x5598f0) fills it: aurastat1 travels in the NewStateList
+// request, aurastat2-6 are set on the list after it.
+struct CurseParams {
+	Game* game;           // 0x00
+	Unit* caster;         // 0x08
+	int32_t pad10[2];     // 0x10 not read here
+	int32_t skill;        // 0x18
+	int32_t level;        // 0x1c
+	int32_t key;          // 0x20
+	int32_t frames;       // 0x24
+	int32_t stats[6];     // 0x28 aurastat1-6, -1 for none
+	int32_t values[6];    // 0x40 their calcs, already worked out
+	int32_t state;        // 0x58 aurastate
+};
+static_assert(offsetof(CurseParams, stats) == 0x28);
+static_assert(offsetof(CurseParams, values) == 0x40);
+static_assert(offsetof(CurseParams, state) == 0x58);
 
 using GetSkillRecordFn = uint8_t* (*)(uint32_t dataFlag, int32_t skillId) noexcept;
 using EvalSkillCalcFn = int32_t (*)(uint32_t dataFlag, Unit* unit, int32_t calc, int32_t skillId, int32_t level) noexcept;
@@ -121,6 +263,37 @@ inline auto RandomBelow(uint32_t* seed, uint32_t n) noexcept -> uint32_t {
 	}
 	const uint32_t v = Roll(seed);
 	return (n & (n - 1)) == 0 ? v & (n - 1) : v % n;
+}
+
+
+// Leap Attack's (0x56b170) cleanup of its damage block: the tagged object at +0x158 (bit 0 set: a heap pointer or
+// none; clear: an object in place), then the list if it outgrew its inline space (capacity without the inline bit).
+inline void ReleaseDamage(LeapKnockback& damage) noexcept {
+	const auto release = [](void* p) {
+		void* allocator = Engine<void* (*)() noexcept>(rva::EngineAllocator)();
+		(*reinterpret_cast<void (***)(void*, void*) noexcept>(allocator))[4](allocator, p);
+	};
+	const uint64_t tagged = damage.tagged[0];
+	void* object = (tagged & 1) != 0 ? reinterpret_cast<void*>(tagged & ~1ull) : &damage.tagged[0];
+	if (object != nullptr) {
+		(**reinterpret_cast<void (***)(void*, int32_t) noexcept>(object))(object, 0);
+		if ((damage.tagged[0] & 1) != 0) {  // read again: the destructor may leave a heap pointer
+			release(reinterpret_cast<void*>(damage.tagged[0] & ~1ull));
+		}
+		damage.tagged[0] = 1;
+	}
+	if (static_cast<int64_t>(damage.listCapacity) >= 0) {
+		release(damage.listData);
+	}
+}
+
+// Copies a rolled block's plain fields (all but the list at 0x40 and the tagged object at 0x158) into a fresh one:
+// ElementalDamage (0x437d00) writes only 0x0c-0x3c and 0x118-0x144, and never the flags.
+inline void CopyRolled(const LeapKnockback& from, LeapKnockback& to) noexcept {
+	const auto* src = reinterpret_cast<const uint8_t*>(&from);
+	auto* dst = reinterpret_cast<uint8_t*>(&to);
+	std::memcpy(dst, src, offsetof(LeapKnockback, listData));
+	std::memcpy(dst + offsetof(LeapKnockback, pad118), src + offsetof(LeapKnockback, pad118), sizeof(from.pad118));
 }
 
 }  // namespace d2r
