@@ -1,5 +1,5 @@
 {
-  "note": "Stock classic Diablo II: Lord of Destruction 1.09d: SHA-256 of every file a 1.09d port is measured against. The DLLs, D2.LNG, Diablo II.exe, D2VidTst.exe and Patch_D2.mpq are the 1.09d set as a version-switching tool stores it (the DLLs carry link timestamps of 2001-11-30, five days before the PC release). The base MPQs are the game installer's data; the three installer MPQs (d2data, d2char, d2sfx) were re-saved without their (attributes) entry, so they are not proven byte-equal to the 2001 discs. Patch_D2.mpq loads before them and overrides them. Game.exe is a no-CD build (decrypted, copy protection removed); Game.exe.stock is the copy-protected original. A byte comparison with the official patch is open: no per-file hashes of it are published. Changing this file is a re-baseline.",
+  "note": "Stock classic Diablo II: Lord of Destruction 1.09d: SHA-256 of every file a 1.09d port is measured against. The DLLs, D2.LNG, Diablo II.exe, D2VidTst.exe and Patch_D2.mpq are the 1.09d set as a version-switching tool stores it (the DLLs carry link timestamps of 2001-11-30, five days before the PC release). The base MPQs are the game installer's data; the three installer MPQs (d2data, d2char, d2sfx) were re-saved without their (attributes) entry, so they are not proven byte-equal to the 2001 discs. Patch_D2.mpq loads before them and overrides them. Game.exe and Game.exe.stock: stock files as found in the reference install. A byte comparison with the official patch is open: no per-file hashes of it are published. Changing this file is a re-baseline.",
   "archives": {
     "d2char.mpq": "9640549fdaffac8e9ec1535d9a594e5fdaa36168e2e53943a38055cfcc612896",
     "d2data.mpq": "5cbfb794a990709bcb11dec4e3ed6b7656c49ea28957c4753cb25263cdd8208a",
@@ -44,9 +44,6 @@
   },
   "not_part_of_109d": [
     "FogOriginal.dll",
-    "PlugY*",
-    "PatchD2File.exe",
-    "RestoreD2File.exe",
     "D2XP_IX86_1xx_114d.mpq",
     "glide3x.dll",
     "BNUpdate.exe",

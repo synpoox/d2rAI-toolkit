@@ -21,6 +21,7 @@ think_d2r_rva, param_slots. A BaseId no monster uses (0, the empty record) has a
 param_slots says where the AI's parameters went (1.10 moved the AIParam slots; see AI_PARAM_SLOTS): "1>1 2>3" = 1.09d
 AIParam1 is D2R aip1, AIParam2 is aip3; "none" = verified that 1.09d's think function reads no parameter; "unverified" =
 the slots were not read on both builds, so a converter keeps the plain copy (AIParamN -> aipN) and says so.
+Engine facts: knowledge/porting-classic-mods.md (1.09d table) and knowledge/d2r-93847-addresses.md (D2R table).
 The image must be a memory-layout dump (section file offsets equal RVAs) of build 93847 (PE stamp 0x6ab3782c; see
 knowledge/engine-re.md).
 """
@@ -46,17 +47,18 @@ AI_TABLE_109D = (0xEBAC8, 266, 16)   # D2Game.dll 1.09d: RVA, records, record si
 AI_TABLE_D2R = (0x2396E90, 155, 32)  # D2R build 93847: RVA, records, record size
 D2R_STAMP = 0x6AB3782C               # PE TimeDateStamp of the 93847 dump under D2RLoader 1.3.1
 
-# Verified AI parameter slot maps, {AI: {1.09d AIParamN: D2R aipM}}, read from both think functions (1.09d D2Game.dll
-# RVA / D2R RVA). An AI not listed keeps the plain copy and is "unverified". {} = verified that 1.09d reads none.
+# Verified AI parameter slot maps, {AI: (1.09d think RVA it was verified against, {1.09d AIParamN: D2R aipM})}, read from
+# both think functions (1.09d D2Game.dll RVA / D2R RVA). rows() fails when a row's 1.09d think differs from the verified
+# one. An AI not listed keeps the plain copy and is "unverified". {} = verified that 1.09d reads none.
 #   Skeleton   0x93620 / 0x5b43a0: P1 approach %, P2 attack %, P3 idle frames, P4 attack 1 vs 2; D2R aip1, aip3, aip2, aip4
 #   Brute      0x8e9c0 / 0x5acc20: same logic, P1 -> aip3, P2 -> aip4
 #   Zombie     0x96ec0 / 0x5ba780: P3 (attack 1 vs 2) -> aip4; its other slots are not verified, so they are not carried
 #   BloodHawk  0x95810 / 0x5aca20: 1.09d hard-codes its 69 %, 10 % and +-50; D2R reads aip1, aip2, aip5 for them
-AI_PARAM_SLOTS: dict[str, dict[int, int]] = {
-    "Skeleton": {1: 1, 2: 3, 3: 2, 4: 4},
-    "Brute": {1: 3, 2: 4},
-    "Zombie": {3: 4},
-    "BloodHawk": {},
+AI_PARAM_SLOTS: dict[str, tuple[int, dict[int, int]]] = {
+    "Skeleton": (0x93620, {1: 1, 2: 3, 3: 2, 4: 4}),
+    "Brute": (0x8E9C0, {1: 3, 2: 4}),
+    "Zombie": (0x96EC0, {3: 4}),
+    "BloodHawk": (0x95810, {}),
 }
 
 
@@ -66,7 +68,7 @@ def slots_text(ai: str) -> str:
         return ""
     if ai not in AI_PARAM_SLOTS:
         return "unverified"
-    return " ".join(f"{a}>{b}" for a, b in sorted(AI_PARAM_SLOTS[ai].items())) or "none"
+    return " ".join(f"{a}>{b}" for a, b in sorted(AI_PARAM_SLOTS[ai][1].items())) or "none"
 
 
 def pe_layout(image: bytes) -> tuple[int, int, list[tuple[int, int, int, int]]]:
@@ -110,10 +112,14 @@ def pairing(t9: Table, d2r: Table) -> dict[str, tuple[str, int]]:
     """{BaseId: (D2R AI, number of 1.09d monstats rows with it)} from the rows of 1.09d's monstats and D2R's monstats.
 
     Rows pair by position (1.09d's records against the first records of D2R's). A BaseId whose rows get different D2R AIs
-    fails: the pairing would not be a function."""
+    fails: the pairing would not be a function. The Expansion separator row must sit at the same position in both."""
     r9, rr = t9.records(), d2r.records()
     if len(rr) < len(r9):
         raise G.GenError(f"D2R monstats has {len(rr)} records, 1.09d's {len(r9)}")
+    sep = [[i for i, r in enumerate(t.rows) if r and r[0] == "Expansion"] for t in (t9, d2r)]
+    if len(sep[0]) != 1 or sep[0] != sep[1]:
+        raise G.GenError(f"the Expansion separator row is at {sep[0]} in 1.09d's monstats and {sep[1]} in D2R's: "
+                         "the rows do not line up")
     b9, ai = t9.col("BaseId"), d2r.col("AI")
     found: dict[str, Counter] = defaultdict(Counter)
     for x, y in zip(r9, rr):
@@ -139,6 +145,9 @@ def rows(pair: dict[str, tuple[str, int]], t109: list[tuple[int, int, int]], tdr
         if ai and ai not in index:
             raise G.GenError(f"D2R AI {ai!r} is not in monai.txt")
         k9, _, think9 = t109[base]
+        if ai in AI_PARAM_SLOTS and AI_PARAM_SLOTS[ai][0] != think9:
+            raise G.GenError(f"BaseId {base} ({ai}) has 1.09d think {think9:#x}, but its slot map was verified against "
+                             f"{AI_PARAM_SLOTS[ai][0]:#x}: read the new think function and extend AI_PARAM_SLOTS")
         kd, _, thinkd = tdr[index[ai]] if ai else (None, 0, 0)
         out.append([str(base), str(n), ai, str(index[ai]) if ai else "", str(k9), hexa(think9),
                     "" if kd is None else str(kd), hexa(thinkd), slots_text(ai)])
