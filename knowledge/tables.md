@@ -52,6 +52,17 @@ validator from these files: it types every cell, checks references, key lengths 
 - Rows counted: **every row except rows whose first cell is `Expansion`**. Blank-key rows are real records
   (monsounds and montype start with one). D2R's own `*Id`/`*ID`/`*hcIdx` comment columns confirm the count.
 - `skilldesc` was re-sorted alphabetically by D2R and is referenced by name only.
+- `skilldesc` behaviour in build 93847. Source: the comments of the classic-port code that rewrites these lines
+  (`shared/classic_import/skilldesc.py`), not a capture in this repo; each is marked as such:
+  - A skill with `SkillRow` 0 is drawn in its page's first cell (a classic client hides it). To keep a skill off the
+    tree, set its `SkillPage` to 0. (Port code comment; unverified in a capture.)
+  - D2R's skilldesc strings carry the value's format code ("Duration: %d seconds"), so a classic line function that
+    prints the text and then the value prints the value twice. (Port code comment; unverified in a capture.)
+  - D2R's own classic line functions print text raw, with no format code ("+%d Percent ..." shows the code as text),
+    so a string with a format code is only safe under the functions and column D2R's lines already use it in.
+    (Port code comment; unverified in a capture.)
+  - The tooltip stacks description lines upward: a line inserted under a built-in line takes that line's slot and the
+    lines above it move up one. (Port code comment; unverified in a capture.)
 - Columns starting with `*` are comments (`*ID`, `*eol`, `*ItemName`...). Keep them but the game ignores them.
 - `*eol` ends some tables: keep it last.
 
@@ -98,7 +109,7 @@ skills `delay` -> `localdelay`, uniqueitems `enabled` -> `spawnable`, missiles `
 |---|---|---|
 | **skills** | `skill` (47), row = ID | `charclass` (30 per class in retail), `skilldesc`, `srvstfunc`/`srvdofunc`/`srvstopfunc`, `cltstfunc`/`cltdofunc`/`cltstopfunc`, `anim`/`seqtrans` (SQ for sequences), `seqnum`, `aurastate`/`passivestate`/`auratargetstate`, `aurastat1-6` + `aurastatcalc1-6`, `aurarangecalc`, `aurafilter`, `calc1-10` (Raven-AI pets read their attack count from `calc3`), `Param1-8` (+9-14), `srvmissile(a/b/c)`, `cltmissile(a/b/c)`, `summon`/`pettype`/`summode`/`petmax`, `mana`/`lvlmana`/`minmana`/`manashift`, `localdelay`, `reqlevel`, `reqskill1-3`, `skpoints` (cost formula; 999 = cannot learn), `leftskill`/`rightskill` (D2R's picker honours them: `rightskill 1` on every active skill, innate ones too), `InTown`. D2R function maxima: srvdo 171, cltdo 109, srvst 70, cltst 61 |
 | **skilldesc** | `skilldesc` | `SkillPage` (tab), `SkillRow`, `SkillColumn`, `ListRow`, `IconCel` (frame in the class icon strip: 2 frames per icon, normal + pressed; class-less skills read one shared sheet, and a classic mod's shared sheet may hold one frame per icon), `str name/short/long/alt`, `descline*`/`dsc2line*`/`dsc3line*` + text a/b + calc a/b. A line type whose text is missing asserts |
-| **missiles** | `Missile` (31), row = ID | `pCltDoFunc`/`pCltHitFunc`/`pSrvDoFunc`/`pSrvHitFunc` (free: srv hit 61-70, srv do 46-54), `Param1-5`, `CltParam1-5`, `sHitPar1-3`, `cHitPar1-3`, `SrvCalc1`, `CltCalc1`, `SHitCalc1`, `CHitCalc1`, `DmgCalc1`, `Range` (expression; classic `LevRange` merged in). **Server hit 6 spawns the monstats row in `sHitPar1`**: remap it when monstats rows move, `CelFile` (classic only), `SubMissile1-3`, `HitSubMissile1-4`, `Skill`. HD look comes from `hd/missiles/missiles.json` by name |
+| **missiles** | `Missile` (31), row = ID | `pCltDoFunc`/`pCltHitFunc`/`pSrvDoFunc`/`pSrvHitFunc` (free: srv hit 61-70, srv do 46-53), `Param1-5`, `CltParam1-5`, `sHitPar1-3`, `cHitPar1-3`, `SrvCalc1`, `CltCalc1`, `SHitCalc1`, `CHitCalc1`, `DmgCalc1`, `Range` (expression; classic `LevRange` merged in). **Server hit 6 spawns the monstats row in `sHitPar1`**: remap it when monstats rows move, `CelFile` (classic only), `SubMissile1-3`, `HitSubMissile1-4`, `Skill`. HD look comes from `hd/missiles/missiles.json` by name |
 | **states** | `state` (47), row = ID | `overlay1-4`, `castoverlay`, `removerlay`, `pgsvoverlay`, `stat`, `setfunc`/`remfunc`, `missile`, `skill`, `colorshift`, `nosend` (not synced to clients). Above 511 states D2R asserts at load; D2RLoader 1.3.1 syncs wide states |
 | **overlay** | `overlay` (47), row = ID | `Filename` (classic DCC), **`Character`** (HD folder), `Trans`, `AnimRate`, `Height1-4` |
 | **monstats** | `Id` (47), row = ID | `BaseId`/`NextInClass`, `MonStatsEx` (monstats2 row; blank = row 0), `MonType`, `AI`, `Code` (classic animation set, also used in HD for timing), `Skill1-8` + `Sk1mode-Sk8mode` (a **monmode code or a monseq name**), `TreasureClass*`, `coldeffect` (signed), `spawnx/spawny` (signed), per-difficulty columns `(N)`/`(H)` |
