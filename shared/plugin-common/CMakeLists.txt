@@ -22,6 +22,7 @@ if(NOT TARGET D2RLPlugin::D2RLPlugin)
 endif()
 
 add_library(plugin_common STATIC
+	src/ai_registry.cpp
 	src/d2r.cpp
 	src/env_guard.cpp
 	src/level_palette.cpp
@@ -38,18 +39,14 @@ endif()
 
 if(PROJECT_IS_TOP_LEVEL)
 	enable_testing()
-	add_executable(plugin_common_tests tests/guard_test.cpp)
-	target_link_libraries(plugin_common_tests PRIVATE plugin_common)
-	if(MSVC)
-		target_compile_options(plugin_common_tests PRIVATE /W4 /permissive- /EHsc /utf-8)
-		set_property(TARGET plugin_common_tests PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
-	endif()
-	add_test(NAME plugin_common_tests COMMAND plugin_common_tests)
-	add_executable(plugin_common_level_palette_test tests/level_palette_test.cpp)
-	target_link_libraries(plugin_common_level_palette_test PRIVATE plugin_common)
-	if(MSVC)
-		target_compile_options(plugin_common_level_palette_test PRIVATE /W4 /permissive- /EHsc /utf-8)
-		set_property(TARGET plugin_common_level_palette_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
-	endif()
-	add_test(NAME plugin_common_level_palette_test COMMAND plugin_common_level_palette_test)
+	# One executable per test file: tests/<name>.cpp builds plugin_common_<name> (add the name here).
+	foreach(test guard_test ai_registry_test level_palette_test)
+		add_executable(plugin_common_${test} tests/${test}.cpp)
+		target_link_libraries(plugin_common_${test} PRIVATE plugin_common)
+		if(MSVC)
+			target_compile_options(plugin_common_${test} PRIVATE /W4 /permissive- /EHsc /utf-8)
+			set_property(TARGET plugin_common_${test} PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
+		endif()
+		add_test(NAME plugin_common_${test} COMMAND plugin_common_${test})
+	endforeach()
 endif()
