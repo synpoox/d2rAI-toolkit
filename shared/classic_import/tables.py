@@ -141,7 +141,7 @@ def monster_numbers(src_data: Path, out_data: Path) -> dict[str, str]:
     if not files[0].is_file():
         return {}
     if not files[1].is_file():
-        raise ValueError("hireling names monstats rows: merge monstats (merge/tables.json) too")
+        raise ValueError("hireling names monstats rows: merge monstats (an id list or merge/tables.json) before it")
     merged = {n.lower(): i for i, n in enumerate(Table(files[1]).names())}
     return {str(i): str(merged[n.lower()]) for i, n in enumerate(Table(files[0]).names()) if n.lower() in merged}
 
@@ -188,8 +188,20 @@ def unknown_sounds(monsounds: Table, d2r_data: Path, sound_cols: Iterable[str] =
     if not f.is_file():
         return []
     names = {r[0].lower() for r in Table(f).rows}
-    cols = [(j, c) for j, c in enumerate(monsounds.header) if c in set(sound_cols)]
+    want = {c.lower() for c in sound_cols}
+    cols = [(j, c) for j, c in enumerate(monsounds.header) if c.lower() in want]
     return [f"{r[0]} {c} {r[j]}" for r in monsounds.rows for j, c in cols if r[j] and r[j].lower() not in names]
+
+
+def extra_renames(src_data: Path, d2r_data: Path, out_data: Path, hireling: bool) -> dict[str, dict[str, str]]:
+    """The renames this module adds to the id lists' (ids.renames): "sound" always, and "monster" and "hiredesc" when
+    `hireling` is merged. rule() spells cells with them; pass the same map to diff.gate(renames=...) so the gate reads
+    the source as the merge did. Only monsounds' sound columns follow "sound" (missiles, skills and states name sounds
+    too, and are not renamed yet)."""
+    ren = {"sound": sound_names(src_data, d2r_data)}
+    if hireling:
+        ren.update(monster=monster_numbers(src_data, out_data), hiredesc=hire_keys(src_data, d2r_data))
+    return ren
 
 
 Hook = Callable[[Table, Table], None]  # (merged, D2R's table): edit the merged table, or raise ValueError
@@ -205,10 +217,10 @@ def rule(rule_file: Path, src_data: Path, d2r_data: Path, out_data: Path, tables
     skilldesc rewrite). A monsounds row naming a sound D2R's table lacks fails the merge."""
     cfg = json.loads(rule_file.read_text("utf-8"))
     ren = ids.renames({t: ids.read_list(ids.list_path(rule_file.parent, t)) for t in tables or ()})
-    ren["sound"] = sound_names(src_data, d2r_data)
-    for table, opts in sorted(cfg.items(), key=lambda kv: kv[0] == "hireling"):
-        if table == "hireling":
-            ren.update(monster=monster_numbers(src_data, out_data), hiredesc=hire_keys(src_data, d2r_data))
+    ren.update(extra_renames(src_data, d2r_data, out_data, False))
+    for table, opts in sorted(cfg.items(), key=lambda kv: (kv[0] == "hireling", kv[0])):
+        if table == "hireling":  # after monstats is merged
+            ren.update(extra_renames(src_data, d2r_data, out_data, True))
         check_options(table, opts)
         d2r = Table(ids.excel(d2r_data) / f"{table}.txt")
         merged = merge_table(table, Table(ids.excel(src_data) / f"{table}.txt"), d2r, ren, **opts)

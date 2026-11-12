@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from shared.classic_import import tables  # noqa: E402
+from shared.classic_import import diff, tables  # noqa: E402
 
 
 def table(*rows: str) -> bytes:
@@ -169,6 +169,32 @@ class TablesTests(unittest.TestCase):
             ["Desert", "30", "43", "1", "1", "skillname99"],  # D2R's own id 30 is kept, the source's Rogue 0/9 left out
             ["Order", "39", "3", "3", "1", "hiredesc_dkor"],  # extrahire follows D2R's warlockhire: monster 3
             ["Order", "40", "3", "3", "1", "strhirespecial1"]])  # D2R's own string for the same text
+
+    def test_the_gate_reads_the_source_as_the_merge_renamed_it(self):
+        self.write("src", "hiredesc", table("Hireling Description | Code | *EOL", "Fire Arrow | farw | 0"))
+        self.write("src", "monstats", table("Id | hcIdx", "kashya | 0", "extrahire | 2"))
+        self.write("d2r", "monstats", table("Id | *hcIdx", "kashya | 0", "warlockhire | ", "x | "))
+        self.write("src", "hireling", table("Hireling | Id | Level | Class | Seller | HireDesc",
+                                            "Order | 31 | 3 | 1 | 1 | farw"))
+        self.write("d2r", "hireling", table("Hireling | Id | Level | Class | Seller | HireDesc",
+                                            "Rogue | 0 | 3 | 0 | 0 | strhire1"))
+        self.write("src", "sounds", table("Sound | FileName", "own_snd | a/own.wav", "same | b.wav"))
+        self.write("d2r", "sounds", table("Sound | FileName", "same | b.flac"))
+        self.write("src", "monsounds", table("Id | Attack1 | Weapon1", "zombie | own_snd | same"))
+        self.write("d2r", "monsounds", table("Id | Attack1 | Weapon1", "zombie | same | same"))
+        cfg = {"monstats": {}, "monsounds": {}, "hireling": {"rows": ["Id", "Level"], "source_only_rows": "append"}}
+        self.merge(cfg)
+        dev = self.root / "deviations.md"
+        dev.write_text("| Deviation | Status | Gate | Work item |\n|---|---|---|---|\n", "utf-8")
+
+        def run(renames):
+            return diff.gate(self.root / "src/global/excel", self.root / "out/global/excel",
+                             self.root / "d2r/global/excel", dev, ("cut",), select=cfg.__contains__, tables_json=cfg,
+                             renames=renames)
+
+        self.assertTrue(run(None).open(), "without the merge's renames the gate sees false deviations")
+        ren = tables.extra_renames(self.root / "src", self.root / "d2r", self.root / "out", True)
+        self.assertEqual(run(ren).open(), [])
 
     def test_a_hook_runs_on_the_merged_table_before_it_is_written(self):
         self.write("src", "levels", table("Name | Id", "Act 1 | 1"))
