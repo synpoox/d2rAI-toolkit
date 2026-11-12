@@ -12,6 +12,7 @@ runs. Everything that needs Windows is behind a function, so the scripts also im
 | `testing/game_ctl.py` | Starts and stops the game in a slot, takes screenshots, sends keys, clicks and console lines. |
 | `testing/game_checks.py` | Runs named in-game checks and writes the results and screenshots. |
 | `testing/release_install.py` | Puts the **published** release into a slot, the way a player gets it. |
+| `testing/warps.py` | Makes `cheat goto` lines for a level's DS1 reference spots, or a markdown doc for a list of levels. |
 | `testing/example_checks.py` | Five example checks. Copy it and make your own. |
 | `testing/testing.example.toml` | The config. Copy it to `modkit-testing.toml`. |
 

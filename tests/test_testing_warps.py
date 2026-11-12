@@ -49,10 +49,22 @@ class Reader(unittest.TestCase):
         data = ds1(10, 8, [(2, 3, 55, 60), (2, 4, 5, 5), (1, 1, 25, 35), (1, 0, 1, 1)])
         classes = {(1, 3): "Waypoint Portal", (1, 4): "Chest"}
         places = {1: ["Rat", "Mephisto Unique"]}
+        self.assertEqual(warps.reference_spots(data, classes, places, ("rat",))[-1], ("monster preset Rat", 1, 1))
+        self.assertIn("andariel", warps.BOSSY)
         self.assertEqual(warps.reference_spots(data, classes),
-                         [("centre", 5, 4), ("waypoint", 11, 12)])
+                         [("centre", 27, 22), ("waypoint", 55, 60)])
         self.assertEqual(warps.reference_spots(data, classes, places),
-                         [("centre", 5, 4), ("waypoint", 11, 12), ("monster preset Mephisto Unique", 5, 7)])
+                         [("centre", 27, 22), ("waypoint", 55, 60), ("monster preset Mephisto Unique", 25, 35)])
+
+
+class Versions(unittest.TestCase):
+    def test_old_version_refused_and_v5_objects(self):
+        with self.assertRaises(ValueError):
+            warps.ds1_header(ds1(version=3))
+        # v5: no act or tag, files=0, walls=1 (floors 1 by default), 10x8 tiles: 2 walls + floor + shadow grids
+        v5 = struct.pack("<3i", 5, 9, 7) + struct.pack("<ii", 0, 1) + bytes(4 * 80 * 4)
+        v5 += struct.pack("<i", 1) + struct.pack("<4i", 1, 2, 3, 4)
+        self.assertEqual(warps.read_objects(v5), [(1, 2, 3, 4)])  # 16-byte records, no flags dword
 
 
 class Folder(unittest.TestCase):
@@ -77,16 +89,29 @@ class Folder(unittest.TestCase):
     def test_level_warps(self):
         out = warps.level_warps(self.d, 50, "A.DS1")
         self.assertEqual(out[0], "cave/a.ds1, 10x8 tiles")  # one variant named: no pin hint
-        self.assertIn(f"  centre (tile 5,4): cheat goto 50,{warps.subtile(100, 5)},{warps.subtile(200, 4)}", out)
+        self.assertIn(f"  centre (tile 5,4, subtile 27,22): cheat goto 50,{100 * 5 + 27},{200 * 5 + 22}", out)
         self.assertIn("  entry: cheat goto 50", out)
         both = warps.level_warps(self.d, 50)
-        self.assertIn("pin: force_ds1.py", both[0])
+        self.assertIn("pin: testing/force_ds1.py", both[0])
         self.assertIn("DS1 not found", "\n".join(both))  # b.ds1 is absent
 
     def test_random_origin(self):
         out = "\n".join(warps.level_warps(self.d, 51))
         self.assertIn("origin unknown", out)
-        self.assertNotIn("cheat goto", out)
+        self.assertIn("entry: cheat goto 51", out)
+        self.assertNotIn("cheat goto 51,", out)
+
+    def test_doc_two_levels(self):
+        doc = warps.warps_doc(self.d, [50, 51])
+        self.assertIn("## Cave (50)", doc)
+        self.assertIn("## Rand (51)", doc)
+        self.assertLess(doc.index("## Cave (50)"), doc.index("## Rand (51)"))
+        self.assertIn("entry: cheat goto 51", doc)
+        out = self.d / "w.md"
+        self.assertEqual(warps.main(["--data", str(self.d), "--level", "50", "--level", "51", "--out", str(out)]), 0)
+        self.assertEqual(out.read_text(encoding="utf-8").count("\n## "), 2)
+        with self.assertRaises(ValueError):
+            warps.warps_doc(self.d, [50, 99])
 
     def test_errors(self):
         with self.assertRaises(ValueError):
