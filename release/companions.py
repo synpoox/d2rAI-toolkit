@@ -4,7 +4,7 @@
     py -3 release/companions.py install --game DIR [--root PROJECT] [--manifest FILE]
 
 A companion is a community plugin (or its data) that a mod ships next to its own. The manifest, by default
-<project>/companions/manifest.json, pins each one by SHA-256 (release.example.companions.json shows the schema):
+<project>/companions/manifest.json, pins each one by SHA-256 (release/companions.example.json shows the schema):
 
   fetch downloads each entry (a GitHub release asset; with `commit` in place of `tag`, the file at that path in the
   repo at that commit; with `url` and no `repo`, that URL, such as a D2RLoader Hub download link; a release asset that
@@ -13,9 +13,14 @@ A companion is a community plugin (or its data) that a mod ships next to its own
   project's own settings for the companions are copied over whatever the zips put there (manifest "config", default
   ["companions/config/"]). No companion binary is ever committed.
 
-  install runs the toolkit's `modkit install`, copies generated/companions/ over <game>/mods/<Name>/, applies each
+  install first checks the game version (see `game` below), then runs the toolkit's `modkit install`, copies generated/companions/ over <game>/mods/<Name>/, applies each
   entry's `loader_settings` to d2rloader/config/d2rloader.toml and copies the vanilla tables that the entries'
   `filter_tables` name when the build did not ship them (from the game's own files, through modkit.base.Base).
+
+Manifest "game" (top level, and per entry to override): the D2R major.minor the companions were built for, such as
+"3.3". `install` compares it with major.minor of the Version in <game>/.build.info (never a build number) and refuses
+on a mismatch; when the version cannot be read (the Steam install has no .build.info) it warns and goes on.
+The manifest's "config" may not list d2rloader.toml (use `loader_settings`, which merges instead of replacing).
 
 Per-entry options (all optional; nothing about one mod is written into this script):
   files            zip path (or asset path) -> path in the installed mod folder; a key ending in "/" is a folder
@@ -38,7 +43,7 @@ import sys
 import urllib.parse
 import urllib.request
 import zipfile
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Callable
 
 TOOLKIT = Path(__file__).resolve().parent.parent
@@ -61,26 +66,132 @@ def github_download(repo: str | None, ref: str | None, asset: str, raw: bool = F
         return r.read()
 
 
+def _norm(p: str) -> str:
+    return p.replace("\\", "/")
+
+
+def _safe_rel(dst, what: str, msg: str = "must be a relative path inside the folder") -> None:
+    """Refuse a path that is absolute, has a drive, or climbs with `..`, judged as both POSIX and Windows."""
+    if not isinstance(dst, str) or not dst:
+        raise CompanionError(f"{what}: {msg}")
+    for p in (PurePosixPath(dst), PureWindowsPath(dst), PurePosixPath(_norm(dst)), PureWindowsPath(_norm(dst))):
+        if p.is_absolute() or p.anchor or p.drive or ".." in p.parts or any(":" in part for part in p.parts):
+            raise CompanionError(f"{what}: {msg}")
+
+
+def _inside(base: Path, rel: str, what: str) -> Path:
+    """base/rel, resolved, after checking it stays inside base."""
+    base = Path(base).resolve()
+    target = (base / rel).resolve()
+    if not target.is_relative_to(base):
+        raise CompanionError(f"{what} would leave the mod folder")
+    return target
+
+
+def _check_source(c: dict, name: str) -> None:
+    def text(k):
+        v = c.get(k)
+        return isinstance(v, str) and bool(v.strip())
+    if "url" in c:
+        if not text("url") or not c["url"].startswith(("https://", "http://")):
+            raise CompanionError(f"{name}: \"url\" must be an http(s) address")
+        return
+    if not (text("repo") and re.fullmatch(r"[\w.-]+/[\w.-]+", c["repo"])):
+        raise CompanionError(f"{name}: needs a \"url\", or \"repo\" (owner/name) plus one of \"tag\" / \"commit\"")
+    if ("tag" in c) == ("commit" in c):
+        raise CompanionError(f"{name}: needs exactly one of \"tag\" or \"commit\"")
+    k = "tag" if "tag" in c else "commit"
+    if not text(k):
+        raise CompanionError(f"{name}: \"{k}\" must be a non-empty string")
+
+
+def _check_game(v, name: str) -> None:
+    if v is not None and not (isinstance(v, str) and re.fullmatch(r"\d+\.\d+", v)):
+        raise CompanionError(f"{name}: \"game\" must be a major.minor version such as \"3.3\"")
+
+
+def build_info_version(text: str) -> str | None:
+    """The Version of the active row of a .build.info (pipe-separated, header line first), or None."""
+    head, first = None, None
+    for line in text.splitlines():
+        if not line.strip() or line.startswith("#"):
+            continue
+        cols = line.split("|")
+        if head is None:
+            head = [c.split("!")[0] for c in cols]
+            if "Version" not in head:
+                return None
+            continue
+        row = dict(zip(head, (c.strip() for c in cols)))
+        if not row.get("Version"):
+            continue
+        if "Active" not in row or row["Active"] == "1":
+            return row["Version"]
+        first = first or row["Version"]
+    return first
+
+
+def major_minor(version: str) -> str | None:
+    m = re.match(r"(\d+)\.(\d+)", version or "")
+    return f"{m.group(1)}.{m.group(2)}" if m else None
+
+
+def game_version(game: Path) -> str | None:
+    """major.minor of the install at `game` from its .build.info, or None when it cannot be read."""
+    try:
+        return major_minor(build_info_version((Path(game) / ".build.info").read_text("utf-8-sig")) or "")
+    except OSError:
+        return None
+
+
+def check_game(game: Path, manifest: dict, warn: Callable[[str], None] = lambda m: print(m, file=sys.stderr)) -> None:
+    """Refuse when a companion's `game` major.minor is not the install's; warn and go on when it cannot be read."""
+    wanted = {c.get("name", "?"): c.get("game", manifest.get("game")) for c in manifest["companions"]}
+    wanted = {n: g for n, g in wanted.items() if g}
+    if not wanted:
+        return
+    have = game_version(game)
+    if have is None:
+        warn(f"companions: cannot read the game version from {Path(game) / '.build.info'}; not checking {', '.join(wanted)}")
+        return
+    bad = [f"{n} (built for {g})" for n, g in wanted.items() if g != have]
+    if bad:
+        raise CompanionError(f"the game is {have}, but {', '.join(bad)}; refusing to install")
+
+
 def load_manifest(root: Path, manifest: Path | None = None) -> dict:
     path = Path(manifest) if manifest else Path(root) / DEFAULT_MANIFEST
     try:
         data = json.loads(path.read_text("utf-8"))
     except (OSError, ValueError) as e:
         raise CompanionError(f"{path}: {e}")
-    if not isinstance(data.get("companions"), list):
+    if not isinstance(data, dict) or not isinstance(data.get("companions"), list):
         raise CompanionError(f"{path}: needs a \"companions\" list")
+    _check_game(data.get("game"), "manifest")
+    config = data.get("config", DEFAULT_CONFIG)
+    if not isinstance(config, list) or not all(isinstance(x, str) for x in config):
+        raise CompanionError(f"{path}: \"config\" must be a list of paths")
+    for spec in config:
+        _safe_rel(spec, f"config path {spec!r}")
+        if _norm(spec).rsplit("/", 1)[-1].lower() == "d2rloader.toml":
+            raise CompanionError(f"{spec}: d2rloader.toml cannot be a config file; use \"loader_settings\" to merge into it")
     for c in data["companions"]:
+        if not isinstance(c, dict):
+            raise CompanionError(f"{path}: every companion must be an object")
         name = c.get("name", "?")
+        _check_source(c, name)
+        _check_game(c.get("game"), name)
         if not isinstance(c.get("files"), dict) or not c["files"]:
             raise CompanionError(f"{name}: needs a non-empty \"files\" map")
         if not re.fullmatch(r"[0-9a-fA-F]{64}", str(c.get("sha256", ""))):
             raise CompanionError(f"{name}: sha256 must be 64 hex characters")
-        if not c.get("asset"):
+        if not c.get("asset") or not isinstance(c["asset"], str):
             raise CompanionError(f"{name}: needs an \"asset\"")
         for dst in c["files"].values():
-            p = PurePosixPath(dst)
-            if p.is_absolute() or ".." in p.parts or re.match(r"^[A-Za-z]:", dst):
-                raise CompanionError(f"{name}: {dst!r} must be a relative path inside the mod folder")
+            _safe_rel(dst, f"{name}: {dst!r}", "must be a relative path inside the mod folder")
+        tables = c.get("filter_tables", [])
+        if not isinstance(tables, list) or not all(isinstance(t, str) and re.fullmatch(r"[A-Za-z0-9_]+", t) for t in tables):
+            raise CompanionError(f"{name}: filter_tables must be a list of table names (letters, digits, _)")
     return data
 
 
@@ -94,12 +205,28 @@ def filter_tables(manifest: dict) -> list[str]:
 
 
 def fetch(root: Path, download: Callable[..., bytes] = github_download, manifest: Path | None = None) -> list[str]:
-    """Rebuild root/generated/companions/ and return the files written (mod-folder relative)."""
+    """Rebuild root/generated/companions/ and return the files written (mod-folder relative). The new tree is built
+    beside it and moved into place only when every entry passed, so a failure leaves the old one untouched."""
     root = Path(root)
     data = load_manifest(root, manifest)
-    dest = root / "generated" / "companions"
-    if dest.exists():
-        shutil.rmtree(dest)
+    final = root / "generated" / "companions"
+    tmp = root / "generated" / "companions.tmp"
+    shutil.rmtree(tmp, ignore_errors=True)
+    tmp.mkdir(parents=True)
+    try:
+        written = _fetch_into(tmp, root, data, download)
+        shutil.rmtree(final, ignore_errors=True)
+        tmp.replace(final)
+    except CompanionError:
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise
+    except Exception as e:  # a bad zip, a write error, a network failure
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise CompanionError(f"{type(e).__name__}: {e}") from e
+    return written
+
+
+def _fetch_into(dest: Path, root: Path, data: dict, download: Callable[..., bytes]) -> list[str]:
     written = []
     for c in data["companions"]:
         raw = "commit" in c
@@ -109,33 +236,33 @@ def fetch(root: Path, download: Callable[..., bytes] = github_download, manifest
             blob = download(c["repo"], c["commit"], c["asset"], True) if raw else download(c["repo"], c["tag"], c["asset"])
         got = hashlib.sha256(blob).hexdigest()
         if got != c["sha256"].lower():
-            shutil.rmtree(dest, ignore_errors=True)
             raise CompanionError(f"{c['asset']}: SHA-256 {got} differs from the manifest")
         if raw or not c["asset"].endswith(".zip"):  # one file: files maps the asset path to its place in the mod folder
             if c["asset"] not in c["files"]:
-                shutil.rmtree(dest, ignore_errors=True)
                 raise CompanionError(f"{c['asset']}: \"files\" has no entry for the asset itself")
             rel = c["files"][c["asset"]]
-            (dest / rel).parent.mkdir(parents=True, exist_ok=True)
-            (dest / rel).write_bytes(blob)
+            target = _inside(dest, rel, f"{c['asset']}: {rel}")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(blob)
             written.append(rel)
             continue
-        zf = zipfile.ZipFile(io.BytesIO(blob))
-        names = [n for n in zf.namelist() if not n.endswith("/")]
-        for src, dst in c["files"].items():
-            # a key ending in / copies the folder's files, else one file
-            picked = [n for n in names if n.startswith(src)] if src.endswith("/") else [n for n in names if n == src]
-            if not picked:
-                shutil.rmtree(dest, ignore_errors=True)
-                raise CompanionError(f"{c['asset']}: no {src} in the zip")
-            for n in picked:
-                rel = dst + n[len(src):] if src.endswith("/") else dst
-                if ".." in PurePosixPath(rel).parts:
-                    shutil.rmtree(dest, ignore_errors=True)
-                    raise CompanionError(f"{c['asset']}: {n} would leave the mod folder")
-                (dest / rel).parent.mkdir(parents=True, exist_ok=True)
-                (dest / rel).write_bytes(zf.read(n))
-                written.append(rel)
+        with zipfile.ZipFile(io.BytesIO(blob)) as zf:
+            names = [n for n in zf.namelist() if not n.endswith("/")]
+            for src, dst in c["files"].items():
+                # a key ending in / copies the folder's files, else one file
+                picked = [n for n in names if n.startswith(src)] if src.endswith("/") else [n for n in names if n == src]
+                if not picked:
+                    raise CompanionError(f"{c['asset']}: no {src} in the zip")
+                for n in picked:
+                    rel = dst + n[len(src):] if src.endswith("/") else dst
+                    try:
+                        _safe_rel(rel, n)
+                        target = _inside(dest, rel, n)
+                    except CompanionError:
+                        raise CompanionError(f"{c['asset']}: {n} would leave the mod folder") from None
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes(zf.read(n))
+                    written.append(rel)
     config = dest / "d2rloader" / "config"
     config.mkdir(parents=True, exist_ok=True)
     # the project's settings for the companions, over any default a zip put there
@@ -143,6 +270,8 @@ def fetch(root: Path, download: Callable[..., bytes] = github_download, manifest
         p = root / spec
         files = sorted(f for f in p.glob("*") if f.is_file()) if spec.endswith("/") else ([p] if p.is_file() else [])
         for f in files:
+            if f.name.lower() == "d2rloader.toml":
+                raise CompanionError(f"{spec}: d2rloader.toml cannot be a config file; use \"loader_settings\" to merge into it")
             shutil.copy2(f, config / f.name)
             written.append(f"d2rloader/config/{f.name}")
     return list(dict.fromkeys(written))
@@ -228,6 +357,7 @@ def main(argv: list[str] | None = None) -> int:
             sys.path.insert(0, str(TOOLKIT))
             from modkit.install import install
             from modkit.base import Base
+            check_game(a.game, load_manifest(a.root, a.manifest))
             print(install(a.root, a.game))
             name = json.loads((a.root / "mod.json").read_text("utf-8"))["name"]
             overlay(a.root, a.game / "mods" / name, a.manifest)

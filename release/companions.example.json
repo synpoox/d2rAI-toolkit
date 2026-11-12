@@ -1,5 +1,6 @@
 {
   "_note": "Pinned companion plugins (release/companions.py). Copy to companions/manifest.json and edit. sha256 is of the downloaded file: from the release's SHA256SUMS, or computed once after you checked the file. Bump one companion per PR, after a coexistence check in a test slot. Our settings for a companion go in companions/config/ and are copied over the zip's own.",
+  "game": "3.3",
   "config": ["companions/config/", "companions/filter.json"],
   "companions": [
     {

@@ -376,7 +376,11 @@ folder. Options per entry, for what only some companions need:
 | `loader_settings` | `{"section": {"key": value}}` written into `d2rloader/config/d2rloader.toml` unless the key is set already, for example `{"d2rcore.items": {"item_stat_ranges": true}}`. |
 
 The project's own settings for a companion (a filter file, plugin configs) are listed in the manifest's top-level
-`config` (default `["companions/config/"]`) and replace the zip's defaults. Bump one companion per change, after a
+`config` (default `["companions/config/"]`) and replace the zip's defaults; `install` also overwrites a player's edits to
+those files in `d2rloader/config/`. `d2rloader.toml` is refused there: use `loader_settings`, which merges. A top-level
+or per-entry `game` (`"3.3"`, major.minor only, never a build number) is compared with the Version in
+`<game>/.build.info` before `install` copies anything; a mismatch refuses, and an unreadable `.build.info` (Steam) only
+warns. Bump one companion per change, after a
 coexistence check in a test slot. `fetch` never commits anything: `generated/` stays out of the repository.
 
 ## Release notes
