@@ -655,7 +655,8 @@ class SingleFlightTests(unittest.TestCase):
         self.assertFalse(any(t.is_alive() for t in ts), "deadlock: each waits for what the other holds")
         self.assertEqual(self.runs, ["one"])
         self.assertTrue(res[1], "two replays what one kept")
-        self.assertIsNone(b.f, "and gave its slot up while it waited")
+        self.assertIsNotNone(b.f, "and took its slot back once it had replayed")
+        b.release()
 
 
 class CiPolicyTests(unittest.TestCase):
@@ -841,3 +842,132 @@ class AstKeyTests(unittest.TestCase):
                 sys.modules.pop("ruleprobe893", None)
             self.assertEqual(k1, k2)
             self.assertNotEqual(k1, k3)
+
+
+class RootAndCapTests(unittest.TestCase):
+    """root() is opt-in: no default folder. cap_bytes() reads MODKIT_CACHE_GB."""
+
+    def env(self, **kv):
+        base = {k: v for k, v in os.environ.items() if k not in ("MODKIT_SHARED_CACHE", "GITHUB_ACTIONS", "MODKIT_CACHE_GB")}
+        return mock.patch.dict(os.environ, {**base, **kv}, clear=True)
+
+    def test_root_is_none_when_not_opted_in_and_the_folder_when_it_exists(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            with self.env():
+                self.assertIsNone(rule_cache.root(), "unset: no default folder")
+            with self.env(MODKIT_SHARED_CACHE=""):
+                self.assertIsNone(rule_cache.root())
+            with self.env(MODKIT_SHARED_CACHE=str(tmp / "missing")):
+                self.assertIsNone(rule_cache.root(), "a missing folder is not created or used")
+            self.assertFalse((tmp / "missing").exists())
+            write(tmp / "afile", "x")
+            with self.env(MODKIT_SHARED_CACHE=str(tmp / "afile")):
+                self.assertIsNone(rule_cache.root(), "a file is not a folder")
+            with self.env(MODKIT_SHARED_CACHE=str(tmp)):
+                self.assertEqual(rule_cache.root(), tmp)
+                self.assertEqual(rule_cache.slot_home(), tmp)
+            with self.env(MODKIT_SHARED_CACHE=str(tmp), GITHUB_ACTIONS="true"):
+                self.assertIsNone(rule_cache.root(), "CI does not use root(): its home is slot_home(), its rules ci_policy()")
+                self.assertEqual(rule_cache.slot_home(), tmp)
+
+    def test_cap_bytes_defaults_to_20_gib_and_follows_the_environment(self):
+        with self.env():
+            self.assertEqual(rule_cache.cap_bytes(), 20 * 2**30)
+        with self.env(MODKIT_CACHE_GB="lots"):
+            self.assertEqual(rule_cache.cap_bytes(), 20 * 2**30, "a bad value falls back")
+        with self.env(MODKIT_CACHE_GB="0.5"):
+            self.assertEqual(rule_cache.cap_bytes(), 2**29)
+
+
+class MemoAndPartTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.cache, self.proj = self.tmp / "rules", self.tmp / "wt"
+        write(self.proj / "merge" / "in.txt", "one")
+        self.roots = {"p": self.proj}
+
+    def test_memo_misses_then_hits_then_misses_after_the_input_changes(self):
+        calls = []
+
+        def compute(t):
+            calls.append(1)
+            t.see(self.proj / "merge" / "in.txt")
+            return {"out.bin": (self.proj / "merge" / "in.txt").read_bytes() + b"!"}
+        run = lambda: rule_cache.memo(self.cache, "m", self.roots, compute)
+        self.assertEqual(run(), ({"out.bin": b"one!"}, False))
+        self.assertEqual(run(), ({"out.bin": b"one!"}, True))
+        self.assertEqual(len(calls), 1, "the hit did not compute")
+        write(self.proj / "merge" / "in.txt", "two, longer")
+        self.assertEqual(run(), ({"out.bin": b"two, longer!"}, False))
+        self.assertEqual(len(calls), 2)
+
+    def test_memo_keeps_nothing_when_the_policy_does_not_write(self):
+        pol = rule_cache.Policy(write=False)
+        for _ in range(2):
+            got = rule_cache.memo(self.cache, "m", self.roots, lambda t: {"a": b"1"}, pol)
+            self.assertEqual(got, ({"a": b"1"}, False))
+        self.assertFalse(self.cache.exists())
+
+    def test_part_put_then_part_get_copies_the_files_back_and_returns_extra(self):
+        gen = self.proj / "generated"
+        write(gen / "maps" / "a.txt", "AAA")
+        t = rule_cache.Trace(self.roots)
+        t.see(self.proj / "merge" / "in.txt")
+        sc = rule_cache.Scope("k", self.roots, [(self.cache, None)], self.cache, rule_cache.Policy())
+        self.assertIsNone(rule_cache.part_get(sc, "part1"), "nothing kept yet")
+        rule_cache.part_put(sc, "part1", ["maps/a.txt"], {"n": 3}, t.reads)
+        shutil.rmtree(gen)
+        self.assertEqual(rule_cache.part_get(sc, "part1"), {"n": 3})
+        self.assertEqual((gen / "maps" / "a.txt").read_text(), "AAA")
+        write(self.proj / "merge" / "in.txt", "changed input")
+        self.assertIsNone(rule_cache.part_get(sc, "part1"), "a read changed: a miss")
+
+    def test_part_put_keeps_nothing_without_a_destination(self):
+        write(self.proj / "generated" / "a.txt", "A")
+        sc = rule_cache.Scope("k", self.roots, [(self.cache, None)], None, rule_cache.Policy())
+        rule_cache.part_put(sc, "part1", ["a.txt"], {}, {})
+        self.assertFalse(self.cache.exists())
+
+
+class SlotAndSweepTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def test_a_merge_that_waited_on_a_key_lock_takes_its_slot_back_on_a_replay(self):
+        cache = self.tmp / "rules"
+        for n in ("one", "two"):
+            write(self.tmp / n / "merge" / "r.tsv", "same")
+
+        def work():
+            (self.tmp / "one" / "merge" / "r.tsv").read_text()
+            time.sleep(1.0)
+            write(self.tmp / "one" / "generated" / "a.txt", "A")
+        slots = rule_cache.Slots(self.tmp / "slots", 2, poll=0.01)
+        slots.acquire()
+        self.addCleanup(slots.release)
+        res = []
+        t = threading.Thread(target=lambda: res.append(rule_cache.rule(cache, "k", {"p": self.tmp / "one"}, work)))
+        with redirect_stdout(io.StringIO()):
+            t.start()
+            time.sleep(0.4)
+            res.append(rule_cache.rule(cache, "k", {"p": self.tmp / "two"}, lambda: None, slots=slots))
+            t.join(30)
+        self.assertIn(True, res, "the second merge replayed")
+        self.assertIsNotNone(slots.f, "and holds a slot again, so the rest of the merge runs under the cap")
+        self.assertTrue(rule_cache.holding())
+
+    def test_sweep_leaves_a_lock_file_that_is_held(self):
+        locks = self.tmp / "rules.locks"
+        write(locks / "held.main", "")
+        write(locks / "idle.main", "")
+        old = time.time() - 10 * 86400
+        for n in ("held.main", "idle.main"):
+            os.utime(locks / n, (old, old))
+        with rule_cache.lock(locks / "held.main"):
+            os.utime(locks / "held.main", (old, old))
+            rule_cache.sweep(self.tmp)
+            self.assertTrue((locks / "held.main").exists(), "a held lock is skipped")
+        self.assertFalse((locks / "idle.main").exists(), "an idle one is deleted")

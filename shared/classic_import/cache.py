@@ -1,7 +1,7 @@
 """Machine-wide caches every worktree shares, so ten agents don't each extract, merge and copy the same data.
 
 The cache root is the folder MODKIT_SHARED_CACHE names (opt-in: there is no default folder). Without it, or on CI, every
-tool works per worktree. Under the root:
+tool works per worktree (on CI the home comes from slot_home() and the rules from ci_policy()). Under the root:
   extract.lock         held by every extract run, so two extracts never run at once
   extract/<key>/       the extract's output, one per extract stamp; a worktree's extract folder is a junction to it
   rules/<key>/<reads>/ what one merge rule wrote, for its code and stamps and what it read (rule, below)
@@ -44,8 +44,9 @@ except ImportError:  # not Windows
 
 
 def root() -> Path | None:
-    """The cache root, or None: not opted in (MODKIT_SHARED_CACHE unset or not a folder), or CI, which keeps its own
-    layout and merges fresh."""
+    """The cache root of a local run, or None: not opted in (MODKIT_SHARED_CACHE unset or not a folder), or CI
+    (GITHUB_ACTIONS set). CI does not use this: its cache home comes from slot_home() and its replay and keep rules from
+    ci_policy()."""
     p = os.environ.get("MODKIT_SHARED_CACHE")
     return None if os.environ.get("GITHUB_ACTIONS") or not p or not Path(p).is_dir() else Path(p)
 
@@ -613,17 +614,22 @@ def rule(cache: Path, key_: str, roots: dict[str, Path], run: Callable[[], None]
         waited.append(1)
         if slots:
             slots.release()  # run() takes one again when it needs it
+    hit = False
     with lock(dest.with_name(dest.name + ".locks") / f"{key_}.{policy.origin}", on_wait=give_up_slot):  # beside rules/
         if replay():  # another run may have kept it between the first look and the lock
             if waited:
                 print(f"rule {key_}: waited for another run of it and replayed what it kept", flush=True)
-            return True
-        global _scope
-        _scope = Scope(key_, roots, [(cache, policy.trusted)] + ([(policy.scratch, None)] if policy.scratch else []), dest, policy)
-        try:
-            return _build(gen, home, roots, run, policy)
-        finally:
-            _scope = None
+            hit = True
+        else:
+            global _scope
+            _scope = Scope(key_, roots, [(cache, policy.trusted)] + ([(policy.scratch, None)] if policy.scratch else []), dest, policy)
+            try:
+                return _build(gen, home, roots, run, policy)
+            finally:
+                _scope = None
+    if waited and slots:
+        slots.acquire()  # the key lock is free again (order: key lock, then slot): the rest of the merge runs under the cap
+    return hit
 
 
 def memo(cache: Path, key_: str, roots: dict[str, Path], compute: Callable[["Trace"], dict[str, bytes]],
@@ -915,6 +921,22 @@ def own(entries: list[Path], policy: Policy) -> list[Path]:
     return [e for e in entries if policy.scratch is None or policy.scratch in e.parents]
 
 
+def _unlink_if_free(f: Path) -> None:
+    """Delete lock file f only while holding its lock (taken without waiting): a file still held is left, as unlinking it
+    would let the next run lock a new file and hold the same key as the holder (POSIX; Windows refuses the delete)."""
+    with open(f, "r+b") as h:
+        try:
+            msvcrt.locking(h.fileno(), msvcrt.LK_NBLCK, 1) if msvcrt else fcntl.flock(h, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return
+        if not msvcrt:  # POSIX: unlink while locked; the lock dies with the handle
+            f.unlink()
+            return
+        h.seek(0)
+        msvcrt.locking(h.fileno(), msvcrt.LK_UNLCK, 1)
+    f.unlink()  # Windows: an open file cannot be deleted, so close first
+
+
 def sweep(cache: Path, stale_s: float = 3 * 86400, lock_s: float = 86400) -> None:
     """Housekeeping before pruning to the cap: delete per-PR scratch folders (rules-pr/pr-*) not used for stale_s seconds
     (the PR closed or went quiet), key folders left empty, and lock files (<root>/*.locks/*) unused for lock_s. A lock
@@ -933,7 +955,7 @@ def sweep(cache: Path, stale_s: float = 3 * 86400, lock_s: float = 86400) -> Non
     for f in [*cache.glob("rules.locks/*"), *cache.glob("rules-pr/*.locks/*")]:
         with contextlib.suppress(OSError):
             if f.is_file() and now - f.stat().st_mtime > lock_s:
-                f.unlink()
+                _unlink_if_free(f)
 
 
 def prune(cache: Path, cap: int, keep_s: float = 900) -> list[Path]:
