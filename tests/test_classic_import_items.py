@@ -40,6 +40,15 @@ class RuleTests(unittest.TestCase):
                 with self.assertRaisesRegex(I.IdError, msg):
                     items.read_rule(p, {"weapons": 1})
 
+    def test_read_rule_keeps_every_no_drop_field_and_refuses_extra_merge_fields(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "item-tables.txt"
+            p.write_text("no-drop\ta\tb\t\tc\nno-drop\td\n", "utf-8")
+            self.assertEqual(items.read_rule(p, {}), ([], {"a", "b", "c", "d"}))
+            p.write_text("merge\tweapons\textra\n", "utf-8")
+            with self.assertRaisesRegex(I.IdError, "line 1: 'merge' takes one table.*extra"):
+                items.read_rule(p, {"weapons": 1})
+
 
 class MergeTests(unittest.TestCase):
     def test_merge_keyed_takes_source_values_keeps_d2r_only_rows_and_appends_new_ones(self):
@@ -109,6 +118,11 @@ class HdTests(unittest.TestCase):
     def src(self, *rows: str):
         return {"weapons": table("code|type|invfile", *rows)}
 
+    def test_a_wrong_hd_dir_names_the_table(self):
+        write(self.hd / "items.json", "[]")
+        with self.assertRaisesRegex(I.IdError, "weapons: no D2R row has an items.json entry"):
+            items.hd_items(self.hd, self.src("ne1|axe|inv_axe"), self.d2r, [], [])
+
     def test_new_codes_borrow_pictures_and_uniques_follow_their_base_item(self):
         files = items.hd_items(self.hd, self.src("hax|axe|inv_axe", "ne1|axe|inv_axe", "ne2|bow|inv_unknown"), self.d2r,
                                [("My Unique", "ne1", None, "inv_axe")], [("The Set's Thing", "ne2", None, "x")])
@@ -163,6 +177,36 @@ class ApplyTests(unittest.TestCase):
                             {"weapons": 1}, " X")
             text = (root / "out/global/excel/weapons.txt").read_bytes().decode("latin-1").split("\r\n")
             self.assertEqual([line.split("\t")[1] for line in text[1:] if line], ["hax", "new"])
+
+    def test_no_drop_with_the_item_tables_merged_runs_the_hd_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for base, code, name in (("src", "new", "Fresh"), ("d2r", "hax", "Axe")):
+                write(root / base / "global/excel/weapons.txt",
+                      tsv("name|code|type|invfile|spawnable", f"{name}|{code}|axe|inv_a|1", "Bow|bow|bow|inv_b|1"))
+                write(root / base / "global/excel/armor.txt", tsv("name|code|type|invfile|spawnable", "Cap|cap|helm|inv_c|1"))
+                write(root / base / "global/excel/misc.txt", tsv("name|code|type|invfile|spawnable", "Key|key|key|inv_k|1"))
+                for extra in ("uniqueitems", "setitems"):
+                    write(root / base / f"global/excel/{extra}.txt", tsv("index|code|invfile"))
+                write(root / base / "global/excel/itemtypes.txt", tsv("ItemType|Code|Equiv1|Equiv2", "Axe|axe||", "Bow|bow||"))
+                write(root / base / "global/excel/treasureclassex.txt",
+                      tsv("Treasure Class|Picks|NoDrop|Item1|Prob1|Item2|Prob2", f"A|1|0|{code}|3|bow|7"))
+            ctx = I.Context({"itemtypes": [("Axe", 0, "Axe"), ("Bow", 1, "Bow")], "uniqueitems": [], "setitems": []},
+                            {}, {}, {})
+            hd = root / "d2r/hd/items"
+            write(hd / "items.json", json.dumps([{"hax": {"asset": "a1"}}, {"bow": {"asset": "b1"}},
+                                                 {"cap": {"asset": "c1"}}, {"key": {"asset": "k1"}}]))
+            write(hd / "uniques.json", "[]")
+            write(hd / "sets.json", "[]")
+            write(root / "merge/item-tables.txt", "merge\tweapons\nmerge\tarmor\nmerge\tmisc\nmerge\ttreasureclassex\nno-drop\tnew\tbow\n")
+            with redirect_stdout(io.StringIO()) as buf:
+                items.apply(root / "merge/item-tables.txt", root / "src", root / "d2r", root / "out", ctx,
+                            {"weapons": 0, "armor": 0, "misc": 0, "treasureclassex": 0}, " X")
+            self.assertIn("never drop: 2 items", buf.getvalue())
+            tc = (root / "out/global/excel/treasureclassex.txt").read_bytes().decode("latin-1").split("\r\n")
+            self.assertEqual(tc[1].split("\t")[2:4], ["10", ""], "both weights went to NoDrop")
+            written = json.loads((root / "out/hd/items/items.json").read_text("utf-8"))
+            self.assertIn({"new": {"asset": "a1"}}, written, "the new code borrows the D2R picture")
 
 
 if __name__ == "__main__":

@@ -37,7 +37,7 @@ HD_PER_CLASSIC = 3.5  # D2R's 98 px inventory cell over the classic 28 px
 def read_rule(path: Path, vanilla: dict[str, int]) -> tuple[list[str], set[str]]:
     """The tables to merge and the never-dropping types or codes of a rule file. `vanilla` names the tables a project
     merges by key (a table needs a vanilla row count there); cubemain needs none."""
-    tables, no_drop = [], set()
+    tables, no_drop = [], set()  # a no-drop line may list several types or codes; a merge line takes exactly one table
     for n, line in enumerate(path.read_text("utf-8").splitlines(), 1):
         parts = line.split("\t")
         if not line or line.startswith("#"):
@@ -46,7 +46,13 @@ def read_rule(path: Path, vanilla: dict[str, int]) -> tuple[list[str], set[str]]
             raise I.IdError(f"{path.name} line {n}: want 'merge<tab>table' or 'no-drop<tab>type or code'")
         if parts[0] == "merge" and parts[1] not in vanilla and parts[1] != "cubemain":
             raise I.IdError(f"{path.name} line {n}: no merge rule for table '{parts[1]}'")
-        (tables.append if parts[0] == "merge" else no_drop.add)(parts[1])
+        if parts[0] == "merge":
+            if len(parts) != 2:
+                raise I.IdError(f"{path.name} line {n}: 'merge' takes one table, got {len(parts) - 1} fields "
+                                f"(unexpected: {', '.join(parts[2:])})")
+            tables.append(parts[1])
+        else:
+            no_drop.update(p for p in parts[1:] if p)
     return tables, no_drop
 
 
@@ -129,7 +135,7 @@ def block_drops(tc: I.Table, items: dict[str, I.Table], itemtypes: I.Table, no_d
     slots = [(th[f"Item{k}"], th[f"Prob{k}"]) for k in range(1, 11) if f"Item{k}" in th]
     gone = set(codes)
     while True:  # treasure classes holding only blocked entries count as blocked
-        more = {r[0] for r in tc.rows if r[0] not in gone and (es := [r[i] for i, _ in slots if r[i]])
+        more = {r[tc.key] for r in tc.rows if r[tc.key] not in gone and (es := [r[i] for i, _ in slots if r[i]])
                 and all(e in gone for e in es)}
         if not more:
             break
@@ -205,7 +211,9 @@ def hd_items(hd_dir: Path, src: dict[str, I.Table], d2r: dict[str, I.Table],
         for r in dtab.rows:
             if r[dtab.key] in asset:
                 by_type.setdefault(r[dt], asset[r[dtab.key]])
-        first = next(asset[r[dtab.key]] for r in dtab.rows if r[dtab.key] in asset)
+        first = next((asset[r[dtab.key]] for r in dtab.rows if r[dtab.key] in asset), None)
+        if first is None:
+            raise I.IdError(f"{t}: no D2R row has an items.json entry in {hd_dir}")
         pi, pt = ptab.header.index("invfile"), ptab.header.index("type")
         for r in ptab.rows:
             code = r[ptab.key]
@@ -324,6 +332,11 @@ def apply(rule: Path, src_data: Path, d2r_data: Path, out_data: Path, ctx: I.Con
                    for k, c in enumerate(tab.header) if c.endswith("invfile") for r in tab.rows}
         if upscale is None:
             pictures = {}
+            classic = src_data / "global" / "items"
+            missed = sorted(n for n in uses if n not in d2r_inv and (classic / f"{n}.dc6").is_file())
+            if missed:
+                print(f"  WARNING: no upscaler given; {len(missed)} source pictures are not upscaled, so their "
+                      f"items borrow D2R pictures ({', '.join(missed)})")
         else:
             pictures = item_pictures(upscale, rule.parent / "art", src_data, d2r_data, out_data, uses, d2r_inv)
         print(f"  item pictures: {len(pictures)} upscaled from the source's")

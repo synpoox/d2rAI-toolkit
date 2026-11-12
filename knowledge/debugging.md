@@ -79,6 +79,8 @@ start, stray plugins, stored key bindings), see [d2rloader.md](d2rloader.md).
 | A summoned pet dies about 2 s after the cast, untouched | Raven-AI pet with an empty `calc3` (D2R's attack count) | Put the count formula in `calc3` |
 | A ranged pet only melees | The classic engine set a ranged-AI flag from a summon skill parameter; D2R does not | Plugin sets the pet's AI control field |
 | A skill can't be put on the right button, or a ground click walks instead of casting | `leftskill`-only skill (often an innate charstats skill) | `rightskill 1` |
+| A new item has a picture in the inventory but is invisible when dropped (build 93847, unverified) | The asset has a `.sprite` but no unit file `data/hd/items/<folder>/<asset>.json` | Copy the unit file of the stand-in D2R asset ([hd-graphics.md](hd-graphics.md#item-pictures)) |
+| A new item with a 4-character code draws no picture (build 93847, unverified) | `items.json` is keyed by the code with bit 0x20 set in its 4th byte; an upper-case 4th letter misses | Give the code a 4th character with bit 0x20 set |
 | A monster skill opens a town portal | Classic srvdofunc 109 (monster frenzy) is D2R's itemless Town Portal | Remap 109 -> 9 for those rows |
 | Every portal recipe opens the Cow Level | D2R's cube portal output knows only the Cow Level | Plugin hook on the cube output handler |
 | A classic timed potion of a regeneration stat gives almost nothing | D2R's timed potion divides non-life/mana stats by the duration | Multiply the calc by `len` |
