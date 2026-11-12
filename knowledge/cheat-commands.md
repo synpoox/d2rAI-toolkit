@@ -32,6 +32,16 @@ the game").
   From an HD preset position (10 units per tile): `x = OffsetX*5 + hdX/2`, `y = OffsetY*5 + hdZ/2`. A map with several
   DS1 variants rolls one per game, so a spot only lands where intended if that variant loaded.
 
+## Test characters and game versions
+
+- **Use a Reign of the Warlock (RotW) character** (character creation's Game Version, the default). A Classic or Lord of
+  Destruction (LoD) character plays D2R's vanilla `excel/base/` tables, which a RotW-only mod never writes: the vanilla
+  skill tree, none of the mod's skills, and `cheat sklvl` of a mod skill does nothing. On the character select screen an
+  LoD character's banner shows an X badge.
+- **`cheat expansion 2` does not convert a character to RotW: it crashed the game.** Make a new RotW character instead.
+  (Observed in a game slot; see also the `expansion` warning below.)
+- The test character's level, experience and points: [testing.md](../docs/testing.md), "The test character".
+
 ## Warnings
 
 - `expansion` can change the character's version on save: do not use it on a test character you keep.

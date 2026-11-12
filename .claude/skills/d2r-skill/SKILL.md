@@ -83,7 +83,8 @@ other tables name it (`python -m modkit find monstats Skill1=<old>`, charstats S
 - Class-less skills share one 62-icon HD sheet (${CLAUDE_PLUGIN_ROOT}/knowledge/hd-graphics.md).
 
 ## 6. Hand over
-Install only with the game closed (`python -m modkit install <project>`), then give the user a short test list in
-the project's TESTING.md: get the skill (`save-set ... --skill SLOT=1` or skill points), cast it in town and on
-monsters, check tooltip numbers at levels 1 and 2, HD and classic (G) graphics, the icon, and hold-to-repeat.
-Then keep working; the user tests in batches.
+Install only with the game closed, in a game slot (`python -m modkit install <project>` for your own game; the
+`d2r-in-game-testing` skill for slots), then run the checks yourself and write the list in the project's TESTING.md:
+get the skill (`save-set ... --skill SLOT=1` or skill points), cast it in town and on monsters, check tooltip numbers
+at levels 1 and 2, HD and classic (G) graphics, the icon, and hold-to-repeat. Hand the user only the rows a check
+cannot settle (a feel judgement, input the harness cannot send). Then keep working.

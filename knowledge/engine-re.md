@@ -80,6 +80,15 @@ the state arrays at D2R's own offsets (+0xaf0), so **moving engine data D2RCore 
 "states fix" stopped all state sync: monsters unhoverable, no overlays). The server skill charge function
 `0x436830` is also hooked at its entry by the loader.
 
+**One owner per hook site.** Give every hooked address (and every table slot you write) exactly one owner: one
+plugin, one feature. Two plugins that both hook the same entry do not stack. The second one's byte check sees the
+first one's jump instead of D2R's bytes and refuses, so which feature survives depends on load order. Example: two
+plugins of one suite both owned the server skill dispatcher `0x43acb0` (build 93847); either one's byte guard
+disabled the other, depending on which loaded first. The fix was to delete the overlapping implementation, not to
+stack a second hook. Before you hook, search every plugin you ship (and any companion plugin you know of) for the
+address; list each owned site in one place, with its owner. If two features need the same function, put both behind
+one hook (one owner that calls both) or hook a caller or callee instead.
+
 ## 6. Writing hooks (PluginSDK 0.4.0)
 
 ```cpp
@@ -93,7 +102,7 @@ bool ok = context->InstallInlineHook(0x33b3b0, Entry, sizeof(Entry), Hook, &g_or
 
 | Rule | Why |
 |---|---|
-| Expected bytes = **whole instructions, at least 14 bytes, REX prefixes included** (`40 53 ...`, `41 56 ...`) | The loader relocates them into the trampoline; a cut instruction crashes |
+| Expected bytes = **whole instructions, REX prefixes included** (`40 53 ...`, `41 56 ...`); stop on an instruction boundary | The bytes are checked against live code, so give whole instructions (a cut instruction is a wrong signature). How D2RLoader covers its 14-byte jump beyond a shorter signature is not documented here, but 8-byte signatures ran in game. No minimum length is enforced by the SDK: the template's sound guard installs five hooks with 8-, 11- and 12-byte signatures (`push rbx / sub rsp,0x20 / mov ebx,ecx` is 8) and runs them in game (build 93847). Longer is safer against a false match, but "at least 14 bytes" is not a rule (the loader's own jump is 14 bytes; that is not the length you must give) |
 | Function pointer types must be **`noexcept`** | SDK requirement for hook targets |
 | Every hook checks its bytes and **refuses on mismatch** | Build safety: a different build never gets patched |
 | Table slots: `PatchWriteU64(rva, &expected, 8, newValue)` with the expected old value (0 for an empty slot, the current pointer when wrapping D2R's function) | Same safety for data writes (srvdofunc slots, missile hit slots) |
