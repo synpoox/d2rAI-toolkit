@@ -34,6 +34,7 @@ powershell -ExecutionPolicy Bypass -File build.ps1                    # -> build
 powershell -ExecutionPolicy Bypass -File build.ps1 -Name my-mod-core  # another DLL / plugin id / command name
 powershell -ExecutionPolicy Bypass -File build.ps1 -Mod MyMod -SoundRows 5100  # turn on the mod and sound checks
 powershell -ExecutionPolicy Bypass -File build.ps1 -Source C:\mymod\plugin -Toolkit C:\tools\d2rAI-toolkit
+powershell -ExecutionPolicy Bypass -File build.ps1 -Tests              # also build and run the game-free tests (skill router) with ctest
 powershell -ExecutionPolicy Bypass -File build.ps1 -Name my-mod-core,my-mod-ui   # a project with two plugins (below)
 ```
 

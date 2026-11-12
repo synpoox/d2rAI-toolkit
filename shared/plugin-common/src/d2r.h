@@ -14,6 +14,8 @@
 
 namespace d2r {
 
+struct Damage;  // opaque: the hit's damage block passed to srvdmg functions; its layout is not mapped yet
+
 // --- Structures ---------------------------------------------------------------------------------------------------
 // Missile creation parameters for rva::CreateMissile. 1.10's 0x5c-byte block, shifted by 0x10 after the three pointers.
 struct MissileParams {

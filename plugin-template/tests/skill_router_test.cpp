@@ -2,6 +2,7 @@
 #include "skill_router.h"
 
 #include <cstdio>
+#include <cstring>
 
 namespace {
 
@@ -31,11 +32,17 @@ int main() {
 	auto* game = reinterpret_cast<d2r::Game*>(&byte);
 	auto* unit = reinterpret_cast<d2r::Unit*>(&byte);
 
+	char report[160] = {};
+	Check(!InstallRouter(nullptr, report, sizeof(report)) && std::strcmp(report, "no routes") == 0,
+	      "no routes: the install refuses and says so");
 	Check(!Add(5, nullptr), "a null function is refused");
 	Check(!Add(-1, &SkillA), "a negative skill id is refused");
 	Check(Add(5, &SkillA) && Add(9, &SkillB), "two skills route");
 	Check(!Add(5, &SkillB), "a skill id routes once");
 	Check(Count() == 2, "two routes");
+	Check(!InstallRouter(nullptr, report, sizeof(report)) && std::strstr(report, "image not bound") != nullptr,
+	      "no context or unbound image: the install refuses and says so");
+	Check(std::strstr(report, "FAILED") != nullptr, "the refusal report says FAILED");
 	Check(Dispatch(game, unit, 5, 7) == 7 && g_calls[0] == 1, "a routed id reaches its function with its level");
 	Check(Dispatch(game, unit, 9, 1) == 1 && g_calls[1] == 1, "the other routed id reaches its own");
 	Check(Dispatch(game, unit, 6, 1) == 0 && g_calls[0] == 1 && g_calls[1] == 1, "an unrouted id returns 0");

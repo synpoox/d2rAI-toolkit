@@ -17,12 +17,13 @@ struct Route {
 // Filled before the router is installed; read-only after
 Route g_routes[MaxRoutes];
 int g_count = 0;
+bool g_installed = false;  // set by a successful InstallRouter: Add refuses after that (the game thread reads g_routes)
 std::atomic<uint32_t> g_misses {0};
 
 }  // namespace
 
 auto Add(int32_t skillId, SrvDoFn function) noexcept -> bool {
-	if (function == nullptr || skillId < 0 || g_count == MaxRoutes) {
+	if (g_installed || function == nullptr || skillId < 0 || g_count == MaxRoutes) {
 		return false;
 	}
 	for (int i = 0; i < g_count; ++i) {
@@ -66,11 +67,13 @@ auto InstallRouter(const D2RL::PluginContext* context, char* report, size_t size
 	const uint64_t rva = d2r::rva::SrvDoTable + static_cast<uint64_t>(Slot) * 8;
 	const bool ok = context->PatchWriteU64(rva, Empty, sizeof(Empty), reinterpret_cast<uint64_t>(&Dispatch));
 	std::snprintf(report, size, "srvdofunc %d router, %d route(s)%s", Slot, g_count, ok ? "" : " FAILED (slot not empty)");
+	g_installed = ok;
 	return ok;
 }
 
 void ResetForTest() noexcept {
 	g_count = 0;
+	g_installed = false;
 }
 
 }  // namespace skill_router
