@@ -61,7 +61,7 @@ DEFAULTS = {
         "min_version": "",            # optional: manifest "launcherMin", the oldest downloader that can install the release
     },
     "catalog": {                      # schema 3 for the Resurrected launcher (package_release.py); off while product_id is ""
-        "product_id": "",             # stable machine ID, e.g. "pd2r"; release_id is <product_id>-<version>
+        "product_id": "",             # stable machine ID, e.g. "mymod"; release_id is <product_id>-<version>
         "min_launcher_version": "0.1.0",
         "loader_versions": [],        # allowed D2RLoader versions; [] = [d2rloader.version]
         "loader_files": [],           # [{path, version}]: the official D2RLoader files to pin by sha256 (version = d2rloader.version)

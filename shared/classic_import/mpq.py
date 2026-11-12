@@ -1,4 +1,4 @@
-"""Read files out of a classic (v1) MPQ archive: classic Diablo II and its mods (read so far: LoD 1.09d, 1.13c, PD2).
+"""Read files out of a classic (v1) MPQ archive: classic Diablo II and its mods (read so far: LoD 1.09d, 1.13c and a 1.13c-based mod's archives).
 
 Covers what those archives use: encrypted hash/block tables, per-file encryption (with and without the fixed key),
 single-unit and sectored files, and zlib, bzip2 and PKWARE DCL implode compression. Read-only, no dependencies.

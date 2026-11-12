@@ -26,8 +26,8 @@ the game").
 - **Warp to an exact spot:** `cheat goto <levelId>,<x>,<y>` takes absolute world subtile coordinates, not
   level-relative ones. `x = OffsetX*5 + tileX*5 + 2`, `y = OffsetY*5 + tileY*5 + 2`, where `OffsetX`/`OffsetY` are the
   level's row (by `Id`) in the mod's built `levels.txt` (`out/data/global/excel/`) and `tileX`/`tileY` is the DS1 tile
-  (a tile in a coverage PNG). The `+2` lands mid-tile. Example: PD2's Kurast map (144) has OffsetX 3000, OffsetY 2550,
-  so tile (109,75) is `cheat goto 144,15547,13127`. This holds for levels with fixed offsets (PD2's map levels); a
+  (a tile in a coverage PNG). The `+2` lands mid-tile. Example: level 144, a mod-added level whose levels.txt row has fixed OffsetX 3000,
+  OffsetY 2550: tile (109,75) is `cheat goto 144,15547,13127`. The rule holds for any level with fixed offsets in the table; a
   randomly placed level's origin isn't in the table. `cheat goto <levelId>` alone lands at the level's entry.
   From an HD preset position (10 units per tile): `x = OffsetX*5 + hdX/2`, `y = OffsetY*5 + hdZ/2`. A map with several
   DS1 variants rolls one per game, so a spot only lands where intended if that variant loaded.
