@@ -52,6 +52,17 @@ validator from these files: it types every cell, checks references, key lengths 
 - Rows counted: **every row except rows whose first cell is `Expansion`**. Blank-key rows are real records
   (monsounds and montype start with one). D2R's own `*Id`/`*ID`/`*hcIdx` comment columns confirm the count.
 - `skilldesc` was re-sorted alphabetically by D2R and is referenced by name only.
+- `skilldesc` behaviour in build 93847. Source: the comments of the classic-port code that rewrites these lines
+  (`shared/classic_import/skilldesc.py`), not a capture in this repo; each is marked as such:
+  - A skill with `SkillRow` 0 is drawn in its page's first cell (a classic client hides it). To keep a skill off the
+    tree, set its `SkillPage` to 0. (Port code comment; unverified in a capture.)
+  - D2R's skilldesc strings carry the value's format code ("Duration: %d seconds"), so a classic line function that
+    prints the text and then the value prints the value twice. (Port code comment; unverified in a capture.)
+  - D2R's own classic line functions print text raw, with no format code ("+%d Percent ..." shows the code as text),
+    so a string with a format code is only safe under the functions and column D2R's lines already use it in.
+    (Port code comment; unverified in a capture.)
+  - The tooltip stacks description lines upward: a line inserted under a built-in line takes that line's slot and the
+    lines above it move up one. (Port code comment; unverified in a capture.)
 - Columns starting with `*` are comments (`*ID`, `*eol`, `*ItemName`...). Keep them but the game ignores them.
 - `*eol` ends some tables: keep it last.
 
