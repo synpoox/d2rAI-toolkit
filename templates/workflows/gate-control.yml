@@ -7,7 +7,11 @@ name: gate-control
 # ever produces the required check.
 #   closed (merged too): cancel the PR's in-flight gate run.
 #   the accept-a-drop label added or removed: rerun the gate of the open PR's current head, which reads the label at
-#   run time. Auto-merge is paused across a removal. Any other label does nothing.
+#   run time. Auto-merge is paused across a removal and left paused: the owner re-enables it (see below). Any other
+#   label does nothing.
+# Why auto-merge is not restored here: a merge made with the workflow token starts no `push` workflows, so gate.yml
+# would never run on that main commit and the baseline artifact would go stale. The owner re-enables auto-merge with
+# their own account; the job posts a PR comment and a step summary saying so. No secret is needed.
 # Repository variables: GATE_CHECK_NAME (default table-diff), GATE_OK_LABEL (default gate-drop-ok).
 on:
   pull_request:
@@ -26,7 +30,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       actions: write
-      pull-requests: write  # pause and restore auto-merge
+      contents: write  # pause auto-merge (gh pr merge --disable-auto)
+      pull-requests: write  # pause auto-merge, and the PR comment
+      checks: read  # the check-runs query after the rerun (a private repository grants nothing not listed)
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
@@ -42,7 +48,7 @@ jobs:
           if [ "$ACTION" != closed ] && [ "$state" != OPEN ]; then echo "PR is $state: nothing to rerun"; exit 0; fi
           # the newest gate.yml run of that head commit
           run=$(gh run list --workflow gate.yml --event pull_request --commit "$head" --limit 1 --json databaseId,status -q '.[0] | "\(.databaseId) \(.status)"')
-          if [ -z "$run" ]; then echo "no gate run on $head (docs-only change?)"; exit 0; fi
+          if [ -z "$run" ]; then echo "no gate run on $head"; exit 0; fi
           id=${run% *}; status=${run#* }
           active=false; case "$status" in queued|in_progress|waiting|requested|pending) active=true;; esac
           if [ "$ACTION" = closed ]; then
@@ -68,7 +74,7 @@ jobs:
             done
             if ! $ended; then
               msg="gate run $id was still running 300 s after the cancel request, so it was not rerun. Rerun it by hand once it ends."
-              $paused && msg="$msg Auto-merge stays paused: re-enable it after the rerun."
+              $paused && msg="$msg Auto-merge stays paused: re-enable it yourself after the rerun."
               echo "::error::$msg"
               exit 1
             fi
@@ -76,17 +82,18 @@ jobs:
           gh run rerun "$id"
           echo "reran gate run $id"
           if $paused; then
-            # restore auto-merge only once the rerun's new check is on the head and not completed (<= 60 s)
+            # wait (<= 60 s) until the rerun's new check is on the head and not completed, so the note is accurate
+            check=$(jq -rn --arg c "$CHECK" '$c|@uri')
             queued=false
             for i in $(seq 1 12); do
-              n=$(gh api "repos/$GH_REPO/commits/$head/check-runs?check_name=$CHECK&filter=latest" -q '[.check_runs[] | select(.status != "completed")] | length')
+              n=$(gh api "repos/$GH_REPO/commits/$head/check-runs?check_name=$check&filter=latest" -q '[.check_runs[] | select(.status != "completed")] | length')
               if [ "$n" -gt 0 ]; then queued=true; break; fi
               sleep 5
             done
-            if ! $queued; then
-              echo "::error::the rerun's $CHECK check did not show up on $head within 60 s. Auto-merge stays paused: re-enable it once the gate is running."
-              exit 1
-            fi
-            gh pr merge "$PR" --auto "--$(echo "$auto" | tr A-Z a-z)"
-            echo "auto-merge restored"
+            # Auto-merge stays paused: a merge by the workflow token would start no gate run on main (see the header).
+            if $queued; then state_note="The gate is running again on $head."; else state_note="The rerun's $CHECK check did not show up on $head within 60 s: check the gate before merging."; fi
+            note="Auto-merge was paused while the gate reran after the label was removed, and it is still paused. $state_note Re-enable auto-merge yourself once the gate has passed (\`gh pr merge $PR --auto --$(echo "$auto" | tr A-Z a-z)\`, or the button on the PR)."
+            echo "::warning::$note"
+            echo "$note" >> "$GITHUB_STEP_SUMMARY"
+            gh pr comment "$PR" --body "$note" || echo "::warning::could not post the PR comment"
           fi
