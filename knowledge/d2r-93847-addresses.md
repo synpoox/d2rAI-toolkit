@@ -245,7 +245,7 @@ empty). Functions holding one inline its destruction (see `0x5630e0`'s epilogue)
 | `0x3bb0f0` | (missile) -> frames elapsed |
 | `0x3bb1e0` | (missile) -> frames left |
 | `0x3bdbc0` / `0x3bd450` / `0x3bd8a0` | total frames / set frames left / set step counter |
-| `0x2390e80` | **server do table** (record +0x2c), no bound, dispatcher `0x466ce0`; 46-54 empty |
+| `0x2390e80` | **server do table** (record +0x2c), no bound, dispatcher `0x466ce0`; 46-53 empty (the next table starts at `0x2391030` after slot 53) |
 | `0x2391030` | **server hit table** (record +0x2e), bound 71 at `0x2391404`, dispatcher `0x464ac0` (game, missile, target or null); **61-70 empty** |
 | `0x2358430` | **client do table** (record +0x28), called (missile, float part-frame) from `0x1ba040`; slot 14 unused |
 | `0x2358710` | **client hit table** (record +0x2a), bound 81 at `0x2358a64`; slots 6, 7 empty |
@@ -452,7 +452,7 @@ pairs and `scha`/`pelt`. The plugin template's `item_type_check.cpp` checks them
 Table slots are written with `PatchWriteU64(table + 8*slot, expected, 8, function)`: expected 0 for an empty slot,
 the current pointer when wrapping a D2R function. srvdofunc `0x238ea00` (free 172-190), cltdofunc `0x235f7d0` (free
 110-129), server missile hit `0x2391030` (free 61-70), client missile hit `0x2358710` (6, 7 empty), server missile
-do `0x2390e80` (46-54 empty), client missile do `0x2358430` (14 unused). Item spell flag:
+do `0x2390e80` (46-53 empty), client missile do `0x2358430` (14 unused). Item spell flag:
 `PatchWriteU32(0x236fe30 + 12*slot + 8, 0 -> 1)`.
 
 ## Inventory grid widget (build 93847)
@@ -475,6 +475,18 @@ do `0x2390e80` (46-54 empty), client missile do `0x2358430` (14 unused). Item sp
 After `0x2dc4b0` returns, `out` is plain ASCII with one line per LF, bottom line first and no colour codes (tested in game). Lines with the same stat are already merged, so a line can hold values from more than one source.
 
 Unlike tooltip listeners, this buffer takes colour codes: U+E07E plus the code character. `;` is purple and `3` is the property blue; a code holds for the rest of its line and later lines (tested in game).
+
+## Unverified table addresses (tools/probe_tables.py, build 93847)
+
+Built into `tools/probe_tables.py` and printed there as "(UNVERIFIED)". No Ghidra evidence is recorded for them yet: confirm each one (what it is, how found) and move it into the sections above, or drop it. Probe-only, so none belongs in `shared/plugin-common/src/rvas_93847*` unless plugin code starts using it.
+
+| RVA | Guess | Status |
+|---|---|---|
+| `0x235f590` | cltstfunc (client start function) table, bound u32 at `0x235f7c0` | unverified |
+| `0x2391270` | missile damage function table (`msrvdmg`), bound u32 at `0x2391408` | unverified |
+| `0x2386bd8` | u32 bound of the property function table `0x2386ab0` | unverified |
+| `0x1d1945c` | u32 read as the compiled-formula (prgcalc) count, named `prgcalc_bound` | unverified |
+| `0x238e710` | srvstfunc table size: the tool reads up to the next table `0x238ea00` (94 slots); an earlier draft used 91 | unverified |
 
 ## Monster AI table (build 93847)
 
