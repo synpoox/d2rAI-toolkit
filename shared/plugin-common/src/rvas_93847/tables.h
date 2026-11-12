@@ -75,8 +75,8 @@ inline constexpr int MissileSrvHitFirstFree = 61;
 inline constexpr uint64_t MissileCltDoTable = 0x2358430;
 inline constexpr int MissileCltDoSlots = 92;
 inline constexpr int MissileCltDoFirstFree = 78;
-// int32_t fn(Unit* missile, Unit* hit): 81 slots (dispatcher 0x1b8e60, bound dword 0x2358a64), 66-80 free (and 6-8,
-// 11, 15, 17, 20-23, 27, 35, 45, 49, 58, 59). Zero skips the hit's explosion. Record +0x2a.
+// int32_t fn(Unit* missile, Unit* hit): 81 slots (dispatcher 0x1b8e60, bound dword 0x2358a64), 66-80 free (and 6, 7 empty
+// in the image; a mod's reading also lists 8, 11, 15, 17, 20-23, 27, 35, 45, 49, 58, 59 as empty, not checked here). Zero skips the hit's explosion. Record +0x2a.
 inline constexpr uint64_t MissileCltHitTable = 0x2358710;
 inline constexpr int MissileCltHitSlots = 81;
 inline constexpr int MissileCltHitFirstFree = 66;
