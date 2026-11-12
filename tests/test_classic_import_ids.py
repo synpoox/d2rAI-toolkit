@@ -317,12 +317,21 @@ class HookTests(unittest.TestCase):
         h = ["code", "gfx"]
         self.assertEqual(fix("misc", h, ["a", '"toolong"']), ["a", "tool"])
         self.assertEqual(fix("misc", h, ["Mixed-Case", "ok"]), ["Mixed-Case", "ok"])  # misc has no properties
-        self.assertEqual(fix("uniqueitems", ["index", "prop1"], ["u", "Mixed-Case"]), ["u", "mixed-case"])
-        # only property-code columns are respelled, not a name, an id or a parameter
-        h = ["index", "*ID", "prop1", "par1", "mod 1 code", "a1mod1code"]
-        self.assertEqual(fix("sets", h, ["Mixed-Case", "Mixed-Case", "Mixed-Case", "Mixed-Case", "Mixed-Case",
-                                         "Mixed-Case"]),
-                         ["Mixed-Case", "Mixed-Case", "mixed-case", "Mixed-Case", "mixed-case", "mixed-case"])
+        self.assertEqual(fix("uniqueitems", ["index", "prop1", "par1"], ["u", "Mixed-Case", "0"]), ["u", "mixed-case", "0"])
+        # only property-code columns are respelled, not a name, an id, a parameter or an item code (D2R 93847 headers)
+        M = "Mixed-Case"
+        h = ["index", "*ID", "prop1", "par1", "min1", "max1"]
+        self.assertEqual(fix("uniqueitems", h, [M] * 6), [M, M, "mixed-case", M, M, M])
+        h = ["index", "code", "prop1", "par1"]  # uniqueitems' bare code is an item code
+        self.assertEqual(fix("uniqueitems", h, [M] * 4), [M, M, "mixed-case", M])
+        h = ["description", "op", "param", "mod 1", "mod 1 chance", "mod 1 param", "mod 1 min", "b mod 2", "b mod 2 chance",
+             "b mod 2 param"]
+        self.assertEqual(fix("cubemain", h, [M] * 10),
+                         [M, M, M, "mixed-case", M, M, M, "mixed-case", M, M])
+        h = ["index", "aprop1a", "apar1a", "amin1a", "amax1a", "aprop1b", "apar1b"]
+        self.assertEqual(fix("setitems", h, [M] * 7), [M, "mixed-case", M, M, M, "mixed-case", M])
+        h = ["index", "PCode2a", "PParam2a", "PMin2a", "PMax2a"]
+        self.assertEqual(fix("sets", h, [M] * 5), [M, "mixed-case", M, M, M])
 
     def test_derive_and_finishes_in_order(self):
         d2r = table("skill|charclass|passive|rightskill|x\nA|ama|0|1|\n")

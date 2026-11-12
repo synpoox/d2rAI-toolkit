@@ -416,23 +416,29 @@ def make_spell(funcs: Funcs, refs: dict[str, dict[str, str]] | None = None,
 Fixes = dict[str, dict[tuple[str, str], dict[str, str]]]  # table -> (column, bad value) -> the row's new cells
 
 
-def is_prop_column(name: str) -> bool:
-    """Whether a PROPS-table column holds a property code: prop1, mod 1 code, a1mod2code, ... (not index, *ID, par,
-    min or max)."""
-    low = name.lower()
-    return "par" not in low and bool(re.fullmatch(r"prop\d*|mod ?\d+ ?code|a\d+mod\d+code|\w*code\d*", low))
+def prop_columns(header: list[str]) -> list[tuple[int, int | None]]:
+    """The property-code columns of a PROPS table as (column, its param column): a column holds a property code when
+    the next column's name has `par`, or the next has `chance` and the one after has `par` (cubemain `mod 1`,
+    `mod 1 chance`, `mod 1 param`); `op` and `chance` columns never do. A bare item `code` column matches nothing."""
+    low = [c.lower() for c in header] + ["", "", ""]
+    cols = []
+    for j in range(len(header)):
+        p = j + 1 if "par" in low[j + 1] else j + 2 if "chance" in low[j + 1] and "par" in low[j + 2] else None
+        if p is not None and low[j] != "op" and "chance" not in low[j]:
+            cols.append((j, p))
+    return cols
 
 
 def fix_cells(fixes: Fixes, words: dict[str, str] | None = None, word_tables: set[str] = PROPS) -> FixRow:
     """A FixRow for values no table defines, which D2R's loader refuses: a source row whose `column` holds `bad`
     (quotes aside) gets the new cells (a column the table lacks is skipped). `words`: cell value -> its spelling in
-    the property-code columns (is_prop_column) of every table of `word_tables` (a property code in another letter
+    the property-code columns (prop_columns) of every table of `word_tables` (a property code in another letter
     case, say); other columns, such as index and *ID, are left alone."""
     def fix(table: str, header: list[str], row: list[str]) -> list[str]:
         row = list(row)
         if words and table in word_tables:
-            row = [words.get(v.replace('"', ""), v) if is_prop_column(c) else v for c, v in zip(header, row)] \
-                + row[len(header):]
+            for j, _ in prop_columns(header):
+                row[j] = words.get(row[j].replace('"', ""), row[j])
         for (col, bad), cells in fixes.get(table, {}).items():
             if col in header and row[header.index(col)].replace('"', "") == bad:
                 for c, v in cells.items():
@@ -533,10 +539,8 @@ def fix_props(header: list[str], row: list[str], ren: dict[str, dict[str, str]],
         op, par = header.index("op"), header.index("param")
         if row[op].isdigit() and 3 <= int(row[op]) <= 26:
             row[par] = ids.get("itemstatcost", {}).get(row[par], row[par])
-    low = [c.lower() for c in header] + ["", "", ""]
-    for j in range(len(header)):
-        p = j + 1 if "par" in low[j + 1] else j + 2 if "chance" in low[j + 1] and "par" in low[j + 2] else None
-        kind = props.get(row[j]) if p else None
+    for j, p in prop_columns(header):
+        kind = props.get(row[j])
         if kind in ("skill", "state"):
             row[p] = remap(kind + "s", row[p])
         elif kind == "skillrange" and p + 2 < len(header):  # skill-rand: min and max are a range of skill ids
@@ -678,7 +682,8 @@ def apply(rule: Path, src_data: Path, d2r_data: Path, out_data: Path, tables: li
     """The merge driver's rule kind for merge/ids-<table>.tsv: check the project's lists (`tables`, bound with
     functools.partial) and write that table, references to the listed tables renamed and NUM_REFS columns in the
     mod's ids. A table in `followers` (opt-in; pass FOLLOWERS: objects -> objtype) also writes the table that follows
-    it, when both games have it; a project with its own rule for that table leaves it out. A project with its own fixes calls merge_table with its hooks instead."""
+    it, when both games have it; a project with its own rule for that table leaves it out. A project with its own
+    fixes calls merge_table with its hooks instead."""
     table = rule.stem[len("ids-"):]
     lists = lists_for(rule.parent, tables, src_data, d2r_data)
     nums = {t for refs in NUM_REFS.values() for t in refs.values()} & set(tables)
