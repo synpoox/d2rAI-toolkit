@@ -487,3 +487,9 @@ Built into `tools/probe_tables.py` and printed there as "(UNVERIFIED)". No Ghidr
 | `0x2386bd8` | u32 bound of the property function table `0x2386ab0` | unverified |
 | `0x1d1945c` | u32 read as the compiled-formula (prgcalc) count, named `prgcalc_bound` | unverified |
 | `0x238e710` | srvstfunc table size: the tool reads up to the next table `0x238ea00` (94 slots); an earlier draft used 91 | unverified |
+
+## Monster AI table (build 93847)
+
+| RVA | Meaning |
+|---|---|
+| `0x2396e90` | Monster AI table: 155 records of 32 bytes `{kind (u64), init fn, think fn, next}`, absolute 64-bit pointers (image base `0x140000000`). Indexed by the row of `monai.txt` (the monstats `AI` column names the row). Examples: Skeleton think `0x5b43a0`, Brute `0x5acc20`, Zombie `0x5ba780`, BloodHawk `0x5aca20`. Read from a memory-layout dump; pairs with 1.09d's AI table in [porting-classic-mods.md](porting-classic-mods.md). The generator `shared/classic_import/gen_109d_monster_ai.py` reads it |
