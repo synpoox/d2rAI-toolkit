@@ -49,6 +49,17 @@ def side_by_side(left: Image, right: Image) -> Image:
     return Image(2 * left.width, left.height, b"".join(rows))
 
 
+def split_pair(pair: Image) -> tuple[Image, Image]:
+    """The inverse of side_by_side: the left and the right half of a pair image."""
+    if pair.width % 2:
+        raise ValueError(f"a pair image has an even width, not {pair.width}")
+    half = pair.width // 2
+    stride = pair.width * 3
+    left = [pair.rgb[y * stride:y * stride + half * 3] for y in range(pair.height)]
+    right = [pair.rgb[y * stride + half * 3:(y + 1) * stride] for y in range(pair.height)]
+    return Image(half, pair.height, b"".join(left)), Image(half, pair.height, b"".join(right))
+
+
 def distance(a: Image, b: Image) -> float:
     """Signature distance of two shots (0 = same picture); infinite when the sizes differ."""
     if (a.width, a.height) != (b.width, b.height):
