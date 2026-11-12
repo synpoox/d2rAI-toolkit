@@ -8,6 +8,8 @@ package_release.py     Mod folder -> dist/: <Folder>-<v>.7z, downloader-manifest
                        with [catalog] also release-manifest.json + feed.json (schema 3, the Resurrected launcher).
                        Also importable: find_7z, write_7z, file_list, empty_dirs, forbidden_files, sha256.
 publish_release.py     publish | promote | list | gc | verify. Uploads only what the host lacks, to a dir: or sftp:// target.
+companions.py          Fetch a mod's community plugins pinned by SHA-256 (companions.example.json), overlay the project's
+                       settings and install them with the mod: `fetch` | `install --game DIR`.
 dl_ingest.py           Runs ON the download host. Checks an upload, builds the player 7z, writes the channel file last.
 dl_sync.py             Runs ON the download host. Mirrors the site to an S3-compatible bucket with rclone.
 github_release.py      Creates or updates a GitHub / Forgejo release page from the changelog (REST, token from env or file).
