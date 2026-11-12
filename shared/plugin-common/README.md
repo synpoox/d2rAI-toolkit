@@ -10,8 +10,11 @@ Target: **D2R 3.3.0 build 93847 + D2RLoader 1.3.1, PluginSDK 0.4.0.** `plugin-te
 | `src/build_guard.h` | Image check: the PE TimeDateStamp of the running game against `rva::ImageStamp` (`0x6ab3782c`), and the log/status line |
 | `src/rvas_93847.h` | Engine facts for build 93847: `ImageStamp`, and the RVAs and record offsets by area in `src/rvas_93847/` (tables, damage, units, offsets, stats, items, levels, ai, client, pools). One header per build. The structures (`MissileParams`, `SummonParams` and the rest) and helpers are in `d2r.h` |
 | `src/d2r.h`, `src/d2r.cpp` | `d2r::Bind()` (fails closed: binds nothing on any other image), the typed function table `d2r::api`, `Engine<Fn>`, `At<T>`, `UnitXY`, `EvalCalc`, `ValidMissile`, D2 RNG |
+| `src/ai_registry.*` | `ai_registry::Register(context, monaiRow, d2rThink, classId, think)`: a monster think function by monai row and monstats class, D2R's think for every other monster (`ai_registry::Vanilla(row)`) |
 | `src/env_guard.*` | Environment guard: another mod running, the DLL outside its mod folder, a second copy, other plugins |
 | `src/off_switch.*` | Reads `<name>-off.txt` beside the path you pass (the DLL or the plugin's config): part words to leave out |
+| `src/parts.*` | The parts table: `{word, engine, install, state}` rows, `InstallAll` (off file, wrong image, log line per part) and `WriteStatus` for the console command |
+| `src/level_palette.*` | `level_palette::Install`: loads a level's own legacy palette when a level change crosses a `levels.txt` Pal (no load screen), through D2R's act palette load; `NeedsLoad`, `Counters` |
 | `src/log.*` | Log helper (`plog::Info/Warn/Error`, `plog::Sample` for hot paths) |
 | `src/crash_guard.h` | Logs a FAULT line when the game faults: address, why, whether this plugin is on the stack |
 

@@ -1,3 +1,6 @@
 # Hook scripts run under sh: keep LF endings on every platform
 tools/hooks/* text eol=lf
 *.sh text eol=lf
+
+# Workflow templates: LF on every platform
+templates/workflows/*.yml text eol=lf

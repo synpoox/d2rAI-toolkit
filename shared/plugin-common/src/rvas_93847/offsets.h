@@ -166,6 +166,7 @@ inline constexpr int MonPartyMin = 0x62;  // uint8
 inline constexpr int MonPartyMax = 0x63;  // uint8
 inline constexpr int MonMinGrp = 0x65, MonMaxGrp = 0x66;  // uint8 MinGrp, MaxGrp (field table 0x39db30; 1.13c +0x2f, +0x30)
 inline constexpr int MonRun = 0x6a;  // int16 monstats Run: D2R's field table (0x39db30) has Velocity at 0x68, Run at 0x6a.
+inline constexpr int MonDrain = 0xf2;  // uint8 monstats Drain (Normal); Nightmare +1, Hell +2
 inline constexpr int MonAlign = 0x87;  // uint8 monstats Align (rva::MonStatsRecord); 0x493cc0 reads it for 0x48e600
 // monstats record: aidel uint8[3] (the txt field table 0x39db30), aip1-8 int16[8][3], Skill1-8 int16, Sk1-8mode uint8
 inline constexpr int MonAiDel = 0x8a, MonAiParams = 0x90, MonSkills = 0x1c4, MonSkillModes = 0x1d4;
