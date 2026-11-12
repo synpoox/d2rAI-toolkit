@@ -16,7 +16,7 @@ Read `${CLAUDE_PLUGIN_ROOT}/knowledge/porting-classic-mods.md` first; it has the
   (credit, publishing). Without their permission, stop and say why. Follow their terms throughout.
 - Never commit Blizzard's files or the mod's archives.
 - HD first; classic graphics later. Stand-in vanilla art first, custom art last.
-- Keep an unported list (feature, why, what players see) in the mod project.
+- Keep a deviations ledger (feature, why, what players see) in the mod project: `${CLAUDE_PLUGIN_ROOT}/templates/deviations.md`, saved as `docs/deviations.md`.
 - First milestone: a new character in Act 1. Then work from what breaks.
 
 ## Steps
@@ -42,7 +42,7 @@ Read `${CLAUDE_PLUGIN_ROOT}/knowledge/porting-classic-mods.md` first; it has the
    start loads D2R's sounds), read `d2rloader.log`, fix load asserts, get into Act 1.
 9. **Graphics** (`${CLAUDE_PLUGIN_ROOT}/knowledge/hd-graphics.md`): HD item/unique/set entries, missiles.json, HD states for sequence
    skills, overlay folders, model/texture indexes for new paths; ship the classic files the tables reference.
-10. Keep the bug list and TESTING.md current; crashes from players go through the `d2r-crash` skill.
+10. Keep the issues and TESTING.md current; crashes from players go through the `d2r-crash` skill.
 
 ## Before you say "done" with a table
 - Row count under 32,768, keys within their dataguide lengths.

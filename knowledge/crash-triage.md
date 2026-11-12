@@ -177,6 +177,6 @@ the heap. Log the first, 100th and 10,000th fallback and show counts in the stat
 
 ## 7. Close the loop
 
-- Write the cause and the evidence (report, log lines, the instruction) in your bug list.
+- Write the cause and the evidence (report, log lines, the instruction) in the issue.
 - Add a check or a self-check that would catch it again (a build-time validator, a plugin startup check).
 - If you could not reproduce it, say so in the fix notes and say what the log will show if it comes back.

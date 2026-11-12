@@ -38,6 +38,6 @@ and the symptom table in `${CLAUDE_PLUGIN_ROOT}/knowledge/debugging.md`.
 - Fix the data when the data is wrong (an id out of range, a missing HD entry, a reassigned function number).
 - Fix with a plugin guard when D2R itself fails on a case the mod creates (null allocation, bad sound id): byte-
   checked hooks, counted and logged, an off word and a status line.
-- Write the cause and evidence (report lines, instruction, register) in the bug list; add a check that would
+- Write the cause and evidence (report lines, instruction, register) in the issue; add a check that would
   catch it again. If you could not reproduce it, say so, and say what the log will show if it returns.
 - New engine facts go into `${CLAUDE_PLUGIN_ROOT}/knowledge/` (addresses with the build number).

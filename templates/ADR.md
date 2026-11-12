@@ -6,7 +6,7 @@ or a research document (`templates/research.md`) the record links to.
 
 Status: `<proposed | accepted | superseded by ADR NNNN | rejected>`
 Date: `<YYYY-MM-DD>`
-Decided by: `<owner | coordinator, with the owner's name only if the owner agrees to it being public>`
+Decided by: `<owner | orchestrator, with the owner's name only if the owner agrees to it being public>`
 Issue: `<#n>`
 
 ## Context

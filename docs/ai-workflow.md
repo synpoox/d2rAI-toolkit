@@ -1,14 +1,14 @@
 # Running a D2R mod project with AI agents
 
 This guide explains a working method for building or porting a Diablo II: Resurrected mod with AI agents. It comes
-from a large classic-to-D2R overhaul port that was run this way: one human owner, one coordinator agent, and
-dozens of short-lived worker agents ("lanes").
+from a large classic-to-D2R overhaul port that was run this way: one human owner, one orchestrator agent that
+routes and never implements, and dozens of short-lived implementer and reviewer agents ("lanes").
 
 You do not need all of it. A small mod can be one person and one agent. But once a project has more than a handful of
 open problems, the pieces below keep it from falling apart.
 
 Ready-made files for everything in this guide are in [`templates/`](../templates/). Three skills wrap the main
-jobs: `d2r-coordinator` (plan and run lanes), `d2r-project-conventions` (issues, PRs, branches, gate) and `d2r-release` (ship a version).
+jobs: `d2r-orchestrator` (route lanes, review, merge, hand off), `d2r-project-conventions` (issues, PRs, branches, gate) and `d2r-release` (ship a version).
 
 ## Contents
 1. [The big picture](#1-the-big-picture)
@@ -16,14 +16,14 @@ jobs: `d2r-coordinator` (plan and run lanes), `d2r-project-conventions` (issues,
 3. [Lanes: one job, one branch, one PR](#3-lanes-one-job-one-branch-one-pr)
 4. [Choosing models and providers](#4-choosing-models-and-providers)
 5. [Game slots and testing](#5-game-slots-and-testing)
-6. [The bug list](#6-the-bug-list)
-7. [Releasing](#7-releasing)
-8. [Safety: secrets, identity, public things](#8-safety-secrets-identity-public-things)
-9. [Talking to the human owner](#9-talking-to-the-human-owner)
-10. [Writing a good lane prompt](#10-writing-a-good-lane-prompt)
-11. [Common failure modes and fixes](#11-common-failure-modes-and-their-fixes)
-12. [Starter checklist](#12-starter-checklist)
-13. [Using the skills from another project](#13-using-the-skills-from-another-project-local-plugin)
+6. [Releasing](#6-releasing)
+7. [Safety: secrets, identity, public things](#7-safety-secrets-identity-public-things)
+8. [Talking to the human owner](#8-talking-to-the-human-owner)
+9. [Writing a good lane prompt](#9-writing-a-good-lane-prompt)
+10. [Common failure modes and fixes](#10-common-failure-modes-and-their-fixes)
+11. [Starter checklist](#11-starter-checklist)
+12. [Using the skills from another project](#12-using-the-skills-from-another-project-local-plugin)
+13. [Documentation audit](#13-documentation-audit)
 
 ---
 
@@ -32,9 +32,9 @@ jobs: `d2r-coordinator` (plan and run lanes), `d2r-project-conventions` (issues,
 ```mermaid
 flowchart TD
     Owner([Owner / human])
-    Coord[Coordinator session<br/>plans, briefs, reviews, merges, releases]
-    Bugs[(docs/bugs.md<br/>numbered bug list)]
-    Plan[(docs/PLAN.md<br/>phases and progress)]
+    Orch[Orchestrator session<br/>routes, merges, releases, never implements]
+    Issues[(GitHub issues<br/>the work list)]
+    Plan[(docs/PLAN.md<br/>roadmap, status on the issues)]
 
     subgraph Lanes [Lanes: one job each, run in parallel]
         L1[Lane 1<br/>branch ticket/1-a<br/>worktree A]
@@ -48,22 +48,22 @@ flowchart TD
     Rel[Release<br/>version + changelog + publish]
     Players([Players])
 
-    Owner -- goals, decisions, approvals --> Coord
-    Coord -- status, copy-paste blocks, questions --> Owner
-    Coord <--> Bugs
-    Coord <--> Plan
-    Coord -- one lane prompt per job --> L1 & L2 & L3
+    Owner -- goals, decisions, approvals --> Orch
+    Orch -- one line per vital update or blocker --> Owner
+    Orch <--> Issues
+    Orch <--> Plan
+    Orch -- one lane prompt per job --> L1 & L2 & L3
     L1 & L2 & L3 -- need a running game --> Slots
     L1 & L2 & L3 -- push branch, open --> PR
-    PR -- coordinator reviews --> Coord
-    Coord -- merges, never the lane --> Main
+    PR -- separate reviewer checks --> Orch
+    Orch -- squash merges, never the lane --> Main
     Main --> Rel --> Players
     Players -- bug reports --> Owner
-    Owner -- pass on --> Coord
+    Owner -- pass on --> Orch
 ```
 
-The loop in one sentence: **the owner decides, the coordinator plans and merges, lanes do one job each and open a pull
-request, and every merged fix is released.**
+The loop in one sentence: **the owner decides, the orchestrator routes and merges, implementers do one job each and
+open a pull request, a separate reviewer checks it, and every merged fix is released.**
 
 ### Decisions for a port
 
@@ -82,18 +82,19 @@ None of these decisions shows that a particular rule works; each rule still need
 
 | Role | Does | Never does |
 |---|---|---|
-| **Owner** (human) | Sets goals, answers questions, approves anything public, paid or destructive, plays the game, reports bugs. | Has to read code or run lane commands (the coordinator gives copy-paste blocks). |
-| **Coordinator** (one long agent session) | Plans phases, splits work into lanes, writes lane prompts, reviews and merges PRs, builds and tests merged results, bumps versions, releases, keeps the docs current. | Does the big implementation work itself. A coordinator that codes gets slow and loses the overview. |
-| **Lane** (short agent session) | Does exactly one bug or feature on its own branch, runs the tests for what it touched, opens a PR, reports. | Merges, touches files outside its job, releases, or messages other agents. |
+| **Owner** (human) | Sets goals, answers questions, approves anything public, paid or destructive, plays the game, reports bugs. | Has to read code or run lane commands (the orchestrator gives copy-paste blocks). |
+| **Orchestrator** (one long agent session) | Plans phases, keeps the work list on issues, splits work into lanes, writes lane prompts, starts implementers and reviewers (at most 5 implementer agents at once; reviewers do not count), squash-merges reviewed PRs, cleans up, releases, writes the handoff. | **Implements.** An orchestrator that codes gets slow and loses the overview; it routes. |
+| **Implementer** (short agent session) | Does exactly one bug or feature on its own branch, runs the tests for what it touched, opens a PR, reports. | Merges, touches files outside its job, releases, waits on CI, or messages other agents. |
+| **Reviewer** (short agent session, strongest model) | Reads one PR's diff against its issue and the rules, checks the tests are real, reports findings. | Is the agent that wrote the PR, or merges. |
 
-Keep the coordinator on your strongest model. It reviews other agents' work and makes judgement calls, so it is the
-worst place to save money.
+Keep the orchestrator and every reviewer on your strongest model. They judge other agents' work, so they are the worst
+place to save money.
 
 ## 3. Lanes: one job, one branch, one PR
 
 **One bug or feature per lane.** Two bugs in one lane means one slow review, one big diff, and one fix you can't ship
-without the other. If two reports look related, merge them into one bug first (see [section 6](#6-the-bug-list)),
-then give that one bug to one lane.
+without the other. If two reports look related, merge them into one issue first,
+then give that one issue to one lane.
 
 **Each lane works in its own checkout.** Use a git worktree (or a separate clone) so lanes never share a working
 directory:
@@ -111,12 +112,19 @@ Rules that keep this safe:
 
 - A lane branch is named `ticket/<n>-<slug>` (`research/<topic>`, `refactor/<topic>`; see the `d2r-project-conventions` skill) and starts from the current `origin/main`. Say so in the prompt. A lane
   that starts from some other branch drags that branch's changes into its PR.
-- **Lanes open PRs and never merge.** The coordinator reads the diff, checks the tests, merges, and resolves
-  conflicts. This is the main quality gate.
+- **Implementers open PRs and never merge.** A separate reviewer reads the diff and checks the tests; the
+  orchestrator squash-merges once the reviewer reports no blocking findings and resolves conflicts. This is the main quality gate.
+  Evidence: a project with a separate Opus-class reviewer and a fix-cycle cap caught what the writing agent missed
+  without stalling.
+- **At most 2 fix cycles per PR.** A cycle is: reviewer findings, implementer fix, re-review. After the second, merge
+  what stands alone and file a follow-up issue for the rest. A third cycle rarely converges.
+- **Workers never wait on CI and never touch runners.** Push, open the PR, report. The reviewer or orchestrator reads
+  the checks later. A docs-only PR skips CI unless it touches the gate inputs (`d2r-project-conventions` skill).
 - A lane only edits the files its job needs. If it finds a second problem, it writes it down in its report instead
-  of fixing it. The coordinator turns that into a new bug and a new lane.
+  of fixing it. The orchestrator turns that into a new issue and a new lane.
 - Merge in a separate worktree (`git worktree add --detach ../merge-wt origin/main`), not in the checkout a release
-  job is using.
+  job is using. Merges are **squash merges**; delete the branch afterwards (never `research/*`, `issue-assets`,
+  `handoff/*`, `backup/*`).
 - The lane's final report always has the same shape: PR link, head commit, what changed, what was tested and how,
   what is left. See [`templates/lane-prompt.md`](../templates/lane-prompt.md).
 - **A lane that "finishes" while waiting on something has actually stopped.** Ending a turn ends the lane. Tell every
@@ -124,14 +132,24 @@ Rules that keep this safe:
   turn. If a lane reports "waiting for the run", check its branch and PR before you trust the report, then send it a
   follow-up telling it to continue.
 
-### How the coordinator runs a round
+### How the orchestrator runs a round
 
-1. Read the bug list and plan. Pick the next jobs.
-2. Write one prompt per job (from the template). Start the lanes, each on a fresh branch from `main`.
-3. While they run, review earlier PRs, update docs, answer the owner.
-4. When a PR arrives: read the diff, check the tests it claims, merge it in a separate worktree, run the targeted
-   checks for the merged code.
-5. When a batch of fixes is merged: release ([section 7](#7-releasing)).
+1. Read the open issues and the plan. Pick the next jobs. Close duplicates (`duplicate of #N`) before any work.
+2. Write one prompt per job (from the template). Start the implementers, each on a fresh branch from `main`, never
+   more than 5 implementer agents at once (reviewers do not count).
+3. While they run, answer the owner (one line per vital update or blocker) and start a reviewer for each arriving PR.
+4. Reviewer findings go back to the implementer (fix cycle 1, then 2 at most). When the reviewer reports no blocking findings,
+   squash-merge in a separate worktree and run the targeted checks for the merged code.
+5. Clean up: delete the branch, remove the worktree, clear stale slot locks.
+6. When a batch of fixes is merged: release ([section 6](#6-releasing)).
+7. When your context fills up: write the handoff ([below](#handoff)).
+
+### Handoff
+
+The orchestrator's context is finite. Before it fills, fill in [`templates/handoff.md`](../templates/handoff.md) (state,
+running agents, waiting items, next jobs, decisions and traps not yet recorded elsewhere) and push it as the only file on
+an **orphan branch** `handoff/orchestrator-<YYYY-MM-DD>`. Orphan, so it shares no history with `main` and never
+shows in a diff; kept, never merged and never deleted. The next orchestrator starts by reading the newest one.
 
 ### Decision records
 
@@ -151,7 +169,8 @@ Expensive models pay for themselves on work where a mistake is subtle and costs 
 
 | Job | Model tier | Why |
 |---|---|---|
-| Coordinator session | Strongest | Reviews everything, makes the calls. |
+| Orchestrator session | Strongest | Routes everything, makes the calls. |
+| Reviewer | Strongest (Opus class), always | Judges another agent's diff. |
 | Reverse engineering the game binary, writing plugin/engine hooks, crash analysis, anything that touches code addresses, release-critical fixes, reconciling two lanes that fixed the same thing | **Strongest** (e.g. Claude Opus class) | Wrong guesses crash the game or corrupt saves, and the reasoning is long. |
 | Data-table work, tools, scripts, tests, most bug lanes once you know roughly where the cause is, docs that need judgement, icon and image pipelines | **Mid** (e.g. Claude Sonnet class) | Good enough, much cheaper and faster. |
 | Inventories, counting rows, grepping, renaming, converting a list, summarising logs, mechanical edits with a clear spec, test scaffolding, proofreading a diff for slips | **Small / cheap** (e.g. Claude Haiku class, or another provider's small model) | No design decisions are needed. |
@@ -167,7 +186,7 @@ Spread lanes over several accounts or providers when you can:
 - Look up the live provider and model names from your orchestration tool each session. They change often. Don't
   hard-code them in long-lived docs.
 
-Give each lane a model on purpose: the table above is a default, and the coordinator may promote a job to a stronger
+Give each lane a model on purpose: the table above is a default, and the orchestrator may promote a job to a stronger
 model when a cheaper lane gets stuck twice.
 
 ## 5. Game slots and testing
@@ -177,9 +196,10 @@ Agents that run the real game need somewhere to run it. Sharing the player's own
 - Make a few **slots**: frozen copies of the game install in their own folders, each with its own save folder.
   Keep your own real game out of the pool and mark it "never touch".
 - **Slots are queued, not added.** Do not make a new slot for every lane. A lane does all its offline work first,
-  then takes a lock on a slot, runs, restores the slot, and releases the lock. If every slot is locked, it waits in
-  a bounded polling loop (a few minutes at a time, up to about half an hour) and continues as soon as one is free. It
-  does not end its turn.
+  then makes one lock attempt on a slot that does not wait (`lock any <lane> --wait 0`), runs, restores the slot, and
+  releases the lock. If no slot is free it stops, files (or asks the orchestrator to file) a `ready-for-agent` issue
+  that holds the run's steps, and reports. It never polls or waits for a slot.
+  Evidence: a long project settled on this because waits tie up an agent slot for nothing.
 - **A lane only installs into or stops a game on a slot it holds the lock for, checked at that moment.** Never kill
   processes by a broad filter; kill only the process ids the lane started.
 - Put the slot number on *every* command that touches saves or a game folder (an environment variable or a flag).
@@ -208,20 +228,7 @@ test harness that is compiled out of release builds. Bugs hide there and appear 
 - Crash reports from players need the loader log and the crash report file. A plugin's own log stops silently when
   the game dies.
 
-## 6. The bug list
-
-Keep **one numbered list** of every report: `docs/bugs.md` (template: [`templates/bugs.md`](../templates/bugs.md)).
-
-- Every report gets the **next number immediately**, with the date, who reported it, and the symptom in the
-  reporter's words. A number makes it possible to say "fixed bug 17" in a commit, a lane prompt and a changelog.
-- **Merge related bugs before you fix them.** Two reports with the same crash address and registers are one bug even
-  if the players describe two causes. A "missing icon" and a "wrong icon" from the same table are one bug. Write
-  "same as #N" in the new row and fix once. This is the cheapest bug fix there is.
-- Status words: `open`, `in progress (lane x)`, `fixed in <version>`, `won't fix (reason)`, `duplicate of #N`.
-- Put the *cause* in the row once you know it. Future agents read this list to avoid repeating dead ends.
-- One bug, one lane. Name the lane after the bug.
-
-## 7. Releasing
+## 6. Releasing
 
 **Release after every batch of fixes**, not once a quarter. Small releases make it obvious which change broke what, and
 players see their report get answered.
@@ -230,12 +237,15 @@ The steps (the `d2r-release` skill walks through them):
 
 1. All fixes for the version are merged and the targeted checks pass.
 2. Bump the version (once, in one place).
-3. Write the changelog section in the player's words: rename `### Unreleased` and let the release fold in the
-   fragments ([`templates/changelog.d/README.md`](../templates/changelog.d/README.md)).
+3. Fold the changelog fragments. Nobody writes a version section by hand: every PR that players will notice adds a
+   small file to `changelog.d/` in the player's words ([`templates/changelog.d/README.md`](../templates/changelog.d/README.md)),
+   and the release stager folds them into the `### <version> (<date>)` section of
+   `CHANGELOG.md`. Evidence: two PRs editing the same changelog lines conflict; fragments
+   never do.
 4. Run the **whole release as one script** with `set -euo pipefail`, which stops at the first failed step and refuses
    to run if the version, the changelog and the build disagree.
 5. Create the public release pages only after the version is confirmed live.
-6. Update the bug list: fixed rows get the version.
+6. Close the fixed issues with the version in the closing comment.
 
 Hard-won rules:
 
@@ -250,7 +260,7 @@ Hard-won rules:
 - Compare any server-side script that ingests uploads with the repo's copy before you publish.
 - Publishing is outward-facing: the first time, and any time the target or channel changes, ask the owner.
 
-## 8. Safety: secrets, identity, public things
+## 7. Safety: secrets, identity, public things
 
 - **Secrets stay out of chat and out of the repo.** Tokens, passwords and private keys live in files in the user's
   home folder (for example `~/.my-mod/api_token`) that the owner creates themselves. Scripts read them. Agents
@@ -272,27 +282,28 @@ Hard-won rules:
 - Downloaded archives and installers are untrusted. Unpack them into a new empty folder, don't run their executables,
   and run any Python that reads them with `-I`.
 
-## 9. Talking to the human owner
+## 8. Talking to the human owner
 
-The owner is busy and isn't reading code. A good coordinator message is short and has the same three parts every time:
+The owner is busy and isn't reading code. The orchestrator sends **one line per vital update or blocker**, and nothing
+else (no running commentary, no status when nothing changed):
 
-- **Done**: what was merged or released (with the bug numbers).
-- **Running**: which lanes are active and what each is waiting for.
-- **Need from you**: the decision or action, if any, as a **copy-paste block** with the expected output.
+- `DONE:` something that matters was merged or released, with the issue numbers.
+- `BLOCKED:` work stops, and what unblocks it.
+- `NEED:` a decision or action from the owner, as one clear question with a recommendation, or a **copy-paste block**
+  with the expected output.
 
-Use tables for status. Don't ask a question the code, the docs or a sensible default can answer; pick the default,
-say you did, and move on. When you do need an answer, ask one clear question and offer your recommendation.
+Don't ask a question the code, the docs or a sensible default can answer; pick the default, say you did, and move on.
 
 [`templates/owner-update.md`](../templates/owner-update.md) has a ready-made shape.
 
-## 10. Writing a good lane prompt
+## 9. Writing a good lane prompt
 
 A lane starts with no memory. Your prompt is everything it knows. A good prompt is short and complete:
 
 1. **The goal in one sentence**, and why it matters.
 2. **Read first**: `AGENTS.md` and the two or three docs that matter. Name them by path.
 3. **Scope**: the files and areas the lane may change. Everything else is out of bounds.
-4. **What is already known**: cause found, things already ruled out, the bug row. This stops it redoing your work
+4. **What is already known**: cause found, things already ruled out, the issue. This stops it redoing your work
    and stops it confirming your guess too eagerly. If you suspect a cause, say it is a suspicion.
 5. **Done means**: the tests that must pass and the evidence to include. "Fixed" is not evidence; a check result is.
 6. **Git**: branch name, base, commit identity, open a PR to `main`, do not merge.
@@ -312,13 +323,13 @@ Tips:
 - For reverse-engineering lanes, give the build number and the address list, and tell the lane to re-verify every
   address by checking the bytes.
 
-## 11. Common failure modes and their fixes
+## 10. Common failure modes and their fixes
 
 | What goes wrong | Why | Fix |
 |---|---|---|
 | A lane "completes" but nothing was pushed. | It ended its turn while a build or run was still going, or it ran out of steam. | Check the branch and worktree. Send a follow-up that says to continue. Put "never end a turn while something you started is running" in the rules. |
-| A lane's PR contains unrelated changes. | The lane started from a branch other than `main`, or the coordinator had another branch checked out. | Always branch from `origin/main`. Start lanes from `main`. Cherry-pick the real commits into a clean branch. |
-| Two lanes fix the same root cause two ways. | The bugs were never merged. | Keep one approach. Turn the other into a self-check so nothing is corrected twice. Merge related bugs before assigning. |
+| A lane's PR contains unrelated changes. | The lane started from a branch other than `main`, or the orchestrator had another branch checked out. | Always branch from `origin/main`. Start lanes from `main`. Cherry-pick the real commits into a clean branch. |
+| Two lanes fix the same root cause two ways. | The duplicate issues were never closed. | Keep one approach. Turn the other into a self-check so nothing is corrected twice. Close duplicates before assigning. |
 | One lane overwrote another's installed build or save. | No lock, or the lane unlocked between install and test. | Lock a slot for the whole session, check the lock right before installing, put the slot on every command. |
 | A lane killed someone else's game. | Broad process kill. | Kill only process ids the lane started. |
 | Tests pass on your install, players still crash. | Developer install is not the release package. | Test with the release installer on a slot. Compare file hashes with the player's. |
@@ -327,33 +338,35 @@ Tips:
 | The same lane keeps failing the same way. | Wrong model or missing context. | Re-brief with what it tried, or promote the job to a stronger model. Two failures is the limit for the same prompt. |
 | Agents invent column values or addresses. | Nothing to check against. | Make them clone the nearest vanilla row, and require byte checks for addresses. |
 | A token or e-mail showed up in a PR. | Secrets in prompts or logs. | Rotate the token. Scan before every commit. Keep secrets in files outside the repo. |
-| The coordinator is buried in detail. | It is doing lane work. | Delegate, keep only the plan, the bug list and the merges. |
+| The orchestrator is buried in detail. | It is doing lane work. | Delegate, keep only the plan, the issues and the merges. |
+| A PR keeps bouncing between reviewer and implementer. | Findings are vague, or the job is two jobs. | At most 2 fix cycles: merge what stands alone, file a follow-up issue for the rest. |
+| The new orchestrator session starts blind. | No handoff. | Write the handoff on an orphan `handoff/orchestrator-<date>` branch before the context fills. |
 | Players report a crash you can't reproduce. | Setup problem: wrong loader mod folder, stale plugin copy, different build. | Have the plugin log its own path, version and the other loaded plugins at startup. Ask for the loader log and the crash report. |
-| A lane stalls waiting for a game slot forever. | All slots locked by lanes that ended without unlocking. | Check slot status. Stale locks from finished lanes are cleared by the coordinator. |
-| Docs drift from reality. | Nobody owns them. | Docs updates are part of the lane's "done". The coordinator checks them at merge. |
+| A lane stalls waiting for a game slot forever. | All slots locked by lanes that ended without unlocking. | Check slot status. Stale locks from finished lanes are cleared by the orchestrator. |
+| Docs drift from reality. | Nobody owns them. | Docs updates are part of the lane's "done". The reviewer checks them at merge. |
 
-## 12. Starter checklist
+## 11. Starter checklist
 
 Setting up a project:
 
-- [ ] Repo created, `main` protected in practice (only the coordinator merges).
-- [ ] `docs/PLAN.md`, `docs/bugs.md`, `changelog.d/` (and `CHANGELOG.md` from its README) created from the templates.
+- [ ] Repo created, `main` protected in practice (only the orchestrator merges).
+- [ ] `docs/PLAN.md`, `docs/deviations.md`, `changelog.d/` (and `CHANGELOG.md` from its README) created from the templates.
 - [ ] `AGENTS.md` and `docs/agents/` written; private-words list created outside the repo; `tools/check_public.py` wired in.
 - [ ] Commit identity decided (noreply address) and written into the rules.
 - [ ] Game slots set up and locked-down; the owner's real install marked untouchable.
 - [ ] Tokens and keys placed by the owner in files in their home folder.
-- [ ] Coordinator prompt filled in from [`templates/coordinator-prompt.md`](../templates/coordinator-prompt.md).
+- [ ] Orchestrator prompt filled in from [`templates/orchestrator-prompt.md`](../templates/orchestrator-prompt.md).
 - [ ] First lanes chosen: setup and inventory first, then tools, then data.
 
 Per bug:
 
-- [ ] Added to the bug list with the next number. Related bugs merged.
-- [ ] One lane, one branch, one PR.
+- [ ] One issue, duplicates closed.
+- [ ] One lane, one branch, one PR, one reviewer.
 - [ ] Targeted checks run; release-package test for player-facing fixes.
-- [ ] Merged by the coordinator. Bug row updated with the version.
-- [ ] Released with a changelog entry.
+- [ ] At most 2 fix cycles, then squash-merged by the orchestrator. Branch deleted, worktree removed.
+- [ ] Released with a changelog fragment. Issue closed with the version.
 
-## 13. Using the skills from another project (local plugin)
+## 12. Using the skills from another project (local plugin)
 
 The `d2r-*` skills live in `.claude/skills/`, so they only load in sessions started inside this repository. To use
 them from a mod project's own repository, register this checkout as a local plugin marketplace once. The checkout is
@@ -402,3 +415,17 @@ Notes:
 - `python -m modkit build <project>` still runs with the toolkit checkout as the working directory and the mod
   project as the argument. `tools/check_public.py` scans its `--root` (default: the current directory), so run it
   as `py -3 <path-to-toolkit>/tools/check_public.py --root <mod repo>` or from inside the mod repo.
+
+## 13. Documentation audit
+
+Docs drift while code changes. Periodically (at each milestone, and before a release) the orchestrator starts one
+implementer for a **documentation audit**: it checks every claim and link in the docs against `main`.
+
+- Every file path, command, flag, skill name and issue or ADR number a doc names still exists and still does what the
+  doc says. Run the commands that are cheap to run.
+- Every relative link and anchor resolves; every skill link uses `${CLAUDE_PLUGIN_ROOT}/...`.
+- Numbers (counts, limits, versions, build numbers) match their source. Two docs that state the same fact agree.
+- The audit writes down findings with file and line, fixes the small ones in its own PR (one topic per PR), and files
+  an issue for each larger one. It changes no behaviour. Findings that need a decision keep the question and the
+  evidence in the issue instead of a guess.
+- A reviewer checks the audit PR like any other.

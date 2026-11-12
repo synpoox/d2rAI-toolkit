@@ -19,6 +19,9 @@ Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you ar
 - It uses the env var `D2R_TOOLKIT`, else walks up from the mod to a `d2rAI-toolkit` sibling folder.
 - The mod's `toolkit.version` file holds the toolkit commit the mod expects (the pin). On a mismatch the finder
   warns: tell the user, and do not move the pin without them. Updating the pin means rebuilding and re-testing.
+- **Bump the pin on purpose**, never as a side effect: one commit, `chore: pin d2rAI-toolkit to <sha>`, that changes
+  only `toolkit.version`, after the build and the targeted checks pass against that toolkit commit. Say in the PR what
+  the new toolkit commits change for the mod.
 
 ## Where things are
 - `${CLAUDE_PLUGIN_ROOT}/modkit/`: the Python toolkit (`python -m modkit -h`). A mod is a project folder of JSON
@@ -31,9 +34,9 @@ Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you ar
   (the capability matrix; check it before planning a plugin feature); charged or not-used-up items are in
   `${CLAUDE_PLUGIN_ROOT}/knowledge/charged-items.md`.
 - `${CLAUDE_PLUGIN_ROOT}/docs/`: how to run a project. `${CLAUDE_PLUGIN_ROOT}/docs/ai-workflow.md` is the method for a mod built with AI
-  agents: a coordinator plus parallel lanes, model choice, game slots, the bug list, releases, safety.
-- `${CLAUDE_PLUGIN_ROOT}/templates/`: fill-in files for a new project: coordinator prompt, lane rules, lane prompt,
-  `bugs.md`, `PLAN.md` (roadmap), `ADR.md`, `deviations.md`, `research.md`, `README-player.md`, `GLOSSARY.md`, owner update,
+  agents: an orchestrator plus parallel lanes and reviewers, model choice, game slots, releases, safety, handoff.
+- `${CLAUDE_PLUGIN_ROOT}/templates/`: fill-in files for a new project: orchestrator prompt, handoff, lane rules, lane prompt,
+  `PLAN.md` (roadmap), `ADR.md`, `deviations.md`, `research.md`, `README-player.md`, `GLOSSARY.md`, owner update,
   `changelog.d/` (see `${CLAUDE_PLUGIN_ROOT}/templates/README.md`).
 - `${CLAUDE_PLUGIN_ROOT}/testing/`: how to test a mod in the real game without a human: game slots (frozen copies of
   the install, queued with locks), named game checks driven through a plugin test harness, release-like installs.
@@ -64,7 +67,7 @@ Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you ar
   - `d2r-port`: porting a classic mod (with ${CLAUDE_PLUGIN_ROOT}/knowledge/porting-classic-mods.md; from 1.09d also the ${CLAUDE_PLUGIN_ROOT}/knowledge/classic-109d-*.md and ${CLAUDE_PLUGIN_ROOT}/knowledge/classic-reference-installs.md files).
 
   Project skills:
-  - `d2r-coordinator`: plan and run a project with several agents (lanes, models, slots, bug list, review).
+  - `d2r-orchestrator`: route a project over several agents (lanes, models, slots, separate review, squash merges, handoff).
   - `d2r-project-conventions`: issues, PRs, branches, merge gate, worktrees (with `${CLAUDE_PLUGIN_ROOT}/templates/agents/` and `.d2r-project.toml`).
   - `d2r-release`: ship a version (bump, changelog, fail-fast publish, release pages, mirrors such as Nexus Mods).
 
@@ -111,8 +114,9 @@ address, a fix), add it to `${CLAUDE_PLUGIN_ROOT}/knowledge/` in the toolkit and
     a private-words list outside the repo (`~/.d2r-modkit/private_terms.txt`, one word per line) and run
     `py -3 ${CLAUDE_PLUGIN_ROOT}/tools/check_public.py --root <mod repo>` before every commit. Commit with a
     noreply identity.
-11. **Working with agents:** one bug or feature per lane (own branch, own worktree, PR); lanes never merge; the
-    coordinator reviews, merges and releases; related bugs are merged in the bug list before fixing. Details:
+11. **Working with agents:** one bug or feature per lane (own branch, own worktree, PR); lanes never merge; a
+    separate reviewer checks each PR (at most 2 fix cycles), the orchestrator squash-merges and releases and never
+    implements; duplicate issues are closed before fixing. Details:
     `${CLAUDE_PLUGIN_ROOT}/docs/ai-workflow.md`.
 12. **Ask the human before** anything public, paid or destructive (publishing, making a repo public, force-push,
     deleting saves or branches, spending money, touching their real game install). Never ask for secrets in chat.

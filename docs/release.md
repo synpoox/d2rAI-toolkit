@@ -22,7 +22,8 @@ python release/release_config.py check             # lists the settings that are
 Set up the download host once ([The download host](#the-download-host)). Then, for every release:
 
 ```sh
-# 1. Bump the version where the project keeps it, and add a "### 1.0.1" section to CHANGELOG.md. Commit both.
+# 1. Bump the version where the project keeps it, and rename "### Unreleased" in CHANGELOG.md to "### 1.0.1 (<date>)"
+#    (the PRs added changelog.d/ fragments; the stager folds them in). Commit both.
 # 2. One script does the rest. It stops at the first error.
 bash release/release.sh 1.0.1 --mod-dir path/to/MyMod --plugin build/my-plugin.dll --plugin-version 1.0.1 \
     --downloader build/MyMod-Downloader.exe
@@ -88,7 +89,7 @@ Three ideas carry the whole design:
 1. **Bump the version** in the one place your project keeps it (plugin version, mod metadata, and the downloader's
    `downloader/VERSION` if the downloader changed). A version is `1.2.3`, or `1.2.3-rc1` for a pre-release. A leading
    `v` is dropped.
-2. **Write the changelog section** `### <version>` ([Release notes](#release-notes)).
+2. **Name the changelog section** `### <version>`: rename `### Unreleased`; the content comes from the `changelog.d/` fragments, never from a hand-written section ([Release notes](#release-notes)).
 3. **Commit.** `release.sh` refuses a checkout with uncommitted changes to tracked files (`--allow-dirty` skips this).
    A pure line-ending change in a generated file is not a reason to block, but a real content change must be committed.
 4. **Check the config:** `python release/release_config.py check`. It lists settings that still hold placeholder text.

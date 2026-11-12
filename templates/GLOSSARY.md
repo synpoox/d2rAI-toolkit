@@ -31,7 +31,7 @@ A frozen copy of the game install used for testing, queued with locks. Slot 1 is
 touched.
 
 **Lane**:
-One bug or feature with its own branch, worktree and pull request. Lanes never merge; the coordinator does.
+One bug or feature with its own branch, worktree and pull request. Lanes never merge; the orchestrator does.
 
 **`<Term>`**:
 `<Definition.>`

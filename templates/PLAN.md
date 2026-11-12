@@ -49,7 +49,7 @@ A guide for the first milestones, not a checklist to tick here: turn each line i
 
 0. **Setup.** Repository from the toolkit; toolchain; game at build `<BUILD>` with the loader; `python -m modkit fetch`
    works; game slots (slot 1 is the owner's real game and is never touched); private-words list outside the repo and
-   `tools/check_public.py` passing; lane rules, coordinator prompt, bug list and `changelog.d/` from `templates/`;
+   `tools/check_public.py` passing; lane rules, orchestrator prompt, handoff, deviations ledger and `changelog.d/` from `templates/`;
    owner decisions (name, hosting, public or private, providers) recorded as decision records.
 1. **Tools.** Extractors and table migration for a port's source; ID mapping layer; `python -m modkit build <project>`
    reports the baseline.

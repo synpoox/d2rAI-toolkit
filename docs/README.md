@@ -17,14 +17,14 @@ the table below.
 
 | Guide | What it covers |
 |---|---|
-| [ai-workflow.md](ai-workflow.md) | Running a mod project with AI agents: coordinator and lanes, model choice, game slots, the bug list, releases, safety, owner updates, failure modes |
+| [ai-workflow.md](ai-workflow.md) | Running a mod project with AI agents: orchestrator and lanes, model choice, game slots, releases, safety, owner updates, handoff, documentation audit, failure modes |
 | [testing.md](testing.md) | Testing in the real game without a human: game slots and their queue, game control without real input, named checks, release-like installs |
 | [release.md](release.md) | Packaging and publishing: 7z and manifest, content-addressed objects, delta upload, server ingest, CDN mirror, release pages, `release.sh` |
 | [distribution.md](distribution.md) | Where players get the files: your own host + CDN + downloader, GitHub Releases, Nexus Mods (archive layout, uploads, API limits, Vortex), and combinations, with a comparison table |
 | [toolkit-finder.md](toolkit-finder.md) | Finding the toolkit from a mod project (also from worktrees) in Python, PowerShell and CMake, and pinning a toolkit commit with `toolkit.version` |
 | [runtime-qualification.md](runtime-qualification.md) | Qualifying a game build and loader release: choosing a loader policy (rolling or pinned), what to record, the baseline checklist |
 | [downloader.md](downloader.md) | The player-facing installer and updater: what it does, building your own from one config header |
-| [../templates/](../templates/) | Fill-in files: coordinator prompt, lane rules, lane prompt, `bugs.md`, `PLAN.md`, decision record, deviations, research doc, player README, glossary, `changelog.d/`, owner update |
+| [../templates/](../templates/) | Fill-in files: orchestrator prompt, handoff, lane rules, lane prompt, `PLAN.md`, decision record, deviations, research doc, player README, glossary, `changelog.d/`, owner update |
 | [../tools/publish_mirror.md](../tools/publish_mirror.md) | Publishing a scrubbed, squashed public copy of a private repo |
 
 ## How D2R works

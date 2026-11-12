@@ -5,7 +5,7 @@ real mod. How the files fit together is in [`docs/ai-workflow.md`](../docs/ai-wo
 
 | File | What it is for |
 |---|---|
-| `coordinator-prompt.md`, `agents/AGENTS.md` (the lane rules), `lane-prompt.md`, `owner-update.md`, `bugs.md` | Running lanes and reporting to the owner |
+| `orchestrator-prompt.md`, `handoff.md`, `agents/AGENTS.md` (the lane rules), `lane-prompt.md`, `owner-update.md` | Running lanes and reporting to the owner |
 | `PLAN.md` | The roadmap: lettered work items, one session each, status on issues, a Blocked-by column |
 | `ADR.md` | One decision record, kept at `docs/adr/NNNN-<slug>.md` |
 | `deviations.md` | The deviations ledger: how a port differs from its source, one row each, feeding the table-diff gate |
