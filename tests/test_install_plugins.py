@@ -84,6 +84,25 @@ class InstallPluginsTests(unittest.TestCase):
         self.assertEqual(moved[0].read_bytes(), b"stray")
         self.assertEqual(list(self.backup.rglob("one.dll"))[0].read_bytes(), b"old")  # moved, not deleted
 
+    def test_stale_plugin_not_in_mod_json_is_replaced(self):
+        (self.plugins / "one.dll").write_bytes(b"stale")   # left by an earlier run; mod.json does not list "one"
+        r = self.run_script()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual((self.plugins / "one.dll").read_bytes(), b"one")
+
+    def test_unusable_mod_name_is_refused_before_any_change(self):
+        for bad in ("", "a/b", "a\\b", ".."):
+            with self.subTest(name=bad):
+                (self.project / "mod.json").write_text(json.dumps({"name": bad}))
+                (self.plugins / "stray.dll").write_bytes(b"stray")
+                r = self.run_script()
+                self.assertNotEqual(r.returncode, 0, r.stdout)
+                self.assertIn("no usable name", r.stdout + r.stderr)
+                self.assertTrue((self.plugins / "stray.dll").exists())
+                self.assertFalse((self.plugins / "one.dll").exists())
+        (self.project / "mod.json").write_text(json.dumps({}))   # no name at all
+        self.assertNotEqual(self.run_script().returncode, 0)
+
     def test_keep_extras_leaves_strays_in_the_mod_folder(self):
         (self.plugins / "stray.dll").write_bytes(b"stray")
         r = self.run_script("-KeepExtras")

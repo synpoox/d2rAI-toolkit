@@ -16,7 +16,7 @@
 # OUR DLL names in the game-wide <Game>\d2rloader\plugins (they would load with every mod and hook twice). Ours are the
 # -Plugins and mod.json plugins, their <name>-off.txt toggles and <name>.* data files, and anything named in -Keep.
 # -KeepExtras leaves other files alone. The backup folder is -BackupDir, else $env:MODKIT_BACKUPS, else
-# ~\.d2r-modkit\stray-plugins. -NoValidate builds past validation errors.
+# ~\.d2r-modkit\stray-plugins (outside the slot and the repo; tests always pass -BackupDir). -NoValidate builds past validation errors.
 param(
     [Parameter(Mandatory)] [string]$Game,
     [string]$Project = ".",
@@ -82,6 +82,7 @@ foreach ($p in @(Get-Process D2R, D2RLoader -ErrorAction SilentlyContinue)) {
 
 $mod = (Get-Content -LiteralPath (Join-Path $Project "mod.json") -Raw | ConvertFrom-Json)
 $modName = $mod.name
+if (-not $modName -or $modName -match '[\\/]|\.\.') { throw "mod.json has no usable name (empty, or with a path separator or '..'): $modName" }
 $modPlugins = @($mod.plugins | Where-Object { $_ } | ForEach-Object { [IO.Path]::GetFileNameWithoutExtension($_) })
 $pluginDir = Join-Path $Game "mods\$modName\d2rloader\plugins"
 $globalDir = Join-Path $Game "d2rloader\plugins"
@@ -103,7 +104,7 @@ if ($Data) {
 New-Item -ItemType Directory -Force $pluginDir | Out-Null
 foreach ($name in $Plugins) {
     $dest = Join-Path $pluginDir "$name.dll"
-    if ($Data -and (Test-Path -LiteralPath $dest)) { Write-Output "$name.dll installed by modkit install -> $pluginDir"; continue }
+    if ($Data -and ($modPlugins -contains $name)) { Write-Output "$name.dll installed by modkit install -> $pluginDir"; continue }
     Copy-Item -LiteralPath (Join-Path $Project (Join-Path $BuildDir "$name.dll")) $dest -Force
     Write-Output "installed $name.dll -> $pluginDir"
 }
