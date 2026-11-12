@@ -7,6 +7,7 @@ Read first:
 - How to run the consolidation: `docs/orchestrator-handoff.md` on branch `plan/consolidation`.
 - The plan itself: `docs/consolidation-plan.md` on the same branch.
 - Both are in the worktree `repos\d2rAI-toolkit-consolidation-plan`.
+- **Phase 2 approvals, item by item:** the live doc <https://claude.ai/artifact/5DCNKj7JZuuSYnWo3i45QT> (snapshot: `docs/handoff/phase2-approvals.md` on this branch). See "Phase 2" below.
 
 The hard rule still holds: **confirm each phase (each Phase 2 lane) with the owner in the plain what/from/to/why
 table, and wait for a clear yes.**
@@ -49,45 +50,45 @@ table, and wait for a clear yes.**
 | d2rAI-toolkit#37 | `ghidra_query.ps1` fails when a script gets no args | ready-for-agent |
 | d2rAI-toolkit#44 | Ship a standard Python bootstrap for mods (replaces resurrected-09's `toolkit_boot.py`) | ready-for-agent; do before resurrected-09's Phase 3 switches |
 | resurrected-forever#59 | `docs/agents/issue-tracker.md` names the old slug `project-forever` | ready-for-agent |
-| pd2-resurrected#924 | Parent: every consolidation leftover for pd2-resurrected, blocked by #143 (alpha) | add one sub-issue per Phase 2 lane as each lands |
+| pd2-resurrected#924 | Parent: every consolidation leftover for pd2-resurrected, blocked by #143 (alpha) | sub-issues for lanes A, E, F, G added (#931–934); add more as later lanes are approved |
 | pd2-resurrected#925 | Phase 1 wiring: finder, pin, drop the SDK submodule, CI checks out the pin, plugin | after alpha |
 | pd2-resurrected#926 | Phase 1 doc links, including `core-rules-inventory.md`'s old `d2rAI-toolkit/pd2-data` path | after alpha |
 
 Older open toolkit issues: #6 (companion installer) and #7 (release builder) belong to lane F. #9, #30 and #32
 (game_slots and game_ctl) are unrelated.
 
-## Next: Phase 2
+## Phase 2: approvals and issues (done 2026-11-11, later the same day)
 
-The owner asked for confirmations of lanes **A and D to I** (the ones that can run in parallel). They were shown in
-full on 2026-11-11, but **no lane is approved yet**. Re-show them (plan §5) and get a yes for each.
+**The approvals doc.** Live: <https://claude.ai/artifact/5DCNKj7JZuuSYnWo3i45QT>, titled "Consolidation Phase 2: lane items and approvals". It is a Claude Doc in the owner's claude.ai account, so it lasts beyond any session. It has one table per lane (A to I), every item, and an Approval dropdown per item (Approved / Waiting / Question / Rejected). A snapshot is on this branch: `docs/handoff/phase2-approvals.md`. **The live doc wins.** Refresh the snapshot at each handoff: export the tab as markdown and replace the byline name with "owner".
 
-- My suggested first batch is A, D, E, F, G (5 workers); H and I follow.
-- Lanes B and C come after A.
+**Nothing has started.** The owner said not to start yet. Next step: ask for a go, then start workers on lanes A, D, E, F and G (5 workers at most), each from its toolkit issue below.
 
-Pending owner decisions inside the lane confirmations:
+| Lane | Decision (2026-11-11) |
+|---|---|
+| A | Approved |
+| B, C | Waiting; they come after A |
+| D | Approved except **D8, on hold** (see below) |
+| E | Approved. E13 slot table: Slot2 toolkit tests, Slot3 Project Forever, **Slot4–8 pd2-resurrected, Slot9–10 resurrected-09** |
+| F | Approved, including F6 (the SessionStart stale-branch hook) |
+| G | Approved except G2, G4 and G5. G1 and G10–G12 follow the **two-homes rule**: every address goes into `rvas_93847.h` *and* `knowledge/d2r-93847-addresses.md`, and a unit test fails when a header RVA has no knowledge row. G10 and G12 go to `knowledge/` only (no toolkit code uses them yet); G11 goes to both. |
+| H, I | Waiting. Lane I's keep/throw table is still unanswered |
 
-- **Lane D:** the 1.09d converter has a monster-AI bug (`BaseId` treated as a row; AIParamN copied to aipN; see
-  resurrected-09 `research/monster-ai`). The toolkit copy gets the fix. Ask whether resurrected-09 should also get the
-  fix now, in its own PR, or only when it switches.
-- **Lane E:** the slot-owner table for `~/.d2r-modkit/slots.toml`: Slot2 toolkit tests, Slot3 Project Forever,
-  Slot4–7 pd2-resurrected. The Terror Zone and Herald checks leave town, so agents only unit-test them.
-- **Lane F:** the stale-branch SessionStart hook would run in every session that loads the plugin; ask whether the
-  owner wants it. CI templates can't be run, because Actions never runs on the toolkit repo.
-- **Lane I:** the toolkit already has methods and templates from upstream. The owner wants a keep/throw decision first.
-  My recommendation, shown to the owner and not yet answered:
+**D8 history.** The owner first said "fix now". resurrected-09 #93 was raised: `BaseId` is not a row, and the AI parameters need a per-AI slot map, of which only 5 are verified. Then the owner said "stop the D8 fix". #93 is open with no `ready-for-agent` label and a hold comment. It still blocks resurrected-09 #90, the lane D switch. When D8 is decided, either relabel #93 or close it and remove that blocker. Toolkit #47's D3 row matches #93's policy: a slot map where one is verified on both builds; otherwise the plain copy, listed as unverified.
 
-  | Existing | Recommendation |
-  |---|---|
-  | `templates/coordinator-prompt.md` | keep, rewrite with the orchestrator method |
-  | `templates/lane-prompt.md` | keep, merge in the brief rules |
-  | `templates/lane-rules.txt` | throw (replaced by `templates/agents/`) |
-  | `templates/bugs.md` | throw, or keep as an option without GitHub |
-  | `templates/PLAN.md` | keep the file, replace its content with the roadmap shape |
-  | `templates/CHANGELOG.md` | replace (lane F, fragments) |
-  | `templates/owner-update.md` | keep, trim to "one line per vital update or blocker" |
-  | `docs/ai-workflow.md` §1–12 | keep, update for contradictions 1, 13, 14, 16; drop §6 if `bugs.md` goes |
-  | `d2r-coordinator` skill | keep, merge in the orchestrator method |
-  | `d2r-release`, `docs/release.md`, `docs/testing.md` | keep |
+**Issues raised.** Every one is labelled `ready-for-agent` (except #93) and blocked natively. A mod switch issue starts only once its toolkit lane issue closes; pd2-resurrected's issues also wait for the alpha (#143), and F and G there also wait for #925. Each switch issue carries a row-by-row delete / use-instead / keep table and the same agent steps: check blockers, follow the toolkit PR's final names, bump the pin, compare old and new output, delete, grep.
+
+| Lane | Toolkit work | pd2-resurrected (public; parent #924) | resurrected-09 (parent #89) | Project Forever |
+|---|---|---|---|---|
+| A | d2rAI-toolkit#46 | #931 | — | — |
+| D | d2rAI-toolkit#47 | — | #90 (blocked by #93 too) | — |
+| E | d2rAI-toolkit#48 | #932 | #91 | #60 |
+| F | d2rAI-toolkit#49 (parent of #6, #7) | #933 | — | — |
+| G | d2rAI-toolkit#50 | #934 | #92 | — |
+| D8 fix | — | — | #93 (on hold) | — |
+
+Found while checking the mods: pd2-resurrected's `AGENTS.md` says "Slot4-8 here" and resurrected-09's README says "Slot9 and Slot10". Both match the amended table; #932 and #91 only swap that text for a pointer to the slot registry. Per that README, its machine config already gives it Slot9 and Slot10 (not checked).
+
+**Still open for the owner:** D8; lanes B, C, H and I (and I's keep/throw table); G2, G4 and G5.
 
 ## Owner to-dos
 
@@ -123,6 +124,8 @@ Pending owner decisions inside the lane confirmations:
 ## Leftover worktrees
 
 - None of this session's worktrees are left; all were removed.
+- The Phase 2 approvals part ran from the toolkit worktree `.claude/worktrees/schema3-packager-27cf10` (branch
+  `claude/orchestrator-handoff-docs-a89b72`, no commits). It made only issues, the doc and this branch's commit.
 - Worktrees owned by other sessions, left alone:
   - toolkit: `.claude/worktrees/schema3-packager-27cf10`, `d2rAI-toolkit-4b`, `-5`, `-plugin-common`,
     `-slot-install`, two under `~/.ao/data/worktrees/`, and two under `%TEMP%`.
