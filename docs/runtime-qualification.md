@@ -4,26 +4,25 @@ Before a mod claims "works on D2R 3.3 with D2RLoader x.y", test that exact combi
 Choosing a combination is not evidence that it works. This page is the checklist, and the rules for what a result is
 worth when the loader updates.
 
-Contents: [Policy](#policy) · [What to record](#what-to-record) · [The checklist](#the-checklist) ·
+Contents: [Choosing a loader policy](#choosing-a-loader-policy) · [What to record](#what-to-record) · [The checklist](#the-checklist) ·
 [Source notes](#source-notes)
 
-## Policy
+## Choosing a loader policy
 
-The common choice for a mod on a fixed game build:
+A mod on a fixed game build (this toolkit targets D2R 3.3, Windows, Battle.net, build 93847, and D2RLoader 1.3.1)
+picks how it follows the loader. Both options are workable; they differ in what they cost.
 
-- The game stays fixed (here D2R 3.3, Windows, Battle.net, build 93847). Steam and Wine are outside the claim until
-  someone tests them. A Steam build has been seen running the same program image under another build number
-  ([d2rloader.md](../knowledge/d2rloader.md), "Versions and builds"), but equality of hook addresses and table data
-  is a finding for the test host, not an assumption.
-- Support follows the **latest official D2RLoader release, betas included**. Do not pin a mod to one loader release,
-  and do not follow an unreleased nightly channel.
-- Each new official release becomes the support target at once. Revalidate the affected checks before marking it
-  verified. A passing record for an older release is history: it does not qualify the new one, and it is not a pin.
-  A newer version number inherits nothing.
-- If the latest loader stops working with the game, report the combination as **incompatible** until fixed. Look for a
-  mod fix or an upstream remedy. Changing the game target, or making an exception for an older loader, is a new
-  decision for the owner.
-- Mark the combination "selected, pending qualification" until a run passes.
+| Option | Consequences |
+|---|---|
+| Rolling latest official release (betas included) | Every new release must be requalified before the mod calls it verified, and a passing record for an older release is history. Players get loader fixes sooner. Hook addresses and service sizes can change under the mod. If the newest loader stops working with the game, the combination is incompatible until the mod or the loader is fixed |
+| Pinned release | Hook addresses, service sizes and test results stay stable, and one record covers the shipped combination. Fixes in later loader releases are missed, and moving the pin takes a deliberate bump and a requalification |
+
+Whichever you choose, a passing record qualifies only the exact release tested: a newer version number inherits
+nothing. A combination stays "selected, pending qualification" until a run passes. The game build is part of the
+claim too. Steam and Wine are untested here: a Steam build has been seen running the same program image under another
+build number ([d2rloader.md](../knowledge/d2rloader.md), "Versions and builds"), but equality of hook addresses and
+table data is a finding for the test host, not an assumption. An unreleased nightly channel has no stable identity to
+record.
 
 ## What to record
 
@@ -72,7 +71,7 @@ them.
 
 | Claim | What the sources show |
 |---|---|
-| First loader with D2R 3.3 support | The official changelog places it in **1.2.0-beta**, not 1.3.0-beta as an earlier research note said |
+| First loader with D2R 3.3 support | The loader's official changelog places it in **1.2.0-beta**; an earlier research note said 1.3.0-beta. [d2rloader-capabilities.md](../knowledge/d2rloader-capabilities.md) now follows the changelog reading. The changelog was not re-fetched when this was reconciled |
 | SDK version of loader 1.3.1-beta | The SDK header reports SDK 0.4.0 / ABI 4; the loader's release notes report SDK 0.3.0 / ABI 4. Observations, not a selection |
 | Game version the loader targets | The loader wiki's overview names an older 3.1 build, which conflicts with newer explicit 3.3 support. The wiki's table research reports testing 3.3.0 build 93847 and leaves other builds unchecked. Neither is a qualification of your mod |
 | A third-party suite's requirements | List build 93847 and a Steam build: evidence for that component, not a guarantee that code and data layouts are identical |

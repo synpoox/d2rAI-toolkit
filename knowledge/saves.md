@@ -12,7 +12,7 @@ Resurrected\mods\<Mod>\` (kept apart from retail saves). D2RLoader also writes i
 | Offset | Size | Field |
 |---|---|---|
 | 0x00 | u32 | signature `0xaa55aa55` |
-| 0x04 | u16 / u32 | retail: u16 version `0x69` (105) in 3.3, bytes 0x06-0x07 zero. D2RLoader extended format: u32 `0x44520000 \| extended version`, so bytes 0x06-0x07 read `RD`. Saves written by the loader here carry `0x44520005`; the PluginSDK 0.4.0 README documents `0x44520006` for saves written after its custom-page change ([the marker](#the-extended-save-marker)) |
+| 0x04 | u16 / u32 | retail: u16 version `0x69` (105) in 3.3, bytes 0x06-0x07 zero. D2RLoader extended format: u32 `0x44520000 \| extended version`, so bytes 0x06-0x07 read `RD`. Saves written by loader 1.3.1 here carry `0x44520005`; the PluginSDK 0.4.0 README documents `0x44520006` for a loader that carries its custom-page change ([the marker](#the-extended-save-marker)) |
 | 0x08 | u32 | file size |
 | 0x0c | u32 | checksum |
 | 0x15 | u8 | progression. A test save sets `0x0f` to open every difficulty (observed on 3.3; used by `testing/save_edit.py`) |
@@ -127,11 +127,12 @@ The first four bytes after the signature tell the formats apart.
 | Source | What it says |
 |---|---|
 | PluginSDK 0.4.0 README ("Inventory and Custom Player Pages") | Extended character version `0x44520006` and item version 6. Earlier extended saves (`0x44520005`, item version 5) still load and use the new format after their next save |
-| A scan of the first 8 bytes of 1,051 `.d2s` files (test-slot characters and loader backups, written up to 2026-11-12 by loader 1.3.1) | 844 read `69 00 00 00` (retail: u16 `0x69`, then zero). 207 read `05 00 52 44` (u32 `0x44520005`, extended). **None** read `0x44520069` or `0x44520006` |
+| A scan of the first 8 bytes of 1,051 `.d2s` files (test-slot characters and loader backups, written up to 2026-11-12 by loader 1.3.0-1.3.1) | 844 read `69 00 00 00` (retail: u16 `0x69`, then zero). 207 read `05 00 52 44` (u32 `0x44520005`, extended). **None** read `0x44520069` or `0x44520006` |
 
 So the u32 at 0x04 is `0x44520000 | extended version`: `RD` (`0x52 0x44`) in bytes 0x06-0x07, the version in the low
-16 bits. Both numbers are right for their loader version: **5** on saves from the loader and SDK this toolkit
-targets, **6** after the SDK 0.4.0 custom-page change. A tool must not compare the whole u32 to one constant. Test
+16 bits. Both numbers are right for their loader version: **5** on saves written by loader 1.3.1, which ships SDK 0.3.0
+services ([d2rloader-capabilities.md](d2rloader-capabilities.md), "Loader and SDK differ"); **6** is documented by the
+SDK 0.4.0 README for a loader that carries its custom-page change, and no such save has been seen here. A tool must not compare the whole u32 to one constant. Test
 bytes 0x06-0x07 for `RD` to tell extended from retail, and read the low 16 bits as the extended version
 (`testing/lod_checks.py` does the first).
 
@@ -144,7 +145,7 @@ together with the `RD` bytes (inference). If a save ever shows `0x06`, it was re
 The format is chosen per mod with `[d2rcore.save_format] mode = "extended"` in the mod's
 `d2rloader/config/d2rloader.toml` ([tables.md](tables.md)); retail is the default. Source tags: **doc** = the loader's
 changelog (1.3.0-beta, 1.1.0-beta), guide or the PluginSDK README; **code** = read in this toolkit or in a public
-Rust `.d2s` parser (v96-v105); **unverified** = not tested in game.
+Rust `.d2s` parser (v96-v105); **observed** = seen in this toolkit's own tests, not root-caused; **unverified** = not tested in game.
 
 | Fact | Retail (`.d2s` v105) | D2RLoader extended | Source |
 |---|---|---|---|
@@ -181,7 +182,7 @@ affixes, 4095 uniques and sets).
 | Fact | Source |
 |---|---|
 | The extended format first shipped in loader 1.3.0-beta (2026-09-15); 1.3.1-beta followed on 2026-09-24. Every release is labelled beta | doc |
-| It has changed once: SDK 0.4.0 moved the character version `0x44520005` to `0x44520006` and the item version 5 to 6. Older saves still load and **are rewritten in the new format on their next save**. Old custom-page items do not name their plugin: load and save them once with only their original page active | doc |
+| It has changed once (not yet in saves written by loader 1.3.1): SDK 0.4.0 moved the character version `0x44520005` to `0x44520006` and the item version 5 to 6. Older saves still load and **are rewritten in the new format on their next save**. Old custom-page items do not name their plugin: load and save them once with only their original page active | doc |
 | Whether an older loader reads a save written by a newer one is not documented: assume one-way | unverified |
 | Multiplayer checks the save format; TCP/IP also checks loader version, mod, shared plugins and the `itemstatcost` schema | doc |
 | Server and shared plugins are recorded in the character's plugin history; client-only plugins are not | doc |

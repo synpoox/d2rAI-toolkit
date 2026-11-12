@@ -28,6 +28,18 @@ class ExamplePatchTests(unittest.TestCase):
                     self.assertIn("value", op, f.name)
                     self.assertTrue(op["file"].startswith("data/"), f.name)
 
+    def test_terror_zone_patch_covers_all_combinations(self):
+        doc = json.loads((EXAMPLES / "no-terror-zones.json").read_text("utf-8"))
+        seen = set()
+        for op in doc["ops"]:
+            if op["op"] == "json" and op["file"].endswith("desecratedzones.json"):
+                path = op["path"]
+                self.assertEqual(path[:3], ["desecrated_zones", 0, "game_difficulties"])
+                seen.add(tuple(path[3:]))
+        want = {(m, d, f) for m in ("expansion", "rotw") for d in ("normal", "nightmare", "hell")
+                for f in ("ladder_enabled", "non_ladder_enabled", "max_herald_tiers")}
+        self.assertEqual(seen, want)
+
 
 if __name__ == "__main__":
     unittest.main()

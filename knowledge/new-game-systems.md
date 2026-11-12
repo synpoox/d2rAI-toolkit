@@ -133,8 +133,8 @@ A typical order, with one PR each ([docs/ai-workflow.md](../docs/ai-workflow.md)
 ## Map hosting: repeatable maps on stock terrain
 
 For a system that sends players to repeatable maps (build 93847, read from D2R's data and static code reading; nothing
-here was run unless marked). Evidence tags: **[S]** data or static code, **[G]** a released mod's recorded in-game
-behaviour or a shipped stock row, **[U]** unverified.
+here was run unless marked). Evidence tags: **[S]** data or static code, **[G]** recorded in-game
+evidence (a released mod, a project's logged game check) or a shipped stock row, **[U]** unverified.
 
 **Two ways to host a map:** send the player to a stock level, or append a **cloned `levels` row** that reuses a stock
 `LevelType`, `lvlprest` DS1 or `lvlmaze`. D2R ships the clone pattern: Pandemonium 1-3 and the Finale (133-136) are

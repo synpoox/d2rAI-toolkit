@@ -43,9 +43,10 @@ are **disabled placeholders**: the row exists so row numbers match across modes,
 | misc | Worldstone shards present, not spawnable | spawnable; 91 items flagged `AdvancedStashStackable` (0 in base) |
 | cubemain, treasureclassex | 155 recipes, 1138 classes | 72 and 220 more (Worldstone-shard crafting, Sunder Charm upgrades, Terrorize consumables, Herald charms) |
 
-- **Do not drop the placeholders** when a table replaces the LoD bank: indexed tables are addressed by row number,
-  saves store `uniqueitems` / `setitems` / `runes` indexes, and engine code tests item-type numbers (`warl` at row
-  67). Keep them disabled (blank `InGame`, `enabled` 0, `disabled` 1, not spawnable, no recipe), as D2R does.
+- Dropping the placeholders when a table replaces the LoD bank shifts indexed rows (tables are addressed by row
+  number), the `uniqueitems` / `setitems` / `runes` indexes saves store, and item-type numbers the engine tests
+  (`warl` at row 67). D2R itself keeps them disabled (blank `InGame`, `enabled` 0, `disabled` 1, not spawnable, no
+  recipe).
 - `sounds.txt` and `soundenviron.txt` are read from `excel/` in every mode. `excel/` holds 18 RotW-only sounds
   (Warlock skills, Worldstone shards, desecrated-zone cues); they have no gameplay effect.
 - A character converted from LoD to RotW (or opened in RotW mode) reads `excel/`. Blizzard's ladder season 16 notes
@@ -141,7 +142,7 @@ Evidence: fields from `knowledge/saves.md`, the engine-limits notes and a read o
 | `armor` / `weapons` / `misc` `code` | stored as a Huffman-coded item code. The table the code sits in decides whether defense, durability and quantity bits follow | **Freeze** existing codes; never move a code between tables or delete it |
 | Base `invwidth` / `invheight`, `inventory.txt` grids | stored x, y | shrinking can strand stored items; a bad placement on a custom page stops the load (unverified for stock grids) |
 | `itemtypes` | engine code tests numbered types (75 rune, 77 hpot, ...); charm, scroll/book and body-part classification changes which extra bits are read | **Freeze** D2R's rows at D2R's numbers and each existing base's type tree where it changes classification |
-| `skills` row order, `charstats` class | class-skill bytes in skill-id order, hotkey skill ids, skill params on items | **Freeze** the order: inserting a class skill shifts every character's points |
+| `skills` row order and `charclass` | class-skill bytes in skill-id order, hotkey skill ids, skill params on items | **Freeze** the order: inserting a class skill shifts every character's points |
 | `levels` ids and `Layer` | waypoints and quests are stored by index (unverified); the automap per `Layer` (< 100) | append only; keep `Layer` < 100 |
 | `hireling` rows | the mercenary type is stored | treat as frozen (unverified) |
 | Plugin id, scope and `logicalId` of every custom page | page identity in extended saves | **Freeze**; keep the provider installed, or its items are dropped after a Recovery backup |

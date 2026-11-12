@@ -268,7 +268,7 @@ Constraints that follow:
 
 Sources (accessed 2026-11-06): Blizzard community team post on TCP/IP (2021-09-07); patch 2.4 notes, "Modding Update"
 (2022-04-14); patch 2.5 / ladder season two article, "Modding" and "Save Data Changes"; the September 2021 launch guide
-(saves, offline authentication); D2RLoader's TCP/IP page; a community launcher's README; Blizzard's EULA,
+(saves, offline authentication); D2RLoader's TCP/IP page (https://d2rloader.net/tcp-ip.html); a community launcher's README; Blizzard's EULA,
 "Unauthorized Connections".
 
 ## Choosing
