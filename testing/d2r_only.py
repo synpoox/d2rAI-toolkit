@@ -10,7 +10,7 @@ game and the test harness. A mod's check module imports them and registers its o
         doc = json.load(open(zones_json_path, encoding="utf-8-sig"))
         assert not d2r_only.zone_switches(doc), d2r_only.zone_switches(doc)
 
-    @check("no-terror-zone-in-game", tags=["d2r-only", "game"])
+    @check("no-terror-zone-in-game", tags=["d2r-only", "game", d2r_only.LEAVES_TOWN])
     def no_terror_zone_in_game(ctx):
         ...   # character in a game, then:
         seen = d2r_only.scan_zones(ctx, zone_level_ids)
@@ -20,17 +20,26 @@ game and the test harness. A mod's check module imports them and registers its o
 How Terror Zones work in the data (D2R 3.3, build 93847): `desecratedzones.json` has, per game mode and difficulty,
 `ladder_enabled`, `non_ladder_enabled` and `max_herald_tiers`; a Herald spawns only in a Terror Zone with a tier cap of
 1 or more. The in-game scan leaves town (it warps with `cheat goto`), so only the pure parts run in the unit tests; the
-rest needs a game slot you locked.
+rest needs a game slot you locked. Every check that leaves town carries the tag `LEAVES_TOWN` ("leaves-town"): run those
+only on a slot locked for out-of-town checks, never under a starting-town-only rule.
+
+The pixel detector is calibrated on build 93847 at a 1920x1080 client, default brightness, HDR off; at another client
+size the sample counts change, so `purple_in` refuses it (pass `client=None` to turn the check off in a unit test).
 """
 from __future__ import annotations
 
 import time
 
-COLOSSAL_SUMMIT = 137    # levels.txt Id of Act 5 - Colossal Summit (Reign of the Warlock table set only)
+LEAVES_TOWN = "leaves-town"   # check tag: the check warps out of town; slot locked for out-of-town checks only
+COLOSSAL_SUMMIT = 137    # levels.txt Id of Act 5 - Colossal Summit (build 93847; Reign of the Warlock table set only)
 ZONE_FIELDS = ("ladder_enabled", "non_ladder_enabled", "max_herald_tiers")
-TERROR_PURPLE_MIN = 40   # purple samples that mean Terror Zone text; calibrated on 93847: 0 without it, 114+ with it
+# Purple samples that mean Terror Zone text. Calibrated on build 93847 at 1920x1080 client, default brightness, HDR off:
+# 0 without the text, 114+ with it. The count scales with client area, hence CALIBRATED_CLIENT.
+TERROR_PURPLE_MIN = 40
+CALIBRATED_CLIENT = (1920, 1080)
 OVERLAY_BOX = (0, 0.04, 1, 0.8)   # client fractions scanned: the map overlay's text area, not the HUD band
 SETTLE = 4.0             # seconds after a warp before the shot
+CONTROL_SETTLE = 2.0     # seconds after the Herald spawn before the shot
 
 
 # ---------------------------------------------------------------- data
@@ -58,7 +67,7 @@ def colossal_portals(cubemain_text: str, level: int = COLOSSAL_SUMMIT) -> list[s
     head = lines[0].split("\t")
     enabled, output = head.index("enabled"), head.index("output")
     return [r[0] for r in (line.split("\t") for line in lines[1:])
-            if len(r) > output and f"lvl={level}" in r[output] and r[enabled] == "1"]
+            if len(r) > max(enabled, output) and f"lvl={level}" in r[output].split(",") and r[enabled] == "1"]
 
 
 # ---------------------------------------------------------------- pixels
@@ -78,40 +87,54 @@ def terror_purple(width: int, height: int, rgb: bytes, box: tuple[int, int, int,
     return n
 
 
-def purple_in(img, fractions: tuple[float, float, float, float] = OVERLAY_BOX) -> int:
-    """terror_purple of a game_ctl.Image, over a box given as client fractions."""
+def purple_in(img, fractions: tuple[float, float, float, float] = OVERLAY_BOX,
+              client: tuple[int, int] | None = CALIBRATED_CLIENT) -> int:
+    """terror_purple of a game_ctl.Image, over a box given as client fractions. The threshold is calibrated at a
+    `client` size (default 1920x1080); another size fails loudly. `client=None` skips that check."""
+    if client is not None:
+        assert (img.width, img.height) == tuple(client), \
+            f"client is {img.width}x{img.height}, the Terror Zone threshold is calibrated at {client[0]}x{client[1]}"
     return terror_purple(img.width, img.height, img.rgb, img.box(*fractions))
 
 
 # ---------------------------------------------------------------- in game (need a game; not run by the unit tests)
 
-def scan_zones(ctx, level_ids, settle: float = SETTLE, sleep=time.sleep) -> dict[int, int]:
-    """With the minimap overlay open (the key `tab`) and debug mode on, warp to each level with `cheat goto` and count
-    Terror Zone text samples. Returns {level id: samples}. The character must be in a game; this leaves town."""
+def scan_zones(ctx, level_ids, settle: float = SETTLE, sleep=time.sleep, client=CALIBRATED_CLIENT) -> dict[int, int]:
+    """LEAVES TOWN (tag `LEAVES_TOWN`): run only on a slot locked for out-of-town checks, never under a
+    starting-town-only rule.
+
+    With the minimap overlay open (the key `tab`) and debug mode on, warp to each level with `cheat goto` and count
+    Terror Zone text samples. Returns {level id: samples}. The character must be in a game."""
     assert ctx.game.console("debug_mode"), "debug_mode not handled"
     ctx.game.key("tab")  # the overlay, where a terrorized level shows its line
     seen = {}
     for level in level_ids:
-        ctx.game.console(f"cheat goto {level}")
+        assert ctx.game.console(f"cheat goto {level}"), f"cheat goto {level} not handled"
         sleep(settle)
         ctx.shot(f"zone-{level}")
-        seen[level] = purple_in(ctx.game.screenshot())
+        seen[level] = purple_in(ctx.game.screenshot(), client=client)
     return seen
 
 
 def assert_none_lit(seen: dict, minimum: int = TERROR_PURPLE_MIN) -> str:
+    assert seen, "no levels scanned"
     lit = {k: v for k, v in seen.items() if v >= minimum}
     assert not lit, f"Terror Zone text in: {lit}"
     return f"{len(seen)} levels visited, Terror Zone text samples max {max(seen.values(), default=0)} (< {minimum})"
 
 
-def herald_control(ctx, monster_row: int, settle: float = 2.0, sleep=time.sleep) -> int:
-    """Positive control: `cheat heraldspawn <monstats row>` forces the level Terror-Zoned whatever the data says, so the
-    same detector must see it. Returns the samples."""
-    ctx.game.console(f"cheat heraldspawn {monster_row}")
+def herald_control(ctx, monster_row: int, settle: float = CONTROL_SETTLE, sleep=time.sleep,
+                   client=CALIBRATED_CLIENT) -> int:
+    """LEAVES TOWN (tag `LEAVES_TOWN`): run only on a slot locked for out-of-town checks, never under a
+    starting-town-only rule.
+
+    Positive control: `cheat heraldspawn <monstats row>` spawns a Herald at the player; it is expected to show the
+    overlay's Terror Zone line, which the same detector must then see. Not yet confirmed in game, in particular with
+    Terror Zones switched off in data (the command may refuse). Returns the samples."""
+    assert ctx.game.console(f"cheat heraldspawn {monster_row}"), "cheat heraldspawn refused (level/monster validation)"
     sleep(settle)
     ctx.shot("control-heraldspawn")
-    return purple_in(ctx.game.screenshot())
+    return purple_in(ctx.game.screenshot(), client=client)
 
 
 def assert_control_lit(samples: int, minimum: int = TERROR_PURPLE_MIN) -> str:

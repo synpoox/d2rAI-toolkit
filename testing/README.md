@@ -12,6 +12,7 @@ Windows is needed to run the game; everything else (locks, config, checks, relea
 | `check_helpers.py` | `pair` (warp, light up, HD|legacy side-by-side PNG) and `moved` (did the character move?), run as `game_ctl.py` subcommands. |
 | `game_checks.py` | Small checks framework: `@check` registry, runner, results JSON, summary, screenshots. |
 | `example_checks.py` | Example checks to copy (`config-sane`, `game-starts`, `main-menu-visible`, `console-echo`, `no-new-crash-files`). |
+| `d2r_only.py` | Checks for content the mod switches off (Terror Zones, Heralds, the Colossal Summit portal). Its in-game parts leave town: tag them `leaves-town` and run them only on a slot locked for out-of-town checks. |
 | `slot_install.py` | Installs a built mod project into a slot (`modkit install`), keeping the slot's own savepath. |
 | `release_install.py` | Installs the PUBLISHED release into a slot, as a player would get it. |
 

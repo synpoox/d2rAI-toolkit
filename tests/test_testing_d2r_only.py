@@ -56,6 +56,13 @@ class ColossalPortals(unittest.TestCase):
         self.assertEqual(d.colossal_portals(text), ["portal"])
         self.assertEqual(d.colossal_portals(text, level=136), ["other"])
 
+    def test_level_match_is_exact(self):
+        text = f"{self.HEAD}\nportal\t1\t100\tRed Portal,lvl=137,qty=1\nb\t1\t100\tRed Portal,lvl=130\n"
+        self.assertEqual(d.colossal_portals(text, level=13), [])
+
+    def test_short_row_ignored(self):
+        self.assertEqual(d.colossal_portals("description\toutput\tenabled\nportal\tRed Portal,lvl=137\n"), [])
+
     def test_disabled_portal_ignored(self):
         self.assertEqual(d.colossal_portals(f"{self.HEAD}\nportal\t0\t100\tRed Portal,lvl=137,qty=1\n"), [])
 
@@ -76,12 +83,12 @@ class Purple(unittest.TestCase):
 
 
 class FakeGame:
-    def __init__(self, shots):
-        self.lines, self.keys, self.shots = [], [], list(shots)
+    def __init__(self, shots, refuse=()):
+        self.lines, self.keys, self.shots, self.refuse = [], [], list(shots), tuple(refuse)
 
     def console(self, line):
         self.lines.append(line)
-        return True
+        return line not in self.refuse
 
     def key(self, k):
         self.keys.append(k)
@@ -108,14 +115,37 @@ class InGame(unittest.TestCase):
         calm, purple = solid((20, 20, 20)), solid((150, 90, 240), 40, 40)
         g = FakeGame([calm, calm, purple])
         ctx = FakeCtx(g)
-        seen = d.scan_zones(ctx, [5, 6], settle=0, sleep=lambda s: None)
+        seen = d.scan_zones(ctx, [5, 6], settle=0, sleep=lambda s: None, client=None)
         self.assertEqual(seen, {5: 0, 6: 0})
         self.assertEqual(g.lines, ["debug_mode", "cheat goto 5", "cheat goto 6"])
         self.assertEqual(g.keys, ["tab"])
         d.assert_none_lit(seen)
-        control = d.herald_control(ctx, 5, settle=0, sleep=lambda s: None)
+        control = d.herald_control(ctx, 5, settle=0, sleep=lambda s: None, client=None)
         self.assertEqual(g.lines[-1], "cheat heraldspawn 5")
         d.assert_control_lit(control)
+
+    def test_refused_goto_fails(self):
+        calm = solid((20, 20, 20))
+        ctx = FakeCtx(FakeGame([calm, calm], refuse=["cheat goto 6"]))
+        with self.assertRaisesRegex(AssertionError, "cheat goto 6 not handled"):
+            d.scan_zones(ctx, [5, 6], settle=0, sleep=lambda s: None, client=None)
+
+    def test_refused_heraldspawn_fails(self):
+        ctx = FakeCtx(FakeGame([solid((20, 20, 20))], refuse=["cheat heraldspawn 5"]))
+        with self.assertRaisesRegex(AssertionError, "heraldspawn refused"):
+            d.herald_control(ctx, 5, settle=0, sleep=lambda s: None, client=None)
+
+    def test_empty_scan_fails(self):
+        with self.assertRaisesRegex(AssertionError, "no levels scanned"):
+            d.assert_none_lit({})
+
+    def test_wrong_client_size_fails(self):
+        with self.assertRaisesRegex(AssertionError, "calibrated at 1920x1080"):
+            d.purple_in(solid((20, 20, 20)))
+        self.assertEqual(d.purple_in(solid((20, 20, 20), 1920, 1080)), 0)
+
+    def test_tag(self):
+        self.assertEqual(d.LEAVES_TOWN, "leaves-town")
 
 
 if __name__ == "__main__":

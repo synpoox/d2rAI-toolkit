@@ -329,6 +329,11 @@ Options of `run`: `--slot N` (or `MODKIT_SLOT`), `--run-id ID` (default `MODKIT_
 `--keep` (leave the game running at the end), `--stop-on-fail`. Global options, given *before* `run` or `list`: `--config FILE`, `--module NAME` and
 `--path DIR` (add a check module or a folder to find it in). Checks run in the order they were registered, each once.
 
+**The `leaves-town` tag.** A check that warps the character out of town (for example `cheat goto`) is tagged
+`leaves-town` (`d2r_only.LEAVES_TOWN`) next to `game`. Run those only on a slot you locked for out-of-town checks, never
+under a starting-town-only rule. `testing/d2r_only.py` (Terror Zone, Herald and Colossal portal checks) has such
+checks; its pixel threshold is calibrated on build 93847 at a 1920x1080 client, default brightness, HDR off.
+
 ### What a check gets: `ctx`
 
 | Member | Use |
