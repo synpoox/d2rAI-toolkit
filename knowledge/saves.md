@@ -15,10 +15,12 @@ Resurrected\mods\<Mod>\` (kept apart from retail saves). D2RLoader also writes i
 | 0x04 | u16 | version `0x69` (105) in 3.3. In D2RLoader extended-format saves bytes 0x06-0x07 read `RD` (u32 `0x44520069`); likely the extended marker (observed, not documented) |
 | 0x08 | u32 | file size |
 | 0x0c | u32 | checksum |
+| 0x15 | u8 | progression. A test save sets `0x0f` to open every difficulty (observed on 3.3; used by `testing/save_edit.py`) |
 | 0x18 | u8 | class |
 | 0x1b | u8 | level (display) |
 | 0x28 | u32[16] | skill hotkeys F1-F16: skill id, `0xffff` = none, `| 0x8000` = bound to the left button (observed) |
 | 0x12b | char[] | character name |
+| 0x98-0x9a | u8[3] | current location of Normal, Nightmare, Hell: `0x80 | (act - 1)` for the active difficulty, 0 for the others (observed on 3.3: `00 00 80` = Hell, act 1) |
 
 **Checksum**: set the size field, zero the checksum field, then over every byte: `c = rotl32(c, 1) + byte`
 (32-bit). Write `c` at 0x0c.
