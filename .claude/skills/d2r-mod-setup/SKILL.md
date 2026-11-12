@@ -20,7 +20,7 @@ Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you ar
 `python -m modkit new <dir> --name <ModName>` creates:
 - `mod.json`: name, savepath (its own save folder), `extendedSaves` (D2RLoader extended save format: needed for
   more than 30 skills per class or wide stat/item IDs), `plugins` (built plugin DLL paths), optional `namespace` (D2RLoader string namespace, written to
-  `d2rloader/metadata.json` on install; knowledge/strings.md).
+  `d2rloader/metadata.json` on install; ${CLAUDE_PLUGIN_ROOT}/knowledge/strings.md).
 - `patches/`: JSON change lists (${CLAUDE_PLUGIN_ROOT}/knowledge/modkit-ops.md), applied in name order on pristine game files.
 - `assets/`: PNGs etc. that patches use. `files/data/`: files shipped as they are.
 Keep the mod project in its own git repo: patches are text, review them like code.
