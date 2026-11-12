@@ -113,6 +113,8 @@ trace words. Bisect any regression by turning halves off; delete the file for no
 (a port found: never turn off calc codes alone while the skills/missiles that use them stay on: the game hangs on
 load).
 
+`tools/probe_tables.py --dump <dump.exe> [--only srvdo] [--show srvdo:41,143]` reads the engine's function tables (srvdofunc, cltdofunc, the missile do/hit/damage tables, property functions) straight from a memory-layout dump: it derives the runtime base from one anchor slot, then prints each table's empty slots and slots sharing one target. The built-in table set is build 93847 only; for another build pass `--tables <json>` after re-verifying the addresses in Ghidra.
+
 ## 8. Logs and dumps
 
 | What | Where |
