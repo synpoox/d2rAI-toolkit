@@ -22,6 +22,27 @@ import game_slots as gs  # noqa: E402
 import testing_config as tc  # noqa: E402
 
 
+# Tests never read the machine's real slot table: every test here sees an empty one unless it sets its own.
+_ISOLATION = None
+
+
+def setUpModule():
+    global _ISOLATION
+    tmp = tempfile.TemporaryDirectory()
+    path = os.path.join(tmp.name, "slots.toml")
+    Path(path).write_text("[owners]\n", encoding="utf-8")
+    patch = mock.patch.dict(os.environ, {"MODKIT_SLOTS_FILE": path})
+    patch.start()
+    os.environ.pop("MODKIT_PROJECT", None)
+    _ISOLATION = (tmp, patch)
+
+
+def tearDownModule():
+    tmp, patch = _ISOLATION
+    patch.stop()
+    tmp.cleanup()
+
+
 def make_cfg(tmp: str, **over) -> tc.Config:
     t = Path(tmp).as_posix()
     data = {

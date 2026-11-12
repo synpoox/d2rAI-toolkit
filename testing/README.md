@@ -53,7 +53,7 @@ MODKIT_RUN=my-lane python testing/game_slots.py unlock 2 my-lane
   [owners]
   "2"   = "toolkit"     # a slot number or a range is the key, a project name the value
   "3"   = "mod-a"
-  "4-8" = "mod-b"
+  "4-6" = "mod-b"
   ```
 - Nothing here sends real mouse or keyboard input or takes focus. The window is found by PID, never by title.
 

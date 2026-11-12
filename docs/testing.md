@@ -103,7 +103,7 @@ repo: `~/.d2r-modkit/slots.toml` (or `--slots-file F`, or `MODKIT_SLOTS_FILE`). 
 [owners]
 "2"   = "toolkit"
 "3"   = "mod-a"
-"4-8" = "mod-b"
+"4-6" = "mod-b"
 ```
 
 With the file present, `game_slots.py lock` (and the lock a `game_ctl.py start` or `game_checks.py run` takes) refuses a

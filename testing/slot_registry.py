@@ -10,7 +10,7 @@ Format (a slot number or a range as the key, a project name as the value; names 
     [owners]
     "2"   = "toolkit"        # the toolkit's own tests
     "3"   = "mod-a"
-    "4-8" = "mod-b"          # a range, both ends included
+    "4-6" = "mod-b"          # a range, both ends included
     # slots not listed belong to nobody: any project may lock them
 
 A caller says which project it is with `--project NAME` or the environment variable MODKIT_PROJECT. With a table
@@ -24,14 +24,18 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 from dataclasses import dataclass, field
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import testing_config as tc  # noqa: E402
 
 ENV_FILE = "MODKIT_SLOTS_FILE"
 ENV_PROJECT = "MODKIT_PROJECT"
 DEFAULT_FILE = os.path.join("~", ".d2r-modkit", "slots.toml")
 
 
-class RegistryError(Exception):
+class RegistryError(tc.ConfigError):
     """The slot table is unreadable or wrong."""
 
 
@@ -48,6 +52,7 @@ class SlotRegistry:
 
     def refusal(self, n: int, project: str | None) -> str | None:
         """Why project may not lock slot N (None: it may)."""
+        project = (project or "").strip() or None
         owner = self.owner_of(n)
         if owner is None or owner == project:
             return None
@@ -58,6 +63,7 @@ class SlotRegistry:
 
     def candidates(self, slots: list[int], project: str | None) -> list[int]:
         """The slots of `slots` this project may take, its own first, then the unowned ones."""
+        project = (project or "").strip() or None
         own = [s for s in slots if project and self.owner_of(s) == project]
         free = [s for s in slots if self.owner_of(s) is None]
         return own + [s for s in free if s not in own]
@@ -99,7 +105,8 @@ def load(path: str | None = None, env: dict | None = None) -> SlotRegistry | Non
     read or parsed raises RegistryError."""
     p = os.path.expanduser(path) if path else default_path(env)
     if not os.path.isfile(p):
-        if path:
+        explicit = bool(path) or bool((os.environ if env is None else env).get(ENV_FILE))
+        if explicit:
             raise RegistryError(f"slot table {p} not found")
         return None
     try:
@@ -112,4 +119,4 @@ def load(path: str | None = None, env: dict | None = None) -> SlotRegistry | Non
 
 
 def env_project(env: dict | None = None) -> str | None:
-    return (os.environ if env is None else env).get(ENV_PROJECT) or None
+    return ((os.environ if env is None else env).get(ENV_PROJECT) or "").strip() or None

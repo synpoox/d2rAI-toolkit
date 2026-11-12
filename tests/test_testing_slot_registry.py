@@ -52,7 +52,23 @@ class Files(unittest.TestCase):
         self.path = os.path.join(self.tmp.name, "slots.toml")
 
     def test_missing_default_is_none(self):
-        self.assertIsNone(sr.load(env={sr.ENV_FILE: self.path}))
+        with mock.patch.object(sr, "DEFAULT_FILE", self.path):  # the default path, not the environment variable
+            self.assertIsNone(sr.load(env={}))
+
+    def test_missing_env_file_is_error(self):
+        with self.assertRaises(sr.RegistryError):
+            sr.load(env={sr.ENV_FILE: self.path})
+
+    def test_project_names_are_stripped(self):
+        r = sr.parse({"owners": {"2": "mod-a"}})
+        self.assertIsNone(r.refusal(2, " mod-a "))
+        self.assertEqual(r.candidates([2, 3], "mod-a "), [2, 3])
+        self.assertEqual(sr.env_project({sr.ENV_PROJECT: " mod-a "}), "mod-a")
+        self.assertIsNone(sr.env_project({sr.ENV_PROJECT: "  "}))
+
+    def test_registry_error_is_a_config_error(self):
+        import testing_config as tc
+        self.assertTrue(issubclass(sr.RegistryError, tc.ConfigError))
 
     def test_missing_explicit_is_error(self):
         with self.assertRaises(sr.RegistryError):

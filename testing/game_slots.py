@@ -386,36 +386,43 @@ def ensure_lock(cfg: tc.Config, n: int, owner: str, alive=None, registry: sr.Slo
     return ok, msg, ok
 
 
-def acquire_wait(cfg: tc.Config, n: int | str, owner: str, wait_s: float = 0, poll_s: float = 5.0,
-                 sleep=time.sleep, clock=time.monotonic, out=print, pid: int | None = None,
-                 registry: sr.SlotRegistry | None = None, project: str | None = None
-                 ) -> tuple[bool, str, int | None]:
+def acquire_wait(*args, **kwargs) -> tuple[bool, str, int | None]:
+    """acquire_wait_ex without the refusal flag: (ok, message, slot)."""
+    ok, msg, slot, _ = acquire_wait_ex(*args, **kwargs)
+    return ok, msg, slot
+
+
+def acquire_wait_ex(cfg: tc.Config, n: int | str, owner: str, wait_s: float = 0, poll_s: float = 5.0,
+                    sleep=time.sleep, clock=time.monotonic, out=print, pid: int | None = None,
+                    registry: sr.SlotRegistry | None = None, project: str | None = None
+                    ) -> tuple[bool, str, int | None, bool]:
     """Like acquire, but queues: while the slot is held, say who holds it and poll until wait_s ran out.
     n may be "any": the first free slot from 2 to slot_count; with a slot table (registry) only the slots `project`
-    owns, then the unowned ones. Returns (ok, message, slot)."""
+    owns, then the unowned ones. Returns (ok, message, slot, refused); refused is True when the slot table (or
+    slot 1) said no, which is final and never queued."""
     deadline = clock() + wait_s
     while True:
         slots = list(range(2, cfg.slot_count + 1)) if n == "any" else [cfg.check_slot_number(n)]
         if not slots:
-            return False, "there is no slot besides slot 1 (game.slot_count)", None
+            return False, "there is no slot besides slot 1 (game.slot_count)", None, True
         if n == "any" and registry is not None:
             slots = registry.candidates(slots, project)
             if not slots:
                 return False, (f"every slot is owned by another project in the slot table ({registry.source}); "
-                               f"project {project or '(none given: --project or MODKIT_PROJECT)'} owns none"), None
+                               f"project {project or '(none given: --project or MODKIT_PROJECT)'} owns none"), None, True
         msg = ""
         for s in slots:
             ok, msg = acquire(cfg, s, owner, pid=pid, registry=registry, project=project)
             if not ok and registry is not None and registry.refusal(s, project):
-                return False, msg, None  # not queued: waiting never makes another project's slot ours
+                return False, msg, None, True  # not queued: waiting never makes another project's slot ours
             if ok:
-                return True, msg, s
+                return True, msg, s, False
             if cfg.is_slot_one(s):
-                return False, msg, None
+                return False, msg, None, True
         left = deadline - clock()
         if left <= 0:
             return False, msg if n != "any" else "every slot is held:\n" + "\n".join(
-                f"  slot {s}: {(lock_info(cfg, s) or LockInfo('', 'free')).describe()}" for s in slots), None
+                f"  slot {s}: {(lock_info(cfg, s) or LockInfo('', 'free')).describe()}" for s in slots), None, False
         out(f"{msg}; waiting (about {int(left)} s left)")
         sleep(min(poll_s, max(left, 0.0)))
 
@@ -675,7 +682,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("slot", nargs="?", help="slot number or 'any'")
     p.add_argument("owner", nargs="?")
     p.add_argument("--wait", type=float, default=0, help="queue: wait up to this many seconds")
-    p.add_argument("--project", default=sr.env_project(), help="your project, for the slot table (default MODKIT_PROJECT)")
+    p.add_argument("--project", type=str.strip, default=sr.env_project(), help="your project, for the slot table (default MODKIT_PROJECT)")
     p = sub.add_parser("unlock")
     p.add_argument("slot", nargs="?")
     p.add_argument("owner", nargs="?")
@@ -727,10 +734,9 @@ def _run(cfg: tc.Config, a) -> int:
         owner = owner or "manual"
         # pid 0 (manual): this process ends right away, and a lock tied to a dead pid counts as stale
         registry = sr.load(a.slots_file)  # None: no table, nothing enforced; a broken table raises (fail closed)
-        ok, msg, _ = acquire_wait(cfg, n, owner, a.wait, pid=0, registry=registry, project=a.project)
+        ok, msg, _, refused = acquire_wait_ex(cfg, n, owner, a.wait, pid=0, registry=registry, project=a.project)
         print(msg)
-        if not ok and (n == 1 or msg.startswith("every slot is owned")
-                       or (registry is not None and n != "any" and registry.refusal(n, a.project))):
+        if not ok and (n == 1 or refused):
             return 2
         return 0 if ok else 1
     if a.cmd == "unlock":
