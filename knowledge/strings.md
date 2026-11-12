@@ -55,11 +55,13 @@ legal keys and stay as they are.
    contradicts the mod.
 6. Duplicate keys: D2R itself ships 121 duplicate IDs; don't add more.
 7. **Multi-line skill text is stored in reverse line order.** Compared with the stock 1.13c string tables (found
-   in the patch's `string.tbl`, `expansionstring.tbl` and `patchstring.tbl`), 195 multi-line strings in D2R's
+   in the stock archives: `string.tbl` in d2data.mpq, `expansionstring.tbl` in d2exp.mpq, `patchstring.tbl` in
+   Patch_D2.mpq), 195 multi-line strings in D2R's
    `skills.json` that stock also has: **162 are exactly stock's lines in reverse order**, none has the same order, and
    31 of the other 33 are an edited text with the first and last lines swapped. Other files with multi-line text
-   (`item-gems`) keep stock order (6 of 7 identical). So when a classic skill description (lines separated by `\n`) is put into `skills.json`, reverse its lines or the description reads upside down. Check
-   one description in game after the first import.
+   (`item-gems`) keep stock order (6 of 7 identical). So when a classic skill description (lines separated by `\n`)
+   is put into `skills.json`, reverse its lines or the description reads upside down. Check one description in game
+   after the first import.
 
 ## D2RLoader namespaces (alternative, not used by the port)
 

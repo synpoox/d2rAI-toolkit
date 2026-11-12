@@ -29,11 +29,12 @@ who approved it. Each is shown as options and consequences, not as the one right
 
 | Option | Consequence |
 |---|---|
-| RotW bank only | Half the tables to maintain. LoD and Classic characters cannot use the mod. D2R-only rows keep their ids (a RotW-only row such as `warl` sits at id 67) |
-| LoD bank only | The class and rows RotW added are absent |
+| RotW bank only | Half the tables to maintain. LoD and Classic characters cannot use the mod. D2R-only rows keep their ids (itemtypes `warl` is at id 67 in both banks) |
+| LoD bank only | The Warlock is not playable; the LoD bank still carries Warlock placeholder rows at RotW's ids, so ids do not shift |
 | **Both banks** (this guide's default; see "Banks" in section 3) | Double the maintenance and the testing |
 
-**Generated data, hash-pinned.** Data comes from a pinned extract of the original and is never committed (section 2).
+**Generated data.** Data is generated from an extract of the original and is never committed (section 2). Whether the
+extract is pinned by hash is a choice (options in section 2).
 
 **Extended saves, append-only ids.** Retail D2R saves hold 30 class skills per class and 9-bit stat ids (up to 511).
 Ids that appear in a save are assigned once and are append-only: renumbering a row breaks every existing character.
@@ -53,6 +54,7 @@ Ids that appear in a save are assigned once and are append-only: renumbering a r
 | **Approximated** | Reproduced roughly, with the difference stated |
 | **Cut** | Not reproduced |
 | **Not yet** | Intended, not built |
+| **Function-equivalent** | A hook parity tier: the same function result for the same inputs, reached by different code or timing; the difference is stated |
 | **Router slot** | One free table slot (for example srvdofunc 190) holding a plugin function that picks among several of the mod's functions by skill id. It is a plugin pattern, not part of D2RLoader |
 | **Companion plugin** | A plugin built outside the port and bundled to stand in for a feature. What it lacks is a deviation |
 
@@ -106,14 +108,15 @@ Triage the engine DLL by its source files: its assert strings usually name them 
 
 Rebuild from scratch every time; never hand-edit the build output.
 
-**Decisions this pipeline implies** (see section 0a): the data is **generated from a hash-pinned extract of the
-original's files and never committed**. Write the merge output into git-ignored folders, and record the hash of each
-source archive in the generator so a different extract fails loudly.
+**Decisions this pipeline implies** (see section 0a): the data is **generated from an extract of the original's files
+and never committed**. Write the merge output into git-ignored folders. Pinning the extract by hash (recording the
+hash of each source archive in the generator so a different extract fails loudly) is recommended, not required.
 
 | Option | Consequence |
 |---|---|
 | Commit the generated patches | The repo then holds the original's data: not allowed (section 0) |
-| Generate into git-ignored `files/` from the pinned extract (default) | Every build needs the install; CI cannot build it; re-baselining the source is a hash change plus fixes to the merge rules |
+| Generate into git-ignored `files/` from a hash-pinned extract (recommended) | Every build needs the install; CI cannot build it; re-baselining the source is a hash change plus fixes to the merge rules |
+| Generate from an unpinned extract | No hash upkeep; a changed or patched source drifts silently into the output |
 
 ## 3. Table by table
 
@@ -136,7 +139,7 @@ a mod added.
 
 | Table | Classic | D2R | What to do |
 |---|---|---|---|
-| plrmode / monmode | Sequence mode spelled `GH` | `Code` is `SQ` (sequence), `KB` (knockback) | Skills' `anim`/`seqtrans` `GH` -> `SQ`; never change D2R's `Code` column |
+| skills `anim` / `seqtrans` (plrmode and monmode are identical, see [classic-113c-tables.md](classic-113c-tables.md)) | Sequence mode spelled `GH` | `Code` is `SQ` (sequence), `KB` (knockback) | Skills' `anim`/`seqtrans` `GH` -> `SQ`; never change D2R's `Code` column |
 | overlay | `Character` empty | `Character` = HD overlay folder | Fill it from D2R's matching row |
 | missiles | `Range` + `LevRange` | `Range` is an expression | `Range` = `base+LevRange*lvl` |
 | inventory | one row per page | two rows per page (two screen layouts) plus new pages | Set grid sizes on every matching row |
@@ -358,30 +361,37 @@ Keep a table of what the original mod has and the port does not, with the reason
 
 ### 10a. Deviation status vocabulary and the D2R-only ledger
 
-Every difference from the original is a **deviation** (section 0 glossary). Give each one a status from this list, in
-the unported table or a deviation register, and no other words:
+Every difference from the original is a **deviation** (section 0b glossary). Give each one a status from this list, in
+the unported table or a deviation register, and use these words:
 
 | Status | Meaning | Next step |
 |---|---|---|
 | **cut** | Not reproduced, by decision | Reason and what players see; reopen only by a new decision |
 | **not yet** | Intended, not built | Owner, work item, size |
 | **approximated** | Reproduced roughly | State the difference in numbers or behaviour |
-| **exact** | Matches the original (for a hook, the parity tier is Exact or Function-equivalent, section 5) | Test that proves it |
+| **exact** | Matches the original (for a hook, the parity tier is Exact or Function-equivalent, see section 0b) | Test that proves it |
 
 **D2R-only content.** D2R has content the original never had (rows past the original's last, new areas, items, recipes,
-runes, monsters). Rule: it is **ON by default**. It is turned off only by a recorded approval, one ledger row per item
-or group:
+runes, monsters). A port chooses how to treat it. Options:
+
+| Option | Consequence |
+|---|---|
+| Keep D2R-only content on by default; switch items off only with a recorded approval (an approval ledger) | Players get D2R's extras and the port needs no per-item work up front; it drifts from the original wherever nobody objected |
+| Switch D2R-only content off by default; switch items on only with a recorded approval | Closest to the original; more rows to switch off and keep switched off as D2R adds content |
+| No ledger; decide case by case | Least paperwork; no record of why something is on or off |
+
+Whichever is chosen, record it as a decision (section 0a). A port that keeps an approval ledger can use one row per
+item or group:
 
 | Column | Holds |
 |---|---|
 | Content | The D2R rows, by table and name |
-| Decision | Keep (default) or turn off |
+| Decision | Keep on or turn off (the opposite of the port's default, with its approval) |
 | Approved by, date | Who said so, and where it is recorded |
 | How it is off | Keep the row in place for id stability (section 4) and switch it off in data: `spawnable 0` (or `disabled`), removed from treasure classes, recipe disabled, area unlinked. Never delete the row |
 | Test | How you check it is off (a drop run, a recipe attempt, a walk to the area) |
 
-Large items (a whole area, a class, a system) get a decision ticket first and an approval before the ledger row.
-Without a recorded approval, D2R's content stays on.
+Large items (a whole area, a class, a system) can get a decision ticket first and an approval before the ledger row.
 
 ## 11. Testing a port
 

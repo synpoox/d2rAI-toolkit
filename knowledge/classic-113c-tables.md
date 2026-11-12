@@ -38,24 +38,25 @@ their rows from D2R's own (they hold ids and UI groups D2R's code reads).
 
 ## 3. Columns: stock 1.13c against D2R 3.3
 
-Row counts are stock / D2R RotW. Only substantive column differences are listed; renames that
+Row counts are stock / D2R RotW, counted as data lines after the header (blank and `Expansion` separator lines
+included; uniqueitems is 402 on that count, 401 without those lines). Only substantive column differences are listed; renames that
 `shared/classic_import/ids.py` (`RENAME_MAP`) already maps are marked "renamed".
 
 | Table | Rows | Stock has, D2R lacks | D2R has, stock lacks |
 |---|---|---|---|
 | events | 13 / 17 (base bank 16) | | see section 4 |
 | states | 185 / 232 | `immed`, `blue`; `id` and `eol` (comment-column renames) | `hidedead`, `canstack`, `sunderfull`, `sunder-res-reduce`, `vfxweaponstate` |
-| skills | 357 / 429 | `auratgtevent`, `auratgteventfunc`, `passiveevent`, `passiveeventfunc`, `delay` (renamed from `localdelay`), `checkfunc`, `nocostinstate`, `general` | `srvstopfunc`, `cltstopfunc`, `auraevent4`, `auraeventfunc4`, `passivestat6-14` and `passivecalc6-14`, `passivereqweaponcount`, `requirespettype`, `requiresweapon`, `useServerMissilesOnRemoteClients`, `KeepCursorStateOnKill`, `ContinueCastUnselected`, `ClearSelectedOnHold` |
+| skills | 357 / 429 | `auratgtevent`, `auratgteventfunc`, `passiveevent`, `passiveeventfunc`, `delay` (renamed to `localdelay` in D2R, see `RENAME_MAP`), `checkfunc`, `nocostinstate`, `general` | `globaldelay`, `alwayshit`, `ItemUseRestrict`, `calc5-10`, `Param9-20`, `srvstopfunc`, `cltstopfunc`, `auraevent4`, `auraeventfunc4`, `passivestat6-14` and `passivecalc6-14`, `passivereqweaponcount`, `requirespettype`, `requiresweapon`, `useServerMissilesOnRemoteClients`, `KeepCursorStateOnKill`, `ContinueCastUnselected`, `ClearSelectedOnHold` |
 | missiles | 684 / 742 | `LevRange`, `Qty`, `SpecialSetup` | `Radius`, `CollisionOverlap`, `OnDiedSound`, `MissileWeaponVFX` |
 | itemstatcost | 359 / 368 | `Divide`, `itemspecific` | `advdisplay` |
-| levels | 138 / 139 | `MonLvl1-3`, `MonLvl1Ex-3Ex` (renamed to `MonLvl`, `MonLvl(N)`, `MonLvl(H)`, `MonLvlEx...`), `EntryFile`, `Beta` | `CompletionTotalRoomsOverride`, `mon11-25` and `nmon11-25` style extra monster slots, `*StringName` |
+| levels | 138 / 139 | `MonLvl1-3`, `MonLvl1Ex-3Ex` (renamed to `MonLvl`, `MonLvl(N)`, `MonLvl(H)`, `MonLvlEx...`), `EntryFile`, `Beta` | `CompletionTotalRoomsOverride`, `LevelGroup` (points into `levelgroups`), `LevelEntry`, `PreventTownPortal`, `umon11-25`, `mon11-25` and `nmon11-25` style extra monster slots, `*StringName` |
 | monstats | 735 / 752 | `NoShldBlock`; `TreasureClass1-4` (renamed to `TreasureClass`, `...Champ`, `...Unique`, `...Quest`) | `CannotDesecrate`, `CannotHerald`, `ShieldBlockOverride`, `TreasureClassDesecrated...`, `TreasureClassHerald...`, `nopreventmonsterheal`, `rightArmItemType`, `leftArmItemType`, `canNotUseTwoHandedItems` |
 | cubemain | 151 / 227 (base bank 155) | `ladder` | `firstLadderSeason`, `lastLadderSeason` |
 | uniqueitems | 402 / 439 | `enabled` (renamed to `spawnable`), `ladder` | `disabled`, `spawnable`, `disableChronicle`, `DropConditionCalc`, `firstLadderSeason`, `lastLadderSeason`, `diablocloneweight` |
 | setitems | 128 / 141 | | `disabled`, `spawnable`, `disableChronicle`, `DropConditionCalc`, ladder season columns, `diablocloneweight` |
 | runes | 169 / 181 | `server` | `disallowCraftingInLadder`, `disallowCraftingInNonLadder`, ladder season columns, `*Patch Release` |
 | itemtypes | 104 / 110 (base bank 109) | `Charm`, `Gem`, `CostFormula`; `MaxSock1/25/40` (renamed to `MaxSockets1-3`) | `MaxSocketsLevelThreshold1/2`, `UICategory`, `RunewordCategory1/2`, `Restricted` |
-| weapons, armor, misc | 307 / 307, 203 / 218, 152 / 170 | `OpenBetaGfx`, `Source Art`, `Game Art`, `special`, `throwable`, `absorbs`, `spelloffset`, `szFlavorText`; NPC price columns spelled `Hralti...` and `Drehya...` (renamed to `Hratli...` and `Anya...`) | `ShowLevel`, `reqstr`/`reqdex`, `DropConditionCalc`, `UICatOverride`, `diablocloneweight`, `Transmogrify`, `TMog*`, `spawnstack`, `PermStoreItem`, `EventItem`, `AdvancedStashStackable` (misc) |
+| weapons, armor, misc | 307 / 307, 203 / 218, 152 / 170 | `OpenBetaGfx`, `Source Art`, `Game Art`, `special`, `throwable`, `absorbs`, `spelloffset`, `szFlavorText`; NPC price columns spelled `Hralti...` and `Drehya...` (renamed to `Hratli...` and `Anya...`) | `ShowLevel`, `reqstr`/`reqdex`, `DropConditionCalc`, `UICatOverride`, `diablocloneweight`, `Transmogrify`, `TMog*`, `spawnstack`, `PermStoreItem`, `EventItem`, `AdvancedStashStackable` (misc), `UsageConditionCalc`, `spelldesccolor`, `spelldescstr2` (misc), `questdiffcheck` (armor) |
 | overlay | 294 / 335 | `Dir`, `Open`, `Beta`, `Frames` (comment column in D2R) | `WeaponStateFlags`, `WeaponStateGroup`, `StartSound` |
 | plrmode, monmode | 20, 16 / 20, 16 | none | none: **identical** to D2R's, including `Code` (`SQ` sequence, `KB` knock back; the `Token` of both is `GH`) |
 
@@ -82,8 +83,8 @@ Reading the table:
   `levelup` finds D2R's own rows at those numbers. Port events by **name**, never by index.
 - D2R raises only the events in its own table. A stat listening on a mod's extra event row loads and never fires
   (cast on death is the worked example in [porting-classic-mods.md](porting-classic-mods.md) section 6).
-- Stock 1.13c itself never sends some of the 13 (they exist in the table); check by hooking before assuming a
-  vanilla event is live.
+- Unverified: stock 1.13c may never send some of the 13 (they exist in the table); no event and no evidence is
+  named here, so check by hooking before assuming a vanilla event is live.
 
 ## 5. Saves: 1.13c version 96 against D2R version 105
 
@@ -149,12 +150,12 @@ and free slots are in [engine-limits.md](engine-limits.md).
 | skills `srvdofunc` | 152 | D2R uses 153-171 for its own skills; free 172-190 |
 | skills `srvstfunc` | 65 | D2R's data goes to 70; see [porting-classic-mods.md](porting-classic-mods.md) section 5 |
 | skills `cltdofunc` | 95 | D2R uses up to 109; free 110-129 |
-| skills `cltstfunc` | 82 (one use, 82; the rest to 53) | D2R's table ends at 61; 82 is past the end |
+| skills `cltstfunc` | 82 (one use, 82; the rest to 53) | D2R's data goes to 61; the table has 70 slots (`0x235f590`, [d2r-93847-addresses.md](d2r-93847-addresses.md)), 62-69 free; 82 is past the end |
 | missiles `pSrvHitFunc` / `pCltHitFunc` | 59 / 63 | D2R uses 0-60 / 0-65; free 61-70 / 66-80 |
-| missiles `pSrvDoFunc` / `pCltDoFunc` / `pSrvDmgFunc` | 36 / 68 / 14 | D2R's data goes to 45 / 77 / above |
+| missiles `pSrvDoFunc` / `pCltDoFunc` / `pSrvDmgFunc` | 36 / 68 / 14 | D2R's data goes to 45 / 77 / 17 |
 | misc `pSpell` | 9 | D2R uses -1..15; free 16-19 |
-| cubemain `op` | 28 (5 rows) | D2R handles 1-28 |
-| itemstatcost `descfunc` | 28 (1-9, 11-18, 20, 22-24, 27, 28) | D2R's data uses 5-29 |
+| cubemain `op` | 28 (5 rows) | D2R's data uses 28 only |
+| itemstatcost `descfunc` | 28 (1-9, 11-18, 20, 22-24, 27, 28) | D2R's data uses 5, 11-19, 22-24, 27-29 (not 1-4, 6-9, 20) |
 | properties `func1` | 36 | D2R's data uses 1-25, 36 |
 
 A value above stock's range in a mod's table is the mod's own function; a value inside it is stock's. That is the
