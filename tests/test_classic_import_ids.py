@@ -258,6 +258,165 @@ class ListFileTests(unittest.TestCase):
             with self.assertRaisesRegex(ids.IdError, "rows with no id"):
                 ids.apply(root / "merge" / "ids-skills.tsv", root / "src", root / "d2r", out, ["skills"])
 
+    def test_apply_writes_the_follower_table(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            files = {"src": {"objects": "Name\nchest\nwell\nnew\n", "objtype": "Name\nChest\nWell\nNew\n"},
+                     "d2r": {"objects": "Name\nchest\nwell\n", "objtype": "Name\nCasket\nWell\n"}}
+            for side, tables in files.items():
+                for t, text in tables.items():
+                    p = root / side / "global" / "excel" / f"{t}.txt"
+                    p.parent.mkdir(parents=True, exist_ok=True)
+                    p.write_text(text, "latin-1")
+            (root / "merge").mkdir()
+            (root / "merge" / "ids-objects.tsv").write_text("chest\t0\tchest\nwell\t1\twell\nnew\t2\tnew\n", "utf-8")
+            ids.apply(root / "merge" / "ids-objects.tsv", root / "src", root / "d2r", root / "out", ["objects"])
+            # objtype follows objects row for row: D2R's names on merged rows, the source's on the appended one
+            self.assertEqual((root / "out/global/excel/objtype.txt").read_text("latin-1"), "Name\nCasket\nWell\nNew\n")
+
+
+def table(text: str, key: str | None = None) -> ids.Table:
+    with tempfile.TemporaryDirectory() as tmp:
+        p = Path(tmp) / "t.txt"
+        p.write_bytes(text.replace("|", "\t").encode("latin-1"))
+        return ids.Table(p, key)
+
+
+class TableReaderTests(unittest.TestCase):
+    def test_keeps_crlf_or_lf_and_pads_short_rows(self):
+        t = table("a|b|c\r\nx|1\r\ny|2|3|4\r\n\r\n")
+        self.assertEqual((t.newline, t.rows), ("\r\n", [["x", "1", ""], ["y", "2", "3"]]))
+        self.assertEqual(t.text(), "a\tb\tc\r\nx\t1\t\r\ny\t2\t3\r\n")
+        self.assertEqual(table("a\nx\n").text(), "a\nx\n")
+
+    def test_expansion_rows_are_not_records_and_the_key_column(self):
+        t = table("Name|Code\nA|a\nExpansion|\nB|b\n", "Code")
+        self.assertEqual((t.records(), t.names()), ([0, 2], ["a", "b"]))
+
+
+class HookTests(unittest.TestCase):
+    """The generic hooks a project chains into merge_table, each fed the project's own values."""
+    ren = {"skills": {"old": "New Name"}}
+
+    def test_make_spell_moves_function_numbers_but_not_references_or_formulas(self):
+        s = ids.make_spell({"skills": {"srvdofunc": {"90": "200"}, "reqskill1": {"old": "x"}}})
+        self.assertEqual(s("skills", "srvdofunc", '"90"', {}), "200")
+        self.assertEqual(s("skills", "srvdofunc", "91", {}), "91")
+        self.assertEqual(s("skills", "reqskill1", "Old", self.ren), "New Name")  # a reference, not a number
+        self.assertEqual(s("skills", "calc1", "skill('old'.blvl)*-2", self.ren), "skill('New Name'.blvl)*(0-2)")
+
+    def test_fix_cells(self):
+        fix = ids.fix_cells({"misc": {("gfx", "toolong"): {"gfx": "tool", "missing": "x"}}},
+                            words={"Mixed-Case": "mixed-case"})
+        h = ["code", "gfx"]
+        self.assertEqual(fix("misc", h, ["a", '"toolong"']), ["a", "tool"])
+        self.assertEqual(fix("misc", h, ["Mixed-Case", "ok"]), ["Mixed-Case", "ok"])  # misc has no properties
+        self.assertEqual(fix("uniqueitems", ["index", "prop1"], ["u", "Mixed-Case"]), ["u", "mixed-case"])
+
+    def test_derive_and_finishes_in_order(self):
+        d2r = table("skill|passive|rightskill|x\nA|0|1|\n")
+        src = table("skill|passive|x\nA|1|\nB|0|\n")
+        seen = []
+        finish = ids.finishes(ids.derive(ids.DERIVED["skills"]), None,
+                              lambda h, row, s, own: seen.append((row[2], own is None)))
+        merged, _ = ids.merge_table("skills", src, d2r, [("A", 0, "A"), ("B", 1, "B")], {}, finish=finish)
+        self.assertEqual([r[2] for r in merged.rows], ["0", "1"])  # passive: no right-mouse slot
+        self.assertEqual(seen, [("0", False), ("1", True)])
+
+    def test_stat_display_follows_the_string(self):
+        d2r = table("Stat|descfunc|descval|descstrpos|descstrneg\nst_a|19||StrA|StrA\nst_a_time|17||StrA|StrA\n"
+                    "st_b|19||StrB|StrB\nst_c|19||StrC|StrC\n")
+        src = table("Stat|descfunc|descval|descstrpos|descstrneg\nst_a|1|1|StrA|StrA\nst_a_time|17|1|StrA|StrA\n"
+                    "st_b|1|1|OwnStr|OwnStr\nst_c|1|1|StrA|StrA\nnew|4|1|StrA|StrA\nnew_time|17|1|StrA|StrA\n"
+                    "new_own|1|1|OwnStr|\n")
+        names = ["st_a", "st_a_time", "st_b", "st_c", "new", "new_time", "new_own"]
+        merged, _ = ids.merge_table("itemstatcost", src, d2r, [(n, i, n) for i, n in enumerate(names)], {},
+                                    finish=ids.stat_display(d2r))
+        self.assertEqual([r[1:3] for r in merged.rows], [
+            ["19", ""], ["17", ""],
+            ["1", "1"],   # a string D2R has no row for keeps the source's display
+            ["19", ""],   # moved to another D2R string: that string's display
+            ["19", ""], ["17", ""],  # appended rows: the D2R row with the same descfunc, else the first
+            ["1", "1"]])
+
+    def test_stat_display_keeps_d2r_strings_a_hardcoded_function_reads(self):
+        d2r = table("Stat|descfunc|descval|descstrpos|descstrneg\nsk|27||ClassSkill|ClassSkill\nel|19||El|El\n")
+        src = table("Stat|descfunc|descval|descstrpos|descstrneg\nsk|27|||\nel||||\n")
+        merged, _ = ids.merge_table("itemstatcost", src, d2r, [("sk", 0, "sk"), ("el", 1, "el")], {},
+                                    finish=ids.stat_display(d2r))
+        self.assertEqual(merged.rows, [["sk", "27", "", "ClassSkill", "ClassSkill"], ["el", "", "", "", ""]])
+
+    def test_missile_funcs_move_the_missile_into_the_column_the_dispatcher_reads(self):
+        cols = "skill|srvdofunc|srvmissile|srvmissilea"
+        src = table(f"{cols}\nbolt|99||jav\nkept|99|own|jav\nother|5||jav\n")
+        merged, _ = ids.merge_table("skills", src, table(f"{cols}\n"), [("bolt", 0, "bolt"), ("kept", 1, "kept"),
+                                                                          ("other", 2, "other")], {},
+                                    finish=ids.missile_funcs([("srvdofunc", "99", "srvmissile", "srvmissilea")]))
+        self.assertEqual(merged.rows, [["bolt", "", "jav", ""], ["kept", "", "own", "jav"], ["other", "5", "", "jav"]])
+
+    def test_hit_params_take_the_mods_ids(self):
+        cols = "Missile|pSrvHitFunc|sHitPar1|sHitPar3"
+        src = table(f"{cols}\ncloud|61|236|500\nnova|5|236|500\n")
+        ids_ = {"states": {"236": "282"}, "itemstatcost": {"500": "510"}}
+        merged, _ = ids.merge_table("missiles", src, table(f"{cols}\n"), [("cloud", 0, "cloud"), ("nova", 1, "nova")],
+                                    {}, finish=ids.hit_params({"61": {"sHitPar1": "states", "sHitPar3": "itemstatcost"}},
+                                                              ids_))
+        self.assertEqual(merged.rows, [["cloud", "61", "282", "510"], ["nova", "5", "236", "500"]])
+
+    def test_property_params_and_kinds(self):
+        props = ids.property_kinds(table("code|func1|stat1\noskill|11||\nhit-skill|19|\nskill-rand|12|\n"
+                                         "state|1|state\nres|1|res\nadd-mon|1|my_mon_add\n"), monster_stats="my_mon_")
+        self.assertEqual(props, {"oskill": "skill", "hit-skill": "skill", "skill-rand": "skillrange",
+                                 "state": "state", "add-mon": "monster"})
+        self.assertNotIn("add-mon", ids.property_kinds(table("code|func1|stat1\nadd-mon|1|my_mon_add\n")))
+        ids_ = {"skills": {"400": "430", "401": "431"}, "monstats": {"690": "691"}}
+        ren = {"skills": {"old": "New Name"}, "states": {"oldstate": "newstate"}}
+        cols = "index|*ID|prop1|par1|min1|max1|prop2|par2|min2|max2"
+        src = table(f"{cols}\nA|0|oskill|Old|1|1|hit-skill|400|5|3\nB|1|skill-rand|10|400|401|state|oldstate||\n"
+                    "C|2|res|400|5|5|add-mon||690|690\n")
+        merged, _ = ids.merge_table("uniqueitems", src, table(f"{cols}\n"), [("A", 0, "A"), ("B", 1, "B"), ("C", 2, "C")],
+                                    ren, ids_, finish=ids.props_finish(ren, ids_, props))
+        self.assertEqual(merged.rows, [
+            ["A", "0", "oskill", "New Name", "1", "1", "hit-skill", "430", "5", "3"],
+            ["B", "1", "skill-rand", "10", "430", "431", "state", "newstate", "", ""],
+            ["C", "2", "res", "400", "5", "5", "add-mon", "", "691", "691"]])
+        cube = ["description", "op", "param", "mod 1", "mod 1 chance", "mod 1 param"]
+        row = ["r", "10", "500", "oskill", "100", "400"]
+        ids.fix_props(cube, row, ren, {"itemstatcost": {"500": "510"}, **ids_}, props)
+        self.assertEqual(row, ["r", "10", "510", "oskill", "100", "430"])  # cube: op stat and a chance column
+
+    def test_num_refs_of_the_project(self):
+        src = table("code|missiletype\nxyz|12\n")
+        merged, _ = ids.merge_table("weapons", src, table("code|missiletype\n"), [("xyz", 0, "xyz")], {},
+                                    {"missiles": {"12": "70"}}, num_refs={"weapons": {"missiletype": "missiles"}})
+        self.assertEqual(merged.rows, [["xyz", "70"]])
+        self.assertEqual(ids.merge_table("weapons", src, table("code|missiletype\n"), [("xyz", 0, "xyz")], {})[0].rows,
+                         [["xyz", "12"]])  # not a NUM_REFS column by default
+
+    def test_monstats_ids_and_left_out(self):
+        d2r = table("Id|x\nm_a|\nExpansion|\nm_d2r|\nm_b|\n")
+        src = table("Id|x\nm_a|\nExpansion|\nm_b|\nm_new1|\nm_new2|\n")
+        self.assertEqual(ids.monstats_ids(src, d2r), {"0": "0", "1": "2", "2": "3", "3": "4"})
+        lines = {"levels": [("A", 0, "A"), ("Cut", ids.LEFT_OUT, "cut"), ("B", 2, "B")]}
+        self.assertEqual(ids.left_out_of(lines, {"levels": ["A", "Cut", "B"]}), {"levels": {"1": ""}})
+
+    def test_context_of(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            files = {"src": {"skills": "skill\nA\nB\n", "monstats": "Id\nm1\nm2\n",
+                             "properties": "code\tfunc1\tstat1\noskill\t11\t\n"},
+                     "d2r": {"skills": "skill\nA\n", "monstats": "Id\nm2\n"}}
+            for side, tables in files.items():
+                for t, text in tables.items():
+                    p = root / side / "global" / "excel" / f"{t}.txt"
+                    p.parent.mkdir(parents=True, exist_ok=True)
+                    p.write_text(text, "latin-1")
+            lists = {"skills": [("A", 0, "A"), ("B", 1, "B_x")], "states": []}
+            ctx = ids.context_of(lists, root / "src", root / "d2r")
+            self.assertEqual(ctx.ids, {"skills": {"0": "0", "1": "1"}, "monstats": {"0": "1", "1": "0"}})
+            self.assertEqual((ctx.ren, ctx.props), ({"skills": {"b": "B_x"}, "states": {}}, {"oskill": "skill"}))
+            self.assertEqual(ids.context_of(lists, root / "src").ids, {"skills": {"0": "0", "1": "1"}})
+
 
 if __name__ == "__main__":
     unittest.main()
