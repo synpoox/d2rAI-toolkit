@@ -28,6 +28,7 @@ add_library(plugin_common STATIC
 	src/level_palette.cpp
 	src/log.cpp
 	src/off_switch.cpp
+	src/parts.cpp
 )
 target_include_directories(plugin_common PUBLIC src)
 target_link_libraries(plugin_common PUBLIC D2RLPlugin::D2RLPlugin)
@@ -40,7 +41,7 @@ endif()
 if(PROJECT_IS_TOP_LEVEL)
 	enable_testing()
 	# One executable per test file: tests/<name>.cpp builds plugin_common_<name> (add the name here).
-	foreach(test guard_test ai_registry_test level_palette_test)
+	foreach(test guard_test ai_registry_test level_palette_test parts_test)
 		add_executable(plugin_common_${test} tests/${test}.cpp)
 		target_link_libraries(plugin_common_${test} PRIVATE plugin_common)
 		if(MSVC)
