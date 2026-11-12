@@ -1,5 +1,5 @@
 {
-  "note": "Stock classic Diablo II: Lord of Destruction 1.09d: SHA-256 of every file a 1.09d port is measured against. The DLLs, D2.LNG, Diablo II.exe, D2VidTst.exe and Patch_D2.mpq are the 1.09d set as a version-switching tool stores it (the DLLs carry link timestamps of 2001-11-30, five days before the PC release). The base MPQs are the game installer's data; the three installer MPQs (d2data, d2char, d2sfx) were re-saved without their (attributes) entry, so they are not proven byte-equal to the 2001 discs. Patch_D2.mpq loads before them and overrides them. Game.exe and Game.exe.stock: stock files as found in the reference install. A byte comparison with the official patch is open: no per-file hashes of it are published. Changing this file is a re-baseline.",
+  "note": "Stock classic Diablo II: Lord of Destruction 1.09d: SHA-256 of every file a 1.09d port is measured against. The DLLs, D2.LNG, Diablo II.exe, D2VidTst.exe and Patch_D2.mpq are the 1.09d set as a version-switching tool stores it (the DLLs carry link timestamps of 2001-11-30, five days before the PC release). The base MPQs are the game installer's data; the three installer MPQs (d2data, d2char, d2sfx) were re-saved without their (attributes) entry, so they are not proven byte-equal to the 2001 discs. Patch_D2.mpq loads before them and overrides them. Game.exe: the stock 1.09d file. A byte comparison with the official patch is open: no per-file hashes of it are published. Changing this file is a re-baseline.",
   "archives": {
     "d2char.mpq": "9640549fdaffac8e9ec1535d9a594e5fdaa36168e2e53943a38055cfcc612896",
     "d2data.mpq": "5cbfb794a990709bcb11dec4e3ed6b7656c49ea28957c4753cb25263cdd8208a",
@@ -36,8 +36,7 @@
     "D2Win.dll": "b558c1b55325c0935e5e7c1203cb588532a938632ad940a939dffcfc51df2c1d",
     "Diablo II.exe": "147e33cc5d2dd9520d143847b35c1c8410a432c605155e0d9678b5b9450a7938",
     "Fog.dll": "51b516cb4b6b61df6231de4903b962e3939667c7c9c5abfb07028babcdd4b5fe",
-    "Game.exe": "2b7391519396228f4f7f902426c67157f35fbeef95c9e1f64014d8f70554e182",
-    "Game.exe.stock": "b211b8ad79e9f2bbb29f6e7b0d861cadbd1fe63438a12d740f01404fd2ce8df6",
+    "Game.exe": "b211b8ad79e9f2bbb29f6e7b0d861cadbd1fe63438a12d740f01404fd2ce8df6",
     "ijl11.dll": "5a0b1c4e5d91fd67a1ad23e5ce869899b79a7282cb6e5533dc5c074eb59306ec",
     "SmackW32.dll": "5786b7b72667b9ea1cc4bf7762a9e313c2ad1474392907a0f3b52e4e888029bf",
     "Storm.dll": "d0bb72206211b0aeb8cef8655081fbcda78925d0e4b19d501e9fecb239233a2a"
