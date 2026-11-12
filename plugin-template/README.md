@@ -174,8 +174,9 @@ another plugin's function.
    hooked. Do not stack a hook on it. Use the D2RLoader service or D2RCore export for that function, or hook a
    caller or callee instead. `hook_example.cpp` checks this at runtime. The PluginSDK's `DiagnosticsService` can
    tell you who owns a patch.
-3. Copy the entry bytes: **whole instructions, at least 14 bytes, REX prefixes included** (for example
-   `40 53` is `push rbx`, not just `53`). D2RLoader writes a 14-byte absolute jump and moves the bytes you name
+3. Copy the entry bytes: **whole instructions, REX prefixes included** (for example
+   `40 53` is `push rbx`, not just `53`), ending on an instruction boundary. There is no 14-byte minimum: the
+   sound guard's hooks use 8-, 11- and 12-byte signatures and run in game. D2RLoader moves the bytes you name
    into the trampoline. If the bytes do not match the live code (wrong image, or someone else patched it), the hook
    is refused and nothing changes.
 4. Declare the function type `noexcept`, and keep an `original` pointer:
@@ -200,7 +201,7 @@ Plan it with [knowledge/new-game-systems.md](../knowledge/new-game-systems.md) b
 - **Read the data, don't copy it.** Take tiers, modifiers and limits from the mod's tables (item stats, levels.txt
   columns) so the data lane can tune them without a new DLL.
 - **Hooks from the registry first.** The [93847 registry](../knowledge/d2r-93847-addresses.md) already lists, for
-  example, the portal maker, the cube's portal output, the spawn-monster function and room to level. Confirm each
+  example, the portal maker, the cube's `Red Portal` output (`0x5da800`), the spawn-monster function and room to level. Confirm each
   one in Ghidra (signature, callers, entry bytes) before you hook it, and add what you find.
 - **Count and report.** Every part shows its counters in the status command (`mapmods: 412 monsters changed`). That
   is how a test check or a player's report proves the part ran.
@@ -209,8 +210,8 @@ Plan it with [knowledge/new-game-systems.md](../knowledge/new-game-systems.md) b
 
 - Every RVA, offset and entry byte sequence is for build 93847 only. After a game or D2RLoader update, dump the
   image again, re-find each address, and only then write the new build's `rvas_<build>.h` in the shared library.
-- Inline hooks need whole instructions, at least 14 bytes, with REX prefixes included. Hook function types must be
-  `noexcept`.
+- Inline hooks need whole instructions with REX prefixes included (no fixed minimum length; the sound guard's 8-byte
+  signatures run in game). Hook function types must be `noexcept`.
 - Check for an existing D2RLoader hook (`jmp [rip+x]` at the entry) before you patch any engine function.
 - **Never patch or move the unit state arrays.** D2RLoader 1.3.1 already syncs more than 512 states
   ("wide states") and reads D2R's own layout. A plugin that moved them broke all client state sync (monster hover,

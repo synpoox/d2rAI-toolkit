@@ -7,10 +7,10 @@
 // The pattern, for any function:
 //  1. Find the function in Ghidra (tools/ghidra_query.ps1 Decompile.java / Disasm.java 0x<rva>) and work out its
 //     arguments and return type.
-//  2. Copy its first bytes from the disassembly: WHOLE instructions, at least 14 bytes (D2RLoader writes a 14-byte
-//     jmp [rip+0] + address), REX prefixes included (40 53 = push rbx). The bytes are both a safety check (wrong
-//     image, or someone else patched it -> the hook is refused, nothing changes) and what D2RLoader relocates into
-//     the trampoline that becomes `original`.
+//  2. Copy its first bytes from the disassembly: WHOLE instructions, REX prefixes included (40 53 = push rbx), ending
+//     on an instruction boundary. No fixed minimum: sound_guard.cpp hooks with 8-byte signatures and runs in game.
+//     The bytes are both a safety check (wrong image, or someone else patched it -> the hook is refused, nothing
+//     changes) and what D2RLoader relocates into the trampoline that becomes `original`.
 //  3. Check first whether D2RLoader already hooks the function: an entry of FF 25 (jmp [rip+x]) means D2RLoader (or
 //     another plugin) replaced it. Do not stack a second hook on it; use the D2RLoader service/export instead, or
 //     hook a caller/callee. This file shows the check.
@@ -28,7 +28,7 @@ constexpr uint64_t HitDelayRva = 0x56ac00;  // (unit, weapon) -> frames until th
 // PUSH R15 (41 57) / SUB RSP,0x80 (48 81 ec 80 00 00 00): 19 bytes, 7 whole instructions.
 constexpr uint8_t HitDelayEntry[] = {0x48, 0x89, 0x5c, 0x24, 0x18, 0x55, 0x56, 0x57, 0x41, 0x56,
                                      0x41, 0x57, 0x48, 0x81, 0xec, 0x80, 0x00, 0x00, 0x00};
-static_assert(sizeof(HitDelayEntry) >= 14, "an inline hook needs at least 14 bytes of whole instructions");
+static_assert(sizeof(HitDelayEntry) == 19, "this example copies 19 bytes: 7 whole instructions");
 
 using HitDelayFn = int32_t (*)(void* unit, void* weapon) noexcept;
 

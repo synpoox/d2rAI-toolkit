@@ -11,7 +11,7 @@ Read ${CLAUDE_PLUGIN_ROOT}/knowledge/tables.md (item tables section) and ${CLAUD
 from a vanilla row: `python -m modkit show weapons "Crystal Sword"`, `show uniqueitems "The Gnasher"`.
 
 ## Base items (weapons.txt, armor.txt, misc.txt)
-- `clone_row` a similar base, then set `code` (3-4 chars, unique across all three tables), `name` (string key),
+- `clone_row` a similar base, then set `code` (3 characters, unique across all three tables; a 4-character code gets no picture and cannot be spawned), `name` (string key),
   `namestr`, damage/defense columns, `levelreq`, `reqstr`/`reqdex`, `gemsockets`, `type` (itemtypes code),
   `invwidth`/`invheight`, `normcode`/`ubercode`/`ultracode` (the exceptional/elite chain), `level` (item level for
   treasure classes), `rarity`, `cost`.

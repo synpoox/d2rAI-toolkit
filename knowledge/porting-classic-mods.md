@@ -140,7 +140,7 @@ D2R 3.x reused classic "free" slots for its own skills. Values that meant the mo
 | skills `srvdofunc` | 1-171 | **172-190** | A classic DLL's 153-171 are D2R 3.x skills now. Put new server functions at **172+** |
 | skills `srvdofunc` 109 | D2R's itemless Town Portal | | 1.13c's 109 (monster frenzy) was merged into 9 (Frenzy) |
 | skills `srvstfunc` 64 | D2R's Bind Demon | | 1.13c's 64 (frenzy start) -> use 67 |
-| skills `cltstfunc` | max 61 | | Classic 82 is past the end of D2R's table: use none |
+| skills `cltstfunc` | max 61 | **62-69** | Classic 82 is past the end of D2R's 70-slot table: use none |
 | skills `cltdofunc` | 1-109 (96-109 are D2R 3.x skills) | **110-129** | Classic 96-99 run D2R's Volcano / Sigil / Ring of Fire client code |
 | missiles `pSrvHitFunc` | 0-60 | 61-70 | |
 | misc `pSpell` | -1..15 | 16-19 | 20+ does nothing |
@@ -171,7 +171,7 @@ Others seen:
 | **Ranged pets**: the mod's summon code read a flag in one of the summon skill's `Param` columns and switched the pet's AI to its ranged branch | D2R's summon function has no such step: the pet melees | Plugin: after the pet is made, set its AI control field (observed in 93847: monster data `+0x30` -> `+0x44 = 1`, `+0x48 = 0` picks the NecroPet ranged branch) |
 | Raven-AI pets: attack count = `Param1 + (lvl-1)*Param2` (a negative Param1 made a pet permanent) | D2R takes the count from the skill's **`calc3`** | Write the count formula into `calc3` (e.g. `ln12`), or the pet dies on its first think |
 | The mod's skill picker ignored `leftskill` / `rightskill` | D2R honours them | Section 7 |
-| Cube output "open a portal" for any level | D2R's cube executor (`0x5269c0`) opens only the Cow Level | Plugin hook on the output handler |
+| Cube output "open a portal" for any level | D2R's `Cow Portal` output is fixed to the Cow Level; `Red Portal,lvl=<id>` (handler `0x5da800`) opens any level of the same act | Write `Red Portal,lvl=<id>`; a per-use destination or another act needs a plugin |
 | A classic timed potion added its stat as is | D2R's timed potion (`pSpell` 3, `0x57ecb0`) treats a stat's calc as the **total over the duration**, except hitpoints, mana, manarecovery and hpregen; every other stat is stored as calc / len | Multiply the calc by the `len` formula for those stats |
 | Quest kill handlers | D2R runs a quest's kill handler only while the quest is still open in that difficulty | Test with a character whose quest is open |
 
