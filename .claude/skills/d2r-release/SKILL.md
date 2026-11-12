@@ -28,7 +28,10 @@ Releases, Nexus Mods, or a mix) is in `${CLAUDE_PLUGIN_ROOT}/docs/distribution.m
    version, and the installer's version if the installer changed). One bump per release.
    Requirement checks in the installer use the game version (`3.3`), never a build number (${CLAUDE_PLUGIN_ROOT}/knowledge/d2rloader.md).
 2. **Write the changelog section** `### <version> (<date>)` using `${CLAUDE_PLUGIN_ROOT}/templates/CHANGELOG.md`: player wording, one line per
-   change, bug numbers, and a bold note first if players must restart or update something.
+   change, bug numbers, and a bold note first if players must restart or update something. Changes arrive as
+   fragment files in the project's `changelog.d/` (`${CLAUDE_PLUGIN_ROOT}/templates/changelog.d/README.md`); rename
+   `### Unreleased` to the version heading in the release commit, and `${CLAUDE_PLUGIN_ROOT}/release/stage.py` folds the
+   fragments in when it packages (and deletes them only if the run succeeded).
 3. **Commit** the bump and changelog (noreply identity). Generated headers that differ only in line endings are not
    a real change; a real content change must be committed first.
 4. **Run the release as one script** with `set -euo pipefail`. The script should:

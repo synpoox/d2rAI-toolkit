@@ -1,4 +1,4 @@
-"""Tests for shared/classic_import's 1.09d datasets and generators (run: python -m unittest discover tests).
+"""Tests for shared/classic_import's 1.09d datasets, generator and converter (run: python -m unittest discover tests).
 
 Synthetic data only. The tests that rebuild the committed datasets from the game files run when the inputs are on the
 machine, named by environment variables (never stored in the repo): D2_109D_INSTALL (the 1.09d folder), D2_113C_PATCH
@@ -11,12 +11,14 @@ import os
 import struct
 import sys
 import unittest
+from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from modkit.tsv import Table  # noqa: E402
-from shared.classic_import import extract, gen_109d_map as G, gen_109d_monster_ai as AI  # noqa: E402
+from shared.classic_import import column_map as stage, extract, from_109d as C  # noqa: E402
+from shared.classic_import import gen_109d_map as G, gen_109d_monster_ai as AI  # noqa: E402
 
 PKG = Path(__file__).resolve().parent.parent / "shared" / "classic_import"
 
@@ -296,6 +298,270 @@ class GeneratedMonsterAiTests(unittest.TestCase):
     def test_committed_table_is_what_the_files_build(self):
         text = AI.build(env_path("D2_109D_INSTALL"), env_path("D2R_EXCEL"), env_path("D2R_IMAGE"))
         self.assertEqual(AI.TSV_OUT.read_text(encoding="utf-8"), text)
+
+
+# ---- the converter (from_109d): hooks on synthetic tables
+
+class LookupTests(unittest.TestCase):
+    def test_a_lookup_that_merges_two_values_cannot_be_reversed(self):
+        lk = C.Lookup("t", {"aura": "", "none": ""})
+        self.assertEqual(lk.fwd("aura"), "")
+        with self.assertRaises(stage.MapError):
+            lk.inv("")
+
+    def test_a_lookup_has_no_entry_for_a_stranger(self):
+        lk = C.Lookup("t", {"1": "a"})
+        with self.assertRaises(stage.MapError):
+            lk.fwd("2")
+        with self.assertRaises(stage.MapError):
+            lk.inv("b")
+
+    def test_references_by_row_number(self):
+        lk = C.refs("skills row", ["Attack", "Kick"], "0")
+        self.assertEqual([lk.fwd("1"), lk.fwd("0")], ["Kick", ""])
+        self.assertEqual([lk.inv("Kick"), lk.inv("")], ["1", "0"])
+        with self.assertRaises(stage.MapError):
+            lk.fwd("7")
+
+    def test_srcdam_units(self):
+        self.assertEqual([C.times16("6"), C.times16("-1"), C.times16(""), C.by16("96")], ["96", "-1", "", "6"])
+        with self.assertRaises(stage.MapError):
+            C.by16("100")
+
+    def test_strip_and_put_back_a_prefix(self):
+        fwd, inv = C.strip("STATE_")
+        self.assertEqual((fwd("STATE_FOO"), inv("foo")), ("foo", "STATE_FOO"))
+        with self.assertRaises(stage.MapError):
+            fwd("state_foo")
+
+
+class CarryCopiesTests(unittest.TestCase):
+    MAP = {"tables": {"armor": {"columns": {"name": {"to": ["name"], "kind": "same"},
+                                            "mindam": {"to": ["mindam"], "kind": "same"},
+                                            "maxdam": {"to": ["maxdam"], "kind": "rename"}}}}}
+
+    def test_a_repeated_name_goes_out_as_another_copy_of_its_target(self):
+        t9 = {"armor": tab("armor", "name\tmindam\tmaxdam\tmindam\tmaxdam", "a\t1\t2\t3\t4", "Expansion", "b\t5\t6\t7\t8")}
+        out = {"armor": tab("armor", "name\tmindam\tmaxdam", "a\t1\t2", "", "b\t5\t6")}
+        out["armor"].rows[1] = ["Expansion", "", ""]
+        C.carry_copies(t9, out, self.MAP)
+        self.assertEqual(out["armor"].header, ["name", "mindam", "maxdam", "mindam", "maxdam"])
+        self.assertEqual(out["armor"].rows, [["a", "1", "2", "3", "4"], ["Expansion", "", "", "", ""],
+                                             ["b", "5", "6", "7", "8"]])
+
+
+class AiParamTests(unittest.TestCase):
+    """BaseId -> AI and the per-AI AIParam slot maps, through the real column-map stage on a one-table map."""
+
+    ROWS = [  # base_id, d2r_ai, param_slots
+        {"base_id": "0", "d2r_ai": "", "param_slots": ""},
+        {"base_id": "1", "d2r_ai": "Skeleton", "param_slots": "1>1 2>3 3>2 4>4"},
+        {"base_id": "2", "d2r_ai": "Zombie", "param_slots": "3>4"},
+        {"base_id": "3", "d2r_ai": "Idle", "param_slots": "unverified"},
+        {"base_id": "4", "d2r_ai": "BloodHawk", "param_slots": "none"},
+        {"base_id": "5", "d2r_ai": "Skeleton", "param_slots": "1>1 2>3 3>2 4>4"},
+    ]
+    HEADER = "Class\tBaseId\tAIParam1\tAIParam2\tAIParam3\tAIParam4\tAIParam5"
+
+    def setUp(self):
+        full = C.load_map()["tables"]["monstats"]["columns"]
+        self.map = {"tables": {"monstats": {"columns": {c: full[c] for c in self.HEADER.split("\t")}}}}
+        self.ai = C.AiTable(self.ROWS)
+        self.recode, self.back_only = C.ai_hooks(self.ai, self.map)
+
+    def forward(self, *rows: str) -> Table:
+        t = tab("monstats", self.HEADER, *rows)
+        return stage.apply(self.map, {"monstats": t}, recode={k: f for k, (f, _) in self.recode.items()})["monstats"]
+
+    def back(self, out: Table) -> list[list[str]]:
+        rows = []
+        for n, r in enumerate(out.records()):
+            c = dict(zip(out.header, r))
+            row = [self.recode["monstats.BaseId"][1](c, n)]
+            row.append(self.recode["monstats.AIParam1"][1](c, n))
+            row += [self.back_only[f"monstats.AIParam{i}"](c, n) for i in range(2, 6)]
+            rows.append(row)
+        return rows
+
+    def cells(self, out: Table, n: int = 0) -> dict[str, str]:
+        return {c: v for c, v in zip(out.header, out.records()[n]) if v}
+
+    def test_baseid_becomes_the_d2r_ai_and_1_13c_baseid_stays_blank(self):
+        out = self.forward("a\t1\t\t\t\t\t")
+        self.assertEqual(self.cells(out), {"NameStr": "a", "AI": "Skeleton", "*BaseId 1.09d": "1"})
+        self.assertFalse(out.has_col("BaseId"))
+
+    def test_a_verified_ai_gets_its_slots_moved_on_all_difficulties(self):
+        c = self.cells(self.forward("a\t1\t50\t30\t20\t40\t"))
+        want = {"aip1": "50", "aip3": "30", "aip2": "20", "aip4": "40"}
+        self.assertEqual({k: v for k, v in c.items() if k.startswith("aip")},
+                         {f"{k}{d}": v for k, v in want.items() for d in ("", "(N)", "(H)")})
+
+    def test_a_slot_with_no_d2r_home_goes_to_the_comment_column(self):
+        c = self.cells(self.forward("a\t1\t50\t30\t20\t40\t7"))
+        self.assertEqual(c["*AIParam 1.09d"], "P5=7")
+        self.assertNotIn("aip5", c)
+        c = self.cells(self.forward("a\t2\t1\t2\t3\t4\t5"))  # Zombie: only slot 3 is verified (-> aip4)
+        self.assertEqual((c["aip4"], c["*AIParam 1.09d"]), ("3", "P1=1 P2=2 P4=4 P5=5"))
+        self.assertNotIn("aip1", c)
+
+    def test_an_ai_that_reads_no_parameter_copies_none(self):
+        c = self.cells(self.forward("a\t4\t5\t6\t\t\t"))
+        self.assertEqual(c["*AIParam 1.09d"], "P1=5 P2=6")
+        self.assertFalse([k for k in c if k.startswith("aip")])
+
+    def test_an_unverified_ai_keeps_the_plain_copy(self):
+        c = self.cells(self.forward("a\t3\t10\t20\t\t\t50"))
+        self.assertEqual({k: v for k, v in c.items() if k.startswith("aip")},
+                         {f"aip{i}{d}": v for i, v in ((1, "10"), (2, "20"), (5, "50")) for d in ("", "(N)", "(H)")})
+        self.assertNotIn("*AIParam 1.09d", c)
+
+    def test_blank_and_unused_baseids_give_no_ai(self):
+        out = self.forward("a\t\t\t\t\t\t", "b\t0\t\t\t\t\t")
+        self.assertEqual([self.cells(out, n).get("AI") for n in (0, 1)], [None, None])
+        self.assertEqual(self.back(out), [["", "", "", "", "", ""], ["0", "", "", "", "", ""]])
+
+    def test_a_baseid_past_the_ai_table_fails(self):
+        with self.assertRaises(stage.MapError):
+            self.forward("a\t266\t\t\t\t\t")
+
+    def test_every_case_comes_back(self):
+        rows = ["a\t1\t50\t30\t20\t40\t7", "b\t2\t1\t2\t3\t4\t5", "c\t3\t10\t20\t\t\t50", "d\t4\t5\t6\t\t\t",
+                "e\t5\t\t\t\t\t", "f\t\t\t\t\t\t"]
+        back = self.back(self.forward(*rows))
+        self.assertEqual(back, [r.split("\t")[1:] for r in rows])
+
+    def test_parse_slots_and_the_unverified_list(self):
+        self.assertEqual([C.parse_slots(x) for x in ("", "unverified", "none", "1>3 2>4")], [None, None, {}, {1: 3, 2: 4}])
+        for bad in ("1>2 3>2", "x"):
+            with self.assertRaises(stage.MapError):
+                C.parse_slots(bad)
+        t9 = {"monstats": tab("monstats", self.HEADER, "a\t1\t1\t\t\t\t", "b\t3\t\t\t\t\t", "c\t3\t5\t\t\t\t", "d\t3\t6\t\t\t\t")}
+        self.assertEqual(C.unverified_ais(t9, self.ai), {"Idle": 2})  # Skeleton is verified; one Idle row has no parameter
+
+    def test_the_committed_map_and_table_agree(self):
+        ai = C.load_ai_table()
+        rec, back = C.ai_hooks(ai, C.load_map())
+        self.assertEqual(set(rec), {"monstats.BaseId", "monstats.AIParam1"})
+        self.assertEqual(ai.ai("1"), "Skeleton")
+        self.assertEqual(ai.slot_map("Skeleton"), {1: 1, 2: 3, 3: 2, 4: 4})
+        self.assertEqual(stage.hooks(C.load_map())[0] & {"monstats.BaseId", "monstats.AIParam1"},
+                         {"monstats.BaseId", "monstats.AIParam1"})
+
+
+# ---- the converter on the real tables
+
+# Byte fields in 1.09d's loaders (field type 4: uniqueitems D2Common 0x6fd4fb70, setitems 0x6fd50560), so a blank cell
+# loads as 0. The flags come back as 0 where 1.09d left them blank.
+BLANK_IS_ZERO = {("uniqueitems", "transform"), ("uniqueitems", "invtransform"), ("uniqueitems", "transformcolor"),
+                 ("setitems", "transformcolor")}
+
+
+def differences(t9: dict, again: dict, column_map: dict) -> list[str]:
+    out = []
+    for name, src in sorted(t9.items()):
+        got = again[name]
+        if len(got.rows) != len(src.rows):
+            out.append(f"{name}: {len(src.rows)} rows came back as {len(got.rows)}")
+            continue
+        cols = column_map["tables"][name]["columns"]
+        for i, col in enumerate(src.header):
+            if not col or cols[col]["kind"] == "drop":  # every copy of a repeated name counts
+                continue
+            bad, zero = [], (name, col) in BLANK_IS_ZERO
+            for n, (a, b) in enumerate(zip(src.rows, got.rows)):
+                if not src.is_record(a) and i > 0:  # separator rows ("Expansion") are not records: only their key counts
+                    continue
+                x, y = (a[i] if i < len(a) else ""), b[i]
+                if zero:
+                    x, y = x or "0", y or "0"
+                if x != y and (x.strip() or y.strip()):  # a whitespace-only cell is a blank one
+                    bad.append(f"row {n} {x!r} -> {y!r}")
+            if bad:
+                k = src.header[:i].count(col)
+                out.append(f"{name}.{col}{f' copy {k + 1}' if k else ''}: {len(bad)} cells, e.g. {', '.join(bad[:3])}")
+    return out
+
+
+class DifferencesTests(unittest.TestCase):
+    MAP = {"tables": {"t": {"columns": {"a": {"kind": "same"}, "b": {"kind": "drop"}, "z": {"kind": "recode"}}}}}
+
+    def test_reports_a_changed_cell_but_not_a_drop_column_or_a_blank_that_is_zero(self):
+        t9 = {"t": tab("t", "a\tb\tz", "1\tx\t", "Expansion", "2\ty\t5")}
+        same = {"t": tab("t", "a\tb\tz", "1\t\t", "Expansion", "2\t\t5")}
+        self.assertEqual(differences(t9, same, self.MAP), [])
+        diff = {"t": tab("t", "a\tb\tz", "1\t\t", "Expansion", "3\t\t5")}
+        self.assertEqual(len(differences(t9, diff, self.MAP)), 1)
+        short = {"t": tab("t", "a\tb\tz", "1\t\t", "Expansion")}
+        self.assertIn("3 rows came back as 2", differences(t9, short, self.MAP)[0])
+
+
+@unittest.skipUnless(env_path("D2_109D_INSTALL") and env_path("D2_113C_PATCH"), "1.09d install or 1.13c patch not named")
+class RoundTripTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        ex = G.extract(env_path("D2_109D_INSTALL"), env_path("D2_113C_PATCH"))
+        cls.t9, cls.t13 = C.tables(ex["y109"]), C.tables(ex["y113"])
+        cls.map, cls.ai = C.load_map(), C.load_ai_table()
+        cls.out = C.forward(cls.t9, cls.t13)
+
+    def test_109d_comes_back_except_drop_columns(self):
+        self.assertEqual(differences(self.t9, C.back(self.out, self.t9, self.t13), self.map), [])
+
+    def test_the_known_conversions(self):
+        out, t9, t13 = self.out, self.t9, self.t13
+        sk = out["skills"]
+        self.assertEqual(sk.get(sk.need("Multiple Shot", "skill"), "SrcDam"), "96")  # 1.09d 6 eighths
+        self.assertIn("Angelical Raiment", {r[0] for r in out["sets"].records()})
+        skill = {r[sk.col("Id")]: r[0] for r in sk.records()}
+        self.assertEqual([skill["311"], skill["312"]], ["mon inferno sentry", "mon death sentry"])  # 1.10's rename
+        ms9 = t9["monstats"]
+        sentry = ms9.find("Inferno Sentry")
+        self.assertEqual(out["monstats"].get(out["monstats"].records()[ms9.records().index(sentry)], "Skill1"), "mon inferno sentry")
+        isc, isc13 = out["itemstatcost"], t13["itemstatcost"]
+        op13 = {r[isc13.col("ID")]: r[isc13.col("op")] for r in isc13.records()}
+        mine = {r[isc.col("ID")]: r[isc.col("op")] for r in isc.records() if r[isc.col("op")]}
+        self.assertEqual(len(mine), 77)
+        self.assertEqual({k: v for k, v in mine.items() if op13.get(k) and op13[k] != v}, {})  # 1.10's op where it has one
+        for name, col in [("armor", "mindam"), ("armor", "maxdam"), ("automap", "Type2"), ("chartemplate", "SkillName")]:
+            self.assertEqual(out[name].header.count(col), t13[name].header.count(col), f"{name}.{col}")
+        ct = out["chartemplate"].header
+        self.assertEqual([ct[i + 1] for i, c in enumerate(ct) if c == "SkillName"], [f"Skill{n}" for n in range(1, 10)])
+        ms = out["monstats"]
+        self.assertEqual(ms.get(ms.records()[0], "minHP"), t9["monstats"].get(t9["monstats"].records()[0], "MinHP"))
+
+    def test_baseid_is_the_ai_of_the_same_d2r_row_and_1_13c_baseid_is_blank(self):
+        ms, ms9 = self.out["monstats"], self.t9["monstats"]
+        self.assertFalse(ms.has_col("BaseId"))
+        t13 = self.t13["monstats"]
+        for r, r9, r13 in zip(ms.records(), ms9.records(), t13.records()):
+            self.assertEqual(ms.get(r, "AI"), t13.get(r13, "AI"))  # D2R's AI of the row (checked equal to 1.13c's)
+            self.assertEqual(ms.get(r, "*BaseId 1.09d"), ms9.get(r9, "BaseId"))
+
+    def test_aiparams_follow_the_slot_maps(self):
+        ms, ms9 = self.out["monstats"], self.t9["monstats"]
+        seen = Counter()
+        for r, r9 in zip(ms.records(), ms9.records()):
+            ai = ms.get(r, "AI")
+            p = [ms9.get(r9, f"AIParam{i}") for i in range(1, 6)]
+            if ai == "Skeleton":
+                got = [ms.get(r, c) for c in ("aip1", "aip3", "aip2", "aip4")]
+                self.assertEqual(got, p[:4])
+                seen[ai] += 1
+            elif ai == "Brute":
+                self.assertEqual([ms.get(r, "aip3"), ms.get(r, "aip4")], p[:2])
+                seen[ai] += 1
+            elif ai == "BloodHawk":
+                self.assertEqual([ms.get(r, f"aip{i}") for i in range(1, 6)], [""] * 5)
+                seen[ai] += 1
+            elif self.ai.slot_map(ai) is None:
+                self.assertEqual([ms.get(r, f"aip{i}") for i in range(1, 6)], p)  # the plain copy
+        self.assertEqual(set(seen), {"Skeleton", "Brute", "BloodHawk"})
+
+    def test_the_unverified_list_is_not_empty_and_names_no_verified_ai(self):
+        un = C.unverified_ais(self.t9, self.ai)
+        self.assertTrue(un)
+        self.assertTrue(set(un).isdisjoint(AI.AI_PARAM_SLOTS))
 
 
 if __name__ == "__main__":

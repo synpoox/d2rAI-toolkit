@@ -54,6 +54,12 @@ screen, Item Spawner: access violation at D2R+0x29538e). Entries for uniques/set
 dangling entry for a removed unique crashed the Item Spawner). Stopgap: map new items to a D2R picture of the same type until art
 exists.
 
+Three more `items.json` facts (D2R 3.3, build 93847; taken from the classic-import item code's findings, the draw behaviour was not re-measured against a live client here, so treat them as **unverified** until a lane confirms them in game):
+
+- **The key is the code with bit 0x20 set in its 4th byte.** The UI looks an item up by that key, so a 4-character code whose 4th letter is upper case (bit 0x20 clear) finds no entry and draws no picture. Give a 4-character code a lower-case (or digit) 4th character; 3-character codes are unaffected.
+- **An asset is looked up only in the item's own table folder** (`weapon`, `armor` or `misc` under `global/ui/items/` and `items/`). A picture borrowed from an item of another table (for example a misc item showing a weapon's sprite) must be copied into the borrowing table's folder first, sprites and unit file both.
+- **A dropped item is drawn from the asset's unit file `data/hd/items/<folder>/<asset>.json`.** An asset with only a `.sprite` shows in the inventory but the item is invisible on the ground. A new picture needs a unit file too: copy the one of the D2R asset it stands in for.
+
 ## Skill icons
 
 | Rule | Value |
