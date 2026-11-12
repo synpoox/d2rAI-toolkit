@@ -178,7 +178,7 @@ Getter `0x97790` (dataFlag, skillId) -> record.
 | 65 | `0x563d90` | stat aura (aurastate on caster, auratargetstate on targets) |
 | 66 | `0x5630e0` | damage aura (Holy Fire/Shock); finder callback `0x561280` |
 | 68 | `0x567500` | nova + buff (Shout style) |
-| 76 | `0x568f40` | Whirlwind do (hit delay `0x56ac00`, called at `0x56916d`, `0x569186`, `0x5691e2`) |
+| 76 | `0x568f30` | Whirlwind do: the slot holds a 5-byte `jmp` thunk to the body at `0x568f40`, the address to hook (hit delay `0x56ac00`, called at `0x56916d`, `0x569186`, `0x5691e2`) |
 | 109 | `0x5822b0` | itemless town portal (skill 411); `0x46fa70` finds destination town and makes the portal, `0x470ae0` links the town side |
 | 113 | `0x584b60` | scroll/book skills: only sends packet 0x3f to the client (`0x47f520`) |
 | 121 | `0x576bb0` | Rabies (melee + state + missile; missile choice `0x571700`) |
