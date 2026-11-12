@@ -371,7 +371,7 @@ class CliTests(unittest.TestCase):
         (slot / "mods" / "MyMod" / "d2rloader" / "plugins").mkdir(parents=True)
         (slot / "D2RLoader.exe").write_bytes(b"x")
         (slot / "mods" / "MyMod" / "d2rloader" / "plugins" / "my-plugin.dll").write_bytes(b"x")
-        rc, out, _ = self.cli("run", "tag:offline", "--slot", "2", "--run-id", "cli2")
+        rc, out, _ = self.cli("run", "config-sane", "--slot", "2", "--run-id", "cli2")
         self.assertEqual(rc, 0, out)
         self.assertIsNone(gs.lock_info(self.cfg, 2))
 

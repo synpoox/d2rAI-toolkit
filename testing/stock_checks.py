@@ -20,6 +20,9 @@ def savepath_problems(cfg, slot: int) -> list[str]:
     found, problems = 0, []
     for path in cfg.modinfo_paths(slot):
         if not os.path.isfile(path):
+            if os.path.isdir(os.path.dirname(path)):
+                found += 1
+                problems.append(f"{path}: missing (its folder exists; slot_install.py or game_slots.py sync writes it)")
             continue
         found += 1
         try:
@@ -28,10 +31,12 @@ def savepath_problems(cfg, slot: int) -> list[str]:
         except (OSError, ValueError, AttributeError) as e:
             problems.append(f"{path}: cannot read ({e})")
             continue
-        if not isinstance(got, str) or got.replace("\\", "/") != want:
+        if not isinstance(got, str) or os.path.normcase(got.replace("\\", "/").rstrip()) != os.path.normcase(want):
             problems.append(f"{path}: savepath is {got!r}, slot {slot} wants {want!r}")
     if not found:
-        problems.append(f"no modinfo file in slot {slot}: looked for " + ", ".join(cfg.modinfo_paths(slot)))
+        looked = cfg.modinfo_paths(slot)
+        where = ("looked for " + ", ".join(looked)) if looked else "mod.modinfo_files is empty"
+        problems.append(f"no modinfo file in slot {slot}: {where}")
     return problems
 
 

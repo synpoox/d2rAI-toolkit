@@ -13,6 +13,7 @@ runs. Everything that needs Windows is behind a function, so the scripts also im
 | `testing/game_checks.py` | Runs named in-game checks and writes the results and screenshots. |
 | `testing/release_install.py` | Puts the **published** release into a slot, the way a player gets it. |
 | `testing/example_checks.py` | Five example checks. Copy it and make your own. |
+| `testing/stock_checks.py` | Stock checks that hold for any mod (`slot-savepath`). Turn on with `modules = ["stock_checks"]`. |
 | `testing/testing.example.toml` | The config. Copy it to `modkit-testing.toml`. |
 
 Contents: [Quick start](#quick-start) · [Why slots](#why-slots) · [The config file](#the-config-file) ·
@@ -312,9 +313,12 @@ Register the module in the config and run it:
 
 ```toml
 [checks]
-modules = ["example_checks", "my_checks"]
+modules = ["example_checks", "stock_checks", "my_checks"]
 paths = ["my-checks"]
 ```
+
+`stock_checks` is the toolkit's own module of checks any mod can use; `slot-savepath` fails when a slot's modinfo.json
+`savepath` is not the slot's own save folder.
 
 ```sh
 python testing/game_checks.py list                                  # name, tags, first line of the doc string

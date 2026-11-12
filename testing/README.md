@@ -12,6 +12,7 @@ Windows is needed to run the game; everything else (locks, config, checks, relea
 | `check_helpers.py` | `pair` (warp, light up, HD|legacy side-by-side PNG) and `moved` (did the character move?), run as `game_ctl.py` subcommands. |
 | `game_checks.py` | Small checks framework: `@check` registry, runner, results JSON, summary, screenshots. |
 | `example_checks.py` | Example checks to copy (`config-sane`, `game-starts`, `main-menu-visible`, `console-echo`, `no-new-crash-files`). |
+| `stock_checks.py` | Stock checks for any mod (`slot-savepath`: each modinfo savepath is the slot's own save folder). List it in `checks.modules` to use it. |
 | `slot_install.py` | Installs a built mod project into a slot (`modkit install`), keeping the slot's own savepath. |
 | `release_install.py` | Installs the PUBLISHED release into a slot, as a player would get it. |
 
