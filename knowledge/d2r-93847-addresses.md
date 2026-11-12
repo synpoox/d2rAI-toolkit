@@ -179,7 +179,7 @@ Getter `0x97790` (dataFlag, skillId) -> record.
 | 65 | `0x563d90` | stat aura (aurastate on caster, auratargetstate on targets) |
 | 66 | `0x5630e0` | damage aura (Holy Fire/Shock); finder callback `0x561280` |
 | 68 | `0x567500` | nova + buff (Shout style) |
-| 76 | `0x568f40` | Whirlwind do (hit delay `0x56ac00`, called at `0x56916d`, `0x569186`, `0x5691e2`) |
+| 76 | `0x568f30` | Whirlwind do: the slot holds a 5-byte `jmp` thunk to the body at `0x568f40`, the address to hook (hit delay `0x56ac00`, called at `0x56916d`, `0x569186`, `0x5691e2`) |
 | 109 | `0x5822b0` | itemless town portal (skill 411); `0x46fa70` finds destination town and makes the portal, `0x470ae0` links the town side |
 | 113 | `0x584b60` | scroll/book skills: only sends packet 0x3f to the client (`0x47f520`) |
 | 121 | `0x576bb0` | Rabies (melee + state + missile; missile choice `0x571700`) |
@@ -744,6 +744,15 @@ function (bytes in the header, checked before the patch); **D** data: a variable
 | `0x3e2a448` | CrushingBlowApplySlot | - | CrushingBlowApply's entry is jmp [rip+0x38a8872]: the qword it jumps through, which a plugin can swap | T |
 | `0x3e2aab0` | DamageTypeStepSlot | - | DamageEffects (0x44df10) runs its 12 damage types (1.13c's table, 0x40 bytes each here) through (&ctx, &type, flag), called as jmp [this slot]: D2RCore's resist step (1.13c's 0x6fcfbd00). | T |
 | `0x3e2b652` | SetUnitStateKey | (unit, key) | UnitStateKey's setter (a jmp stub) | R |
+
+## Unverified table addresses (tools/probe_tables.py, build 93847)
+
+Built into `tools/probe_tables.py` and printed there as "(UNVERIFIED)". No Ghidra evidence is recorded for them yet: confirm each one (what it is, how found) and move it into the sections above, or drop it. Probe-only, so none belongs in `shared/plugin-common/src/rvas_93847*` unless plugin code starts using it. `0x235f590` (CltStTable), `0x2391270` (MissileSrvDmgTable) and `0x2386bd8` (the PropertyFuncTable bound) are verified in the coverage section above and no longer listed here.
+
+| RVA | Guess | Status |
+|---|---|---|
+| `0x1d1945c` | u32 read as the compiled-formula (prgcalc) count, named `prgcalc_bound` | unverified |
+| `0x238e710` | srvstfunc table size: the tool reads up to the next table `0x238ea00` (94 slots); an earlier draft used 91 | unverified |
 
 ## Monster AI table (build 93847)
 
