@@ -90,6 +90,10 @@ git fetch origin
 git worktree add ../lanes/fix-crash-andariel -b lane/fix-crash-andariel origin/main
 ```
 
+To remove a finished lane worktree, use `tools/worktree_remove.ps1 -Path <worktree> [-DeleteBranch]`. A plain recursive
+delete walks through a junction to a shared data cache and destroys it; the script unlinks every junction first, checks
+the targets (and any `-Cache` folders) are unchanged, and refuses a locked, dirty or main-checkout target.
+
 Rules that keep this safe:
 
 - A lane branch is named `lane/<short-name>` and starts from the current `origin/main`. Say so in the prompt. A lane
