@@ -28,7 +28,10 @@ testing.md, release.md, distribution.md and downloader.md, and the method in ai-
 6. **Plugins and installers:** `plugin-template/`, `downloader/` and `release/` code follows rule 9 of the
    `d2r-toolkit` skill: the game-image check, major.minor version checks (never a build number) and the item-type
    step.
-7. **Ask the human before** anything public, paid or destructive (publishing, making a repo public, force-push,
+7. **In-game checks are run by agents,** in a game slot (`testing/`, the `d2r-in-game-testing` skill), not left to
+   the user. Ask the human only when a check needs one. Test characters are level 99 (experience 3520485254, 490 stat
+   points, 98 skill points).
+8. **Ask the human before** anything public, paid or destructive (publishing, making a repo public, force-push,
    deleting saves or branches, spending money, touching their real game install). Never ask for secrets in chat.
 
 ## Consumer guide

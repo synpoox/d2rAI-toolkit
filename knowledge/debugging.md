@@ -80,13 +80,13 @@ start, stray plugins, stored key bindings), see [d2rloader.md](d2rloader.md).
 | A ranged pet only melees | The classic engine set a ranged-AI flag from a summon skill parameter; D2R does not | Plugin sets the pet's AI control field |
 | A skill can't be put on the right button, or a ground click walks instead of casting | `leftskill`-only skill (often an innate charstats skill) | `rightskill 1` |
 | A new item has a picture in the inventory but is invisible when dropped (build 93847, unverified) | The asset has a `.sprite` but no unit file `data/hd/items/<folder>/<asset>.json` | Copy the unit file of the stand-in D2R asset ([hd-graphics.md](hd-graphics.md#item-pictures)) |
-| A new item with a 4-character code draws no picture (build 93847, unverified) | `items.json` is keyed by the code with bit 0x20 set in its 4th byte; an upper-case 4th letter misses | Give the code a 4th character with bit 0x20 set |
+| A new item with a 4-character code draws no picture and `cheat spawn` makes nothing (build 93847) | The `items.json` loader `0x6635a0` keys each entry by the first 3 characters plus a space, so a 4-character code never finds its entry and its entry overwrites the one of its 3-character prefix | Use a 3-character code |
 | A monster skill opens a town portal | Classic srvdofunc 109 (monster frenzy) is D2R's itemless Town Portal | Remap 109 -> 9 for those rows |
-| Every portal recipe opens the Cow Level | D2R's cube portal output knows only the Cow Level | Plugin hook on the cube output handler |
+| A portal recipe opens the Cow Level, or no portal | The output is `Cow Portal`, which is fixed to the Cow Level; or the `Red Portal` output has no `lvl=` | `Red Portal,lvl=<level id>` (a level of the player's act); only a per-use destination needs a plugin |
 | A classic timed potion of a regeneration stat gives almost nothing | D2R's timed potion divides non-life/mana stats by the duration | Multiply the calc by `len` |
 | **Client hangs after a few area changes**, log repeats `Reading From: <char>.ma0` | automap cel >= 1499 stored in the map memory (self-loop), or levels `Layer` >= 100 | Clamp cels to <= 1498; keep `Layer` < 100 |
 | Game closes without a report entering a new maze level | levels `Position 1` with no entry rooms | Clear `Position` |
-| **Write to address 0 at `D2R.exe+0xF3D028`** in a busy fight | The 12 MB Renderer Pool is full; the allocator returned null | Plugin heap fallback ([crash-triage.md](crash-triage.md)) |
+| **Write to address 0 at `D2R.exe+0xF3D028`** in a busy fight | The Renderer Pool (12 MB at start) is full; the allocator returned null | Plugin heap fallback or growing the pool ([crash-triage.md](crash-triage.md), [engine-limits.md](engine-limits.md) "Memory") |
 | A changed default hotkey never reaches players who ran an older build | D2RLoader stored the old key in `input-bindings.toml` on first registration | Installer drops the stale entry |
 | A check passes once, then fails on the same test character | The quest finished: D2R runs a quest's kill handler only while it is open | Reset the quest words in the test save |
 | A fix "doesn't work" on one PC only | Another mod folder in `default_mod`, an old plugin in the game-wide folder, or other plugins | Your environment guard's warning; compare file hashes |

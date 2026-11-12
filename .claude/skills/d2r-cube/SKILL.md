@@ -14,7 +14,7 @@ Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you ar
 - Inputs: `numinputs` (total item count), `input 1-7`: an item code, item type, unique/set name in quotes, with
   qualifiers after commas: `"rin,mag"` (magic ring), `qty=3`, `sock=2`, `nos` (no sockets), `pre=`/`suf=`, `upg`,
   `bas`/`exc`/`eli`, `nru`, `noe`. Quote a cell with commas.
-- Output: `output` (code, type, "Cow Portal", "Pandemonium Portal", "useitem", "usetype", ...) with qualifiers
+- Output: `output` (code, type, "Cow Portal", "Pandemonium Portal", "Red Portal,lvl=<level id>" (a red portal to any level of the same act), "useitem", "usetype", ...) with qualifiers
   (`mag`, `rar`, `uni`, `set`, `crf`, `tmp`, `sock=N`, `rep`, `rch`, `pre=`, `suf=`, `reg`, `exc`, `eli`,
   `uns`, `rem`), `lvl`/`plvl`/`ilvl` (item level rules), `mod 1-5` + `chance`/`param`/`min`/`max` (properties);
   `output b`/`output c` with the same columns for extra outputs.
