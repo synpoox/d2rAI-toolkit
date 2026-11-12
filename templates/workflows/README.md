@@ -38,7 +38,7 @@ from a fork would run the fork's code on that machine, so the gate template fail
 | `D2R_GAME` | gate, cache-verify, release | none (required) | Path of the game install (or frozen copy) on the runner |
 | `MODKIT_CACHE_DIR` | gate, cache-verify, release | `<D2R_TOOLKIT>\d2r-data` | Cache of extracted game files (`MODKIT_CACHE`) |
 | `DATA_LINK` | gate, cache-verify | `d2r-data` | Name of the cache junction inside the checkout |
-| `RULE_CACHE_DIR` | gate, cache-verify | `<runner temp>\rule-cache` | Shared folder of cached build results |
+| `RULE_CACHE_DIR` | gate, cache-verify | none (required) | Persistent shared folder of cached build results (`MODKIT_SHARED_CACHE`) |
 | `GATE_CHECK_NAME` | gate, gate-control | `table-diff` | Name of the required check (the gate job's name) |
 | `GATE_OK_LABEL` | gate, gate-control | `gate-drop-ok` | PR label that accepts an intended drop |
 | `BASELINE_ARTIFACT` | gate | `gate-baseline` | Artifact `main` uploads and PRs compare against |

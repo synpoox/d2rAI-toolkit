@@ -4,7 +4,10 @@ name: cache-verify
 # A gate that replays cached build results is only as correct as the cache key. Nightly (and by hand), build main's head
 # fresh and again replaying the shared cache, and fail naming every generated file whose SHA-256 differs. Self-hosted
 # like the gate: it needs the game's files, which never go to GitHub (README.md in this folder).
-# Repository variables: RUNNER_LABELS, D2R_TOOLKIT, D2R_GAME, MODKIT_CACHE_DIR, DATA_LINK, RULE_CACHE_DIR.
+# Repository variables: RUNNER_LABELS, D2R_TOOLKIT (required), D2R_GAME (required), MODKIT_CACHE_DIR, DATA_LINK and
+# RULE_CACHE_DIR (required, no default: the shared rule cache must be a persistent folder, and the runner empties its temp
+# folder before every job). RULE_CACHE_DIR becomes MODKIT_SHARED_CACHE, the toolkit's opt-in rule cache root.
+# PowerShell throughout (the shell is pinned below).
 # The schedule cannot come from a variable: edit the cron line below.
 on:
   schedule:
@@ -20,6 +23,10 @@ concurrency:
   group: cache-verify
   cancel-in-progress: false
 
+defaults:
+  run:
+    shell: pwsh  # or powershell (Windows PowerShell 5.1); the scripts work in both
+
 jobs:
   verify:
     runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["self-hosted","windows"]') }}
@@ -30,16 +37,25 @@ jobs:
       MODKIT_CACHE: ${{ vars.MODKIT_CACHE_DIR || format('{0}\d2r-data', vars.D2R_TOOLKIT) }}
       MODKIT_GAME: ${{ vars.D2R_GAME }}
       DATA_LINK: ${{ vars.DATA_LINK || 'd2r-data' }}
-      RULE_CACHE_VAR: ${{ vars.RULE_CACHE_DIR }}  # empty: <runner temp>\rule-cache
+      RULE_CACHE_VAR: ${{ vars.RULE_CACHE_DIR }}  # required: MODKIT_SHARED_CACHE, a persistent folder
       GENERATED: generated  # EDIT: the folder the build writes and the comparison covers
     steps:
+      - name: Check the setup
+        run: |
+          foreach ($v in "D2R_TOOLKIT", "MODKIT_GAME", "RULE_CACHE_VAR") {
+            if (-not (Get-Item "Env:$v" -ErrorAction SilentlyContinue).Value) {
+              $name = @{ MODKIT_GAME = "D2R_GAME"; RULE_CACHE_VAR = "RULE_CACHE_DIR" }[$v]; if (-not $name) { $name = $v }
+              "::error::the repository variable $name is not set"
+              throw "$name is not set"
+            }
+          }
       - name: Drop cache junction
         # a junction left in the workspace by an earlier run would be walked by checkout's clean step
         run: if (Test-Path $env:DATA_LINK) { cmd /c rmdir $env:DATA_LINK }
         continue-on-error: true
       - uses: actions/checkout@v4
         with:
-          ref: main  # the cache is main's: check main's head, whichever branch a manual run starts from
+          ref: ${{ github.event.repository.default_branch }}  # the cache is the default branch's: check its head, whichever branch a manual run starts from
       - name: Update the toolkit checkout
         run: git -C "$env:D2R_TOOLKIT" pull -q --ff-only
         continue-on-error: true
@@ -47,14 +63,15 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force $env:MODKIT_CACHE | Out-Null
           New-Item -ItemType Junction -Path $env:DATA_LINK -Target $env:MODKIT_CACHE | Out-Null
-          $rules = if ($env:RULE_CACHE_VAR) { $env:RULE_CACHE_VAR } else { Join-Path $env:RUNNER_TEMP "rule-cache" }
-          "RULE_CACHE=$rules" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          # the toolkit's opt-in rule cache root: a persistent folder with no default (the runner empties its temp folder)
+          New-Item -ItemType Directory -Force $env:RULE_CACHE_VAR | Out-Null
+          "MODKIT_SHARED_CACHE=$env:RULE_CACHE_VAR" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
           # EDIT: the mod's extraction commands, each followed by an exit-code check, for example
           #   py -3 -m modkit fetch --prefix data/global/; if ($LASTEXITCODE) { throw "modkit fetch failed" }
       - name: Fresh build
-        # No cache scope set: every rule runs and nothing is read from or kept in the cache.
+        # No CI scope: on CI that means no cache policy, so every rule runs and nothing is read from or kept in the cache.
         run: |
-          Remove-Item Env:CI_SCOPE -ErrorAction SilentlyContinue
+          Remove-Item Env:MODKIT_CI_SCOPE -ErrorAction SilentlyContinue
           # EDIT: the mod's build command
           py -3 tools/build.py; if ($LASTEXITCODE) { throw "fresh build failed" }
           Move-Item $env:GENERATED "$env:GENERATED-fresh"
@@ -62,9 +79,9 @@ jobs:
         # Scope pr-0 replays only the entries main kept and keeps its misses in a scratch folder that is emptied before
         # and after, so this run never writes into the shared cache and never replays leftovers.
         run: |
-          $scratch = Join-Path $env:RULE_CACHE "pr\pr-0"   # EDIT: where the mod's cache keeps a PR scope's misses
+          $scratch = Join-Path $env:MODKIT_SHARED_CACHE "rules-pr\pr-0"   # where the toolkit keeps scope pr-0's misses
           if (Test-Path $scratch) { Remove-Item -Recurse -Force $scratch }
-          $env:CI_SCOPE = "pr-0"
+          $env:MODKIT_CI_SCOPE = "pr-0"
           # EDIT: the same build command; its output must report how many rules were replayed
           $out = py -3 tools/build.py; $code = $LASTEXITCODE
           $out
@@ -73,10 +90,11 @@ jobs:
           # EDIT: the pattern of the build's "N of M rules replayed" line
           $line = $out | Select-String -Pattern 'rule cache: (\d+) of (\d+) rules replayed' | Select-Object -First 1
           if ($line) { $line.Line | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY }
-          # Self-heal hides a cache fault: a build that rebuilt without the cache proves nothing about it.
+          # Self-heal hides a cache fault: a cached entry produced a broken tree and the build rebuilt without the cache.
           if ($out | Select-String -SimpleMatch 'rebuilding without the rule cache') {
-            "::warning::the cached build logged 'rebuilding without the rule cache': the cache was not what was compared"
-            "Warning: the build rebuilt without the rule cache." | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
+            "::error::NOT VERIFIED: the cached build rebuilt without the cache (a cached entry produced a broken tree)"
+            "NOT VERIFIED: the cached build rebuilt without the rule cache." | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
+            throw "cached build rebuilt without the cache"
           }
           # 0 replayed: nothing cached was compared (an empty cache, or a key that never hits), so the check is vacuous.
           if (-not $line -or $line.Matches[0].Groups[1].Value -eq "0") {
