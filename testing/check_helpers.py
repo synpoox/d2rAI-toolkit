@@ -94,30 +94,45 @@ def describe_move(moved: bool, dx: int, dy: int, dist: float) -> str:
 
 def plugin_log_path(cfg, slot: int, plugin: str, scope: str = "auto") -> str:
     """Where <plugin>'s log is. D2RLoader writes a mod-scoped plugin's log inside the mod folder
-    (<mod>/d2rloader/logs/) and a game-wide plugin's in the slot's own d2rloader/logs/. scope: "mod", "game", or
-    "auto" (the mod folder's log if there is one, else the game-wide one)."""
+    (<mod>/d2rloader/logs/) and a game-wide plugin's in the slot's own d2rloader/logs/. scope: "mod", "game",
+    "config" (the config's `[logs] plugin_log`, the harness's single log; "" if it is not set), or "auto" (the config's
+    plugin_log when it is set and is named `<plugin>.log`, else the mod folder's log if there is one, else the
+    game-wide one)."""
     mod = os.path.join(cfg.mod_dir(slot), "d2rloader", "logs", f"{plugin}.log")
     game = os.path.join(cfg.slot_dir(slot), "d2rloader", "logs", f"{plugin}.log")
     if scope == "mod":
         return mod
     if scope == "game":
         return game
+    if scope == "config":
+        return cfg.plugin_log(slot)
     if scope != "auto":
-        raise ValueError(f"scope must be 'mod', 'game' or 'auto', not {scope!r}")
+        raise ValueError(f"scope must be 'mod', 'game', 'config' or 'auto', not {scope!r}")
+    configured = cfg.plugin_log(slot)
+    if configured and os.path.basename(configured) == f"{plugin}.log":
+        return configured
     return mod if os.path.isfile(mod) or not os.path.isfile(game) else game
 
 
-def plugin_log(ctx, plugin: str, scope: str = "auto", skip_if_missing: bool = False) -> str:
+def plugin_log_size(ctx, plugin: str, scope: str = "auto") -> int:
+    """The size in bytes of <plugin>'s log now (0 if none). Take it before starting the game and pass it as
+    `since_size` to plugin_log, so a previous run's lines do not count."""
+    return game_ctl.file_size(plugin_log_path(ctx.cfg, ctx.slot, plugin, scope))
+
+
+def plugin_log(ctx, plugin: str, scope: str = "auto", skip_if_missing: bool = False, since_size: int = 0) -> str:
     """The text of <plugin>'s log since its last load line (`<plugin>: <version> loaded (`), so an old run's lines
-    do not count. "" when there is no file or no load line yet; with skip_if_missing a missing file skips the check
-    (ctx.skip). `ctx` needs .cfg and .slot (a game_checks Context)."""
+    do not count. Only text after byte `since_size` is looked at (default: the whole file; ignored when the file is
+    now smaller, as after a new log). "" when there is no file or no load line yet; with skip_if_missing a missing
+    file skips the check (ctx.skip). `ctx` needs .cfg and .slot (a game_checks Context)."""
     path = plugin_log_path(ctx.cfg, ctx.slot, plugin, scope)
-    if not os.path.isfile(path):
+    if not path or not os.path.isfile(path):
         if skip_if_missing:
             ctx.skip(f"no plugin log yet: {path}")
         return ""
-    with open(path, encoding="utf-8", errors="replace") as f:
-        text = f.read()
+    with open(path, "rb") as f:
+        raw = f.read()
+    text = (raw[since_size:] if 0 < since_size <= len(raw) else raw).decode("utf-8", errors="replace")
     starts = [m.start() for m in re.finditer(rf"{re.escape(plugin)}: \S+ loaded \(", text)]
     return text[starts[-1]:] if starts else ""
 

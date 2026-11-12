@@ -5,6 +5,7 @@ import os
 import struct
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -89,6 +90,32 @@ class PluginLog(Base):
         self.assertEqual(ch.plugin_log(self.ctx, "a.b"), "")
 
 
+class PluginLogConfig(Base):
+    def test_config_scope_and_auto(self):
+        t = Path(self.tmp.name).as_posix()
+        cfg = tc.Config({"game": {"install_dir": f"{t}/i", "slots_dir": f"{t}/s"}, "mod": {"folder": "MyMod"},
+                         "saves": {"root": f"{t}/saves"}, "logs": {"plugin_log": "logs/p.log"}},
+                        base_dir=self.tmp.name)
+        want = cfg.plugin_log(2)
+        self.assertEqual(ch.plugin_log_path(cfg, 2, "p", "config"), want)
+        self.assertEqual(ch.plugin_log_path(cfg, 2, "p"), want)
+        self.assertNotEqual(ch.plugin_log_path(cfg, 2, "other"), want)   # named for another plugin
+        self.assertEqual(ch.plugin_log_path(self.cfg, 2, "p", "config"), "")
+
+    def test_since_size(self):
+        path = ch.plugin_log_path(self.cfg, 2, "p", "mod")
+        old = "p: 0.9 loaded (mod Old, x)\n"
+        self.write(path, old)
+        size = ch.plugin_log_size(self.ctx, "p", "mod")
+        self.assertEqual(size, os.path.getsize(path))
+        self.assertGreater(size, 0)
+        self.assertEqual(ch.plugin_log(self.ctx, "p", "mod", since_size=size), "")
+        self.write(path, old + PluginLog.LOG)
+        self.assertTrue(ch.plugin_log(self.ctx, "p", "mod", since_size=size).startswith("p: 1.0 loaded"))
+        self.write(path, PluginLog.LOG)   # a new, shorter log: the offset is ignored
+        self.assertTrue(ch.plugin_log(self.ctx, "p", "mod", since_size=size + 999))
+
+
 class AssertLoaded(Base):
     def setUp(self):
         super().setUp()
@@ -140,6 +167,94 @@ class Saves(Base):
             lc.create_save_reload(self.ctx, "okname", class_name="sorceress")
         with self.assertRaises(ValueError):
             lc.create_save_reload(self.ctx, "okname", class_pos=(0.5, 0.5))
+
+
+def sidecar_for(save: bytes, ok=True) -> bytes:
+    d = bytearray(0x60)
+    d[:4] = b"D2RL"
+    struct.pack_into("<II", d, 0x34, struct.unpack_from("<I", save, 0xC)[0] + (0 if ok else 1), len(save))
+    return bytes(d)
+
+
+class FakeGame:
+    """click() on Save and Exit writes the files the way the game does: a truncated save first, then the full one."""
+
+    def __init__(self, path, steps):
+        self.path, self.steps, self.keys = path, list(steps), []
+
+    def key(self, k):
+        self.keys.append(k)
+
+    def click(self, x, y):
+        self.clicked = (x, y)
+
+
+class SaveAndExit(Base):
+    def setUp(self):
+        super().setUp()
+        self.path = lc.save_path(self.ctx, "lodcheck")
+        self.side = self.path[:-4] + ".d2rl"
+        os.makedirs(os.path.dirname(self.path))
+        Path(self.path).write_bytes(good_save()[:6] + bytes(2) + good_save()[8:])   # old save, not extended
+        old = os.path.getmtime(self.path) - 100
+        os.utime(self.path, (old, old))
+        Path(self.side).write_bytes(sidecar_for(good_save(), ok=False))   # an old, non-matching sidecar
+        os.utime(self.side, (old, old))
+        self.ctx.shot = lambda *a, **k: None
+        self.ctx.game = FakeGame(self.path, [])
+        self.polls = []
+        patcher = mock.patch.object(lc.time, "sleep", lambda *_: None)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def run_with(self, steps, timeout=30):
+        """steps: one callable per poll; the clock moves 1 s per poll."""
+        steps = list(steps)
+        clock = {"t": 0.0}
+
+        def sleep(_):
+            clock["t"] += 1.0
+            if steps:
+                steps.pop(0)()
+
+        real = lc.game_ctl.wait_for
+        with mock.patch.object(lc.game_ctl, "wait_for",
+                               lambda fn, t, i, d: real(fn, t, i, d, sleep=sleep, clock=lambda: clock["t"])):
+            self.ctx.game.click = lambda x, y: steps.pop(0)()
+            lc.save_and_exit(self.ctx, "lodcheck", "t", timeout)
+
+    def test_half_written_save_is_not_yet(self):
+        full = good_save()
+        w = lambda p, b: Path(p).write_bytes(b)   # noqa: E731
+        self.run_with([lambda: w(self.path, full[:100]),                 # click: truncated save
+                       lambda: w(self.path, full),                       # poll: full save, sidecar still old
+                       lambda: w(self.side, sidecar_for(full))])         # poll: sidecar written
+        self.assertEqual(Path(self.path).read_bytes(), full)
+
+    def test_old_sidecar_is_waited_out(self):
+        full = good_save()
+        with self.assertRaises(game_ctl_timeout()):
+            self.run_with([lambda: Path(self.path).write_bytes(full)], timeout=5)   # sidecar never updates
+
+    def test_newer_sidecar_without_match_accepted(self):
+        full = good_save()
+        def both():
+            Path(self.path).write_bytes(full)
+            Path(self.side).write_bytes(sidecar_for(full, ok=False))
+            t = time.time() + 5
+            os.utime(self.side, (t, t))
+        self.run_with([both])
+
+    def test_sidecar_matches(self):
+        full = good_save()
+        self.assertTrue(lc.sidecar_matches(sidecar_for(full), full))
+        self.assertFalse(lc.sidecar_matches(sidecar_for(full, ok=False), full))
+        self.assertFalse(lc.sidecar_matches(b"D2RL", full))
+        self.assertFalse(lc.sidecar_matches(b"XXXX" + sidecar_for(full)[4:], full))
+
+
+def game_ctl_timeout():
+    return lc.game_ctl.WaitTimeout
 
 
 if __name__ == "__main__":

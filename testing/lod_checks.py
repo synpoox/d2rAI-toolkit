@@ -44,17 +44,19 @@ CLASS_OFFSET, LEVEL_OFFSET = 0x18, 0x1B
 # ---------------------------------------------------------------- plugin
 
 def assert_plugin_loaded(ctx, plugin: str, mod: str, expect: tuple[str, ...] = (), scope: str = "auto",
-                         timeout: float = 90) -> str:
-    """The mod runs and `plugin` logged its load line `<plugin> <version> loaded (mod <mod>, ...)`. Every string in
+                         timeout: float = 90, since_size: int = 0) -> str:
+    """The mod runs and `plugin` logged its load line `<plugin>: <version> loaded (mod <mod>, ...)`. Every string in
     `expect` must also be in the log since that load (for example a plugin's own "environment ok" line). Returns the
-    load line."""
+    load line. The log may hold earlier runs: the latest load line counts, so to require one from this run take
+    `since_size = check_helpers.plugin_log_size(ctx, plugin, scope)` before the game starts and pass it here (only
+    log text after that byte offset is looked at)."""
     ctx.ensure_running()
     try:
-        game_ctl.wait_for(lambda: check_helpers.plugin_log(ctx, plugin, scope), timeout, 2.0,
+        game_ctl.wait_for(lambda: check_helpers.plugin_log(ctx, plugin, scope, since_size=since_size), timeout, 2.0,
                           f"{plugin}'s load line")
     except game_ctl.WaitTimeout:
         raise AssertionError(f"no '{plugin}: ... loaded' line in the plugin log (plugin not loaded?)")
-    log = check_helpers.plugin_log(ctx, plugin, scope)
+    log = check_helpers.plugin_log(ctx, plugin, scope, since_size=since_size)
     m = re.search(rf"{re.escape(plugin)}: (\S+ loaded \([^\n]*)", log)
     assert m, f"no load line in the plugin log of {plugin}"
     loaded = m.group(1)
@@ -84,17 +86,63 @@ def check_save(data: bytes) -> None:
     assert struct.unpack_from("<I", data, 0xC)[0] == checksum(data), "bad checksum"
 
 
+def sidecar_matches(sidecar: bytes, save: bytes) -> bool:
+    """The `.d2rl` sidecar was written for this `.d2s`: magic `D2RL`, and its copies of the save's checksum (0x34) and
+    size (0x38) equal the save's (knowledge/saves.md)."""
+    return (len(sidecar) >= 0x3C and sidecar[:4] == b"D2RL"
+            and struct.unpack_from("<II", sidecar, 0x34) == (struct.unpack_from("<I", save, 0xC)[0], len(save)))
+
+
+def _read_bytes(path: str) -> bytes | None:
+    try:
+        with open(path, "rb") as f:
+            return f.read()
+    except OSError:
+        return None
+
+
+def _save_done(path: str, before: float, requested: float) -> bool:
+    """True once `path` was rewritten after `before` in the extended format, complete (size and checksum fine), and its
+    sidecar matches it or is newer than the save request. A half-written file is "not yet", not an error."""
+    try:
+        if os.path.getmtime(path) <= before:
+            return False
+    except OSError:
+        return False
+    data = _read_bytes(path)
+    if data is None:
+        return False
+    try:
+        check_save(data)
+    except (AssertionError, struct.error):
+        return False
+    if data[6:8] != EXTENDED_MARK:
+        return False
+    sidecar_path = path[:-4] + ".d2rl"
+    sidecar = _read_bytes(sidecar_path)
+    if sidecar is None:
+        return False
+    if sidecar_matches(sidecar, data):
+        return True
+    try:
+        return len(sidecar) >= 0x3C and sidecar[:4] == b"D2RL" and os.path.getmtime(sidecar_path) > requested
+    except OSError:
+        return False
+
+
 def save_and_exit(ctx, char: str, label: str, timeout: float = 30) -> None:
-    """Esc, Save and Exit; waits until the game wrote the save in D2RLoader's extended format (`RD`) and its `.d2rl`
-    sidecar, so the next read sees the finished files."""
+    """Esc, Save and Exit; waits until the game wrote the whole save in D2RLoader's extended format (`RD`) and its
+    `.d2rl` sidecar for it (the sidecar's checksum and size copies match the save, or it is newer than the request), so
+    the next read sees the finished files. A half-written file counts as not yet."""
     path = save_path(ctx, char)
     before = os.path.getmtime(path)
     ctx.game.key("esc")
     time.sleep(1.5)
     ctx.shot(f"{label}-menu")
+    requested = time.time()
     ctx.game.click(*ml.SAVE_AND_EXIT)
-    game_ctl.wait_for(lambda: os.path.getmtime(path) > before and read_save(ctx, char)[6:8] == EXTENDED_MARK
-                      and os.path.isfile(path[:-4] + ".d2rl"), timeout, 1.0, f"{char}.d2s saved on exit")
+    game_ctl.wait_for(lambda: _save_done(path, before, requested), timeout, 1.0, f"{char}.d2s saved on exit")
+    read_save(ctx, char)  # a real problem (signature, size, checksum) now raises with its own message
     time.sleep(3)
     ctx.shot(f"{label}-select")
 

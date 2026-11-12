@@ -21,7 +21,7 @@ CREATE = (0.893, 0.932)
 VERSION_LIST = (0.958, 0.863)   # the "Game Version" drop-down
 EXPANSION = (0.867, 0.812)      # its "Expansion" entry: a Lord of Destruction character
 
-# class portraits on the create-character screen (index = the class byte of the save, 0x18)
+# class portraits on the create-character screen (name: (the class byte of the save at 0x18, the portrait's fractions))
 CLASSES = {
     "barbarian": (4, (0.448, 0.46)),
 }
