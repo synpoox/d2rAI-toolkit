@@ -130,6 +130,107 @@ class CompanionTests(unittest.TestCase):
             with self.assertRaisesRegex(companions.CompanionError, "leave the mod folder"):
                 companions.fetch(root, download=lambda *a: zipped)
 
+    def test_backslash_destinations_cannot_escape(self):
+        for dst in ["..\\escape.dll", "\\abs.dll", "a\\..\\..\\x", "C:\\abs.dll", "C:abs.dll"]:
+            with self.subTest(dst), tempfile.TemporaryDirectory() as tmp:
+                root = self.project(Path(tmp), b"zip")
+                manifest = json.loads((root / "companions" / "manifest.json").read_text())
+                manifest["companions"][0]["files"] = {"a": dst}
+                self.write_manifest(root, manifest)
+                with self.assertRaisesRegex(companions.CompanionError, "relative path"):
+                    companions.load_manifest(root)
+
+    def test_zip_entry_with_backslashes_cannot_leave_the_mod_folder(self):
+        zipped = make_zip({"pack/..\\..\\evil.dll": b"x"})
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.project(Path(tmp), zipped, files={"pack/": "d2rloader/plugins/"})
+            with self.assertRaisesRegex(companions.CompanionError, "leave the mod folder"):
+                companions.fetch(root, download=lambda *a: zipped)
+            self.assertFalse((root / "generated" / "evil.dll").exists())
+            self.assertFalse((root / "generated" / "companions").exists())
+
+    def test_bad_filter_table_names_and_sources_are_refused(self):
+        bad = [({"filter_tables": ["..\\x"]}, "filter_tables"), ({"filter_tables": ["a/b"]}, "filter_tables"),
+               ({"tag": None}, "tag"), ({"repo": None}, "repo"), ({"commit": "abc"}, "exactly one"),
+               ({"game": "3.3.1"}, "major.minor")]
+        for change, msg in bad:
+            with self.subTest(msg), tempfile.TemporaryDirectory() as tmp:
+                root = self.project(Path(tmp), b"zip")
+                manifest = json.loads((root / "companions" / "manifest.json").read_text())
+                for k, v in change.items():
+                    if v is None:
+                        manifest["companions"][0].pop(k)
+                    else:
+                        manifest["companions"][0][k] = v
+                self.write_manifest(root, manifest)
+                with self.assertRaisesRegex(companions.CompanionError, msg):
+                    companions.load_manifest(root)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.project(Path(tmp), b"zip")
+            manifest = json.loads((root / "companions" / "manifest.json").read_text())
+            manifest["companions"] = ["nope"]
+            self.write_manifest(root, manifest)
+            with self.assertRaisesRegex(companions.CompanionError, "object"):
+                companions.load_manifest(root)
+
+    def project_manifest_sha(self, root: Path, blob: bytes):
+        manifest = json.loads((root / "companions" / "manifest.json").read_text())
+        manifest["companions"][0]["sha256"] = hashlib.sha256(blob).hexdigest()
+        self.write_manifest(root, manifest)
+
+    def test_corrupt_zip_keeps_the_old_tree_and_leaves_no_temp(self):
+        good = make_zip({"d2rloader/plugins/x.dll": b"dll", "Other.mpq/data/sfx/a.flac": b"a"})
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.project(Path(tmp), good)
+            companions.fetch(root, download=lambda *a: good)
+            bad = b"not a zip"
+            self.project_manifest_sha(root, bad)
+            with self.assertRaisesRegex(companions.CompanionError, "BadZipFile"):
+                companions.fetch(root, download=lambda *a: bad)
+            self.assertTrue((root / "generated" / "companions" / "d2rloader" / "plugins" / "x.dll").is_file())
+            self.assertFalse((root / "generated" / "companions.tmp").exists())
+
+    def test_d2rloader_toml_cannot_be_a_config_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.project(Path(tmp), b"zip")
+            manifest = json.loads((root / "companions" / "manifest.json").read_text())
+            manifest["config"] = ["companions/d2rloader.toml"]
+            self.write_manifest(root, manifest)
+            with self.assertRaisesRegex(companions.CompanionError, "d2rloader.toml"):
+                companions.load_manifest(root)
+            manifest["config"] = ["companions/config/"]
+            self.write_manifest(root, manifest)
+            (root / "companions" / "config").mkdir()
+            (root / "companions" / "config" / "D2RLoader.toml").write_text("x")
+            blob = make_zip({"d2rloader/plugins/x.dll": b"dll", "Other.mpq/data/sfx/a.flac": b"a"})
+            self.project_manifest_sha(root, blob)
+            with self.assertRaisesRegex(companions.CompanionError, "d2rloader.toml"):
+                companions.fetch(root, download=lambda *a: blob)
+
+    def test_game_version_check(self):
+        info = "Branch!STRING:0|Active!DEC:1|Version!STRING:0\nus|0|2.9.11111.0\nus|1|3.3.93847.0\n"
+        manifest = {"game": "3.3", "companions": [{"name": "A"}, {"name": "B", "game": "3.4"}]}
+        warned = []
+        with tempfile.TemporaryDirectory() as tmp:
+            game = Path(tmp)
+            (game / ".build.info").write_text(info)
+            self.assertEqual(companions.game_version(game), "3.3")
+            companions.check_game(game, {"game": "3.3", "companions": [{"name": "A"}]}, warned.append)
+            with self.assertRaisesRegex(companions.CompanionError, r"game is 3\.3.*B \(built for 3\.4\)"):
+                companions.check_game(game, manifest, warned.append)
+            companions.check_game(game, {"companions": [{"name": "A"}]}, warned.append)  # no game field: no check
+            self.assertEqual(warned, [])
+            (game / ".build.info").write_text(info.replace("3.3.93847.0", "3.4.12345.0"))
+            with self.assertRaisesRegex(companions.CompanionError, "game is 3.4"):
+                companions.check_game(game, {"game": "3.3", "companions": [{"name": "A"}]}, warned.append)
+
+    def test_unreadable_game_version_warns_and_goes_on(self):
+        warned = []
+        with tempfile.TemporaryDirectory() as tmp:
+            companions.check_game(Path(tmp), {"game": "3.3", "companions": [{"name": "A"}]}, warned.append)
+        self.assertEqual(len(warned), 1)
+        self.assertIn("A", warned[0])
+
     def test_overlay_applies_loader_settings_once_and_keeps_others(self):
         zipped = make_zip({"d2rloader/plugins/x.dll": b"dll", "Other.mpq/data/sfx/a.flac": b"a"})
         with tempfile.TemporaryDirectory() as tmp:
