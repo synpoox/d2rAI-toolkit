@@ -12,7 +12,10 @@ runs. Everything that needs Windows is behind a function, so the scripts also im
 | `testing/game_ctl.py` | Starts and stops the game in a slot, takes screenshots, sends keys, clicks and console lines. |
 | `testing/game_checks.py` | Runs named in-game checks and writes the results and screenshots. |
 | `testing/release_install.py` | Puts the **published** release into a slot, the way a player gets it. |
+| `testing/warps.py` | Makes `cheat goto` lines for a level's DS1 reference spots, or a markdown doc for a list of levels. |
+| `testing/force_ds1.py` | Test-only: pins a level to one DS1 variant in a slot's installed `lvlprest.txt`. |
 | `testing/example_checks.py` | Five example checks. Copy it and make your own. |
+| `testing/stock_checks.py` | Stock checks that hold for any mod (`slot-savepath`). Turn on with `modules = ["stock_checks"]`. |
 | `testing/testing.example.toml` | The config. Copy it to `modkit-testing.toml`. |
 
 Contents: [Quick start](#quick-start) · [Why slots](#why-slots) · [The config file](#the-config-file) ·
@@ -93,6 +96,32 @@ What makes a slot independent:
 `MODKIT_RUN` and refuses while that slot's game runs; games in other slots may keep running. Plain
 `python -m modkit --game <slot folder> install` refuses a slot folder of the testing config and points you here.
 Set `mods_policy = "copy"` to copy your own mods folder as well.
+
+`tools/install_plugins.ps1 -Game <slot folder> -Project <mod> -Plugins a,b [-Data]` wraps these for a mod with built
+plugins. `-Game` must be a test slot (2 and up) whose lock `MODKIT_RUN` holds, and `D2R.exe` must be version 3.3; both
+are checked first, before anything changes. It copies `<Project>\plugin\build\Release\<name>.dll` into the slot's
+mod-scoped `mods\<Mod>\d2rloader\plugins\`, moves every other file there (stray third-party plugins; not the
+`<name>-off.txt` toggles or the plugins' own files) and any copy of its DLLs in the game-wide `d2rloader\plugins\` to a
+backup folder instead of deleting it (`-KeepExtras` leaves the first kind), and with `-Data` builds first, then
+installs the project's data and `mod.json` plugins through `slot_install.py` (which keeps the slot's own savepath).
+
+## Slot owners (`~/.d2r-modkit/slots.toml`)
+
+When several projects share one machine's slots, a table says whose slot is whose. It is machine config, outside every
+repo: `~/.d2r-modkit/slots.toml` (or `--slots-file F`, or `MODKIT_SLOTS_FILE`). Example:
+
+```toml
+[owners]
+"2"   = "toolkit"
+"3"   = "mod-a"
+"4-6" = "mod-b"
+```
+
+With the file present, `game_slots.py lock` (and the lock a `game_ctl.py start` or `game_checks.py run` takes) refuses a
+slot another project owns, or an owned slot when no project is given. Give your project with `--project NAME` or
+`MODKIT_PROJECT`. `lock any` picks the project's own slots first, then unowned ones, and never another project's. Slots
+not listed are free for all. No file: nothing is enforced. A file that cannot be read refuses every lock. See
+`testing/slot_registry.py`.
 
 ## The config file
 
@@ -312,9 +341,12 @@ Register the module in the config and run it:
 
 ```toml
 [checks]
-modules = ["example_checks", "my_checks"]
+modules = ["example_checks", "stock_checks", "my_checks"]
 paths = ["my-checks"]
 ```
+
+`stock_checks` is the toolkit's own module of checks any mod can use; `slot-savepath` fails when a slot's modinfo.json
+`savepath` is not the slot's own save folder.
 
 ```sh
 python testing/game_checks.py list                                  # name, tags, first line of the doc string
@@ -328,6 +360,11 @@ python testing/game_checks.py run smoke --slot 2 --run-id before-fix --keep --st
 Options of `run`: `--slot N` (or `MODKIT_SLOT`), `--run-id ID` (default `MODKIT_RUN`, else `run-<date>-<time>-s<slot>`),
 `--keep` (leave the game running at the end), `--stop-on-fail`. Global options, given *before* `run` or `list`: `--config FILE`, `--module NAME` and
 `--path DIR` (add a check module or a folder to find it in). Checks run in the order they were registered, each once.
+
+**The `leaves-town` tag.** A check that warps the character out of town (for example `cheat goto`) is tagged
+`leaves-town` (`d2r_only.LEAVES_TOWN`) next to `game`. Run those only on a slot you locked for out-of-town checks, never
+under a starting-town-only rule. `testing/d2r_only.py` (Terror Zone, Herald and Colossal portal checks) has such
+checks; its pixel threshold is calibrated on build 93847 at a 1920x1080 client, default brightness, HDR off.
 
 ### What a check gets: `ctx`
 
@@ -345,6 +382,17 @@ Options of `run`: `--slot N` (or `MODKIT_SLOT`), `--run-id ID` (default `MODKIT_
 Helpers in `game_ctl`: `wait_for(fn, timeout, interval, desc)` (poll until true, raises `WaitTimeout`), `wait_log(path,
 needle, timeout, offset)`, and the picture tools of `Image`: `stats()` (mean and spread of the grey level),
 `signature(box)`, `box(fx0, fy0, fx1, fy1)`, `pixel(x, y)`, and `signature_distance(a, b)`.
+
+### Ready-made parts for a mod's checks
+
+Three modules hold parts that are the same for every mod. The plugin, the mod and the character are always parameters;
+nothing about a mod is written in them.
+
+| Module | What it gives |
+|---|---|
+| `check_helpers.plugin_log(ctx, plugin, scope="auto", skip_if_missing=False, since_size=0)` | The text of `<plugin>`'s log since its last `<plugin>: <version> loaded (` line, so an old run does not count. `scope` is `mod` (`<mod>/d2rloader/logs/`), `game` (the slot's `d2rloader/logs/`), `config` (the config's `[logs] plugin_log`) or `auto` (that config key when it names `<plugin>.log`, else the mod log, else the game-wide log). `plugin_log_path` gives the path, `plugin_log_size` the size to pass as `since_size` (taken before the game starts) to ignore everything already in the file. |
+| `lod_checks.py` | `assert_plugin_loaded(ctx, plugin, mod, expect=...)`, `read_save` / `check_save` (signature, size field, checksum), `save_and_exit` (Esc, Save and Exit, waits until the whole save is written in the extended format and its `.d2rl` sidecar matches it; a half-written file counts as not yet), `delete_character`, and `create_save_reload(ctx, char, class_name=...)`, which creates a Lord of Destruction character, saves, restarts the game, loads and saves again. Needs the harness; run it only in a slot you locked. |
+| `menu_layout.py` | The click positions of the main menu, the create-character screen and the Esc menu as fractions of the window, with the class portraits. Measured for **D2R 3.3 at 1920x1080** (`D2R_VERSION`, `CLIENT`): re-measure them for another D2R version, and add a class by passing `class_pos` and `class_id` to `create_save_reload`. |
 
 ### The example checks
 
@@ -418,6 +466,20 @@ not inside the slot's `mods` folder. It accepts `schemaVersion` 1 for channel fi
 
 Also compare the versions in a player's report with yours before you chase a ghost: game build, loader version and
 plugin version. Many "bugs" are a stale plugin copy or a loader that starts another mod.
+
+## Pin a DS1 variant
+
+A level with several DS1 variants rolls one per game. To land on the preset under test, pin the level in the slot's
+installed `lvlprest.txt`:
+
+```
+MODKIT_RUN=my-lane python testing/force_ds1.py --slot 2 "Dark Temple Map=DarktempleV2.ds1"
+MODKIT_RUN=my-lane python testing/force_ds1.py --slot 2 --reset
+```
+
+This is test-only. It needs the slot lock held by `MODKIT_RUN`, refuses slot 1 and a slot whose game runs, and touches
+only the slot's installed copy (the original is saved beside it as `lvlprest.txt.force-ds1.orig`). `--reset` or a
+reinstall of the slot undoes it. The mod must ship its own `lvlprest.txt`.
 
 ## Targeted tests and the full suite
 

@@ -67,6 +67,17 @@ inline constexpr uint8_t PoisonApplyHookEntry[] = {0x48, 0x8b, 0xc4, 0x55, 0x56,
 inline constexpr uint64_t AddLife = 0x451820;
 inline constexpr uint8_t AddLifeEntry[] = {0x48, 0x89, 0x5c, 0x24, 0x18, 0x56, 0x48, 0x83,
                                            0xec, 0x20, 0x8b, 0xf2, 0x48, 0x8b, 0xd9};
+// (game, attacker, target, &damage): the life and mana leech of a hit. It shifts the life and mana steal percents
+// (DamageLifeLeech, DamageManaLeech) << 6 (1/64 fixed point) and, for a player attacker, divides them by the difficulty's
+// LifeStealDivisor / ManaStealDivisor (DiffLifeDivisor / DiffManaDivisor); 1.09d divides on a monster target instead.
+// A pet's leech is asked with IsPet (units.h). Drain (MonDrain) 0 on a monster target ends it early. Its caller 0x44ce80
+// drains the target's mana by damage +0x124 and stamina by +0x128 afterwards.
+// push rbp / push rsi / push rdi / push r14 / sub rsp,0x58 / cmp dword [r9+0x120],0
+inline constexpr uint64_t Leech = 0x450c90;
+inline constexpr uint8_t LeechEntry[] = {0x40, 0x55, 0x56, 0x57, 0x41, 0x56, 0x48, 0x83, 0xec,
+                                         0x58, 0x41, 0x83, 0xb9, 0x20, 0x01, 0x00, 0x00, 0x00};
+inline constexpr int DmgFlags = 0x00;                 // uint32 hit flags
+inline constexpr uint32_t DmgFlagElementsLeech = 0x40;  // the elements count in the leeched damage, as the physical does
 
 // --- Area hits -----------------------------------------------------------------------------------------------------
 // (game, unit, &AreaCenter, radius, unit mask, callback, arg, 0): callback(&AreaContext, victim) for each unit in range
@@ -104,6 +115,7 @@ inline constexpr int DmgConvPct = 0x14c;
 // 0x5546b0, per unit 0x5556a0) builds its hit from it.
 inline constexpr uint64_t DifficultyRecord = 0x300830;
 inline constexpr int DiffStaticFieldMin = 0x68;
+inline constexpr int DiffLifeDivisor = 0x1c, DiffManaDivisor = 0x20;  // int32 LifeStealDivisor, ManaStealDivisor
 
 // --- Critical and deadly strike, crushing blow ---------------------------------------------------------------------
 // WeaponDamage's (0x44c030) roll: from 0x44c2b4, right after the physical roll is stored at damage +0x18, to 0x44c3d9

@@ -49,6 +49,14 @@ forbidden = [
 data_dir = "{folder}.mpq/data"
 keep_identical = ["global/dataversionbuild.txt"]   # written by you, so keep it even when it equals the game's
 
+# release/stage.py: the installed mod folder a release is packed from.
+[stage]
+plugins = []                               # built plugin names (no .dll) copied into d2rloader/plugins/, e.g. ["my-rules"]
+plugin_build_dir = "plugin/build/Release"  # where they are built, relative to the project
+companions = false                         # true: also install generated/companions/ (release/companions.py fetch)
+companions_manifest = ""                   # "" = companions/manifest.json
+item_type_check = true                     # check out/data's itemtypes.txt keeps D2R's item type ids
+
 [downloader]
 exe_name = "MyMod-Downloader.exe"          # the file name players get; the manifest's "launcher" entry points at it
 exe = "build/downloader/Release/MyMod-Downloader.exe"   # release.sh publishes this with every release
@@ -87,6 +95,7 @@ acl = "public-read"                        # "" for a provider without object AC
 # Tokens come from the environment variable, else the token file. They are never printed.
 [repos]
 changelog = "CHANGELOG.md"
+fragments = "changelog.d"                  # release/stage.py folds changelog.d/*.md into the changelog (templates/changelog.d/README.md)
 github = "your-name/your-mod"
 github_token_env = "MODKIT_GITHUB_TOKEN"
 github_token_file = "~/.d2r-modkit/github_token"
