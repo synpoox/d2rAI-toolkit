@@ -223,7 +223,8 @@ def read_object_lines(path: Path) -> dict[str, tuple[str, str]]:
 
 def apply_objects(rule: Path, src_data: Path, d2r_data: Path, out_data: Path) -> None:
     """Rule kind for the objects HD rule file: objects.json plus a stand-in json per listed class (run after the id rule
-    for objects). A line for a class that is not a source-only objects row, or a like D2R lacks, fails the merge."""
+    for objects). A line for a class that is not a source-only objects row, or a like D2R lacks, fails the merge, and so does a
+    source-only Class with no line."""
     likes = read_object_lines(rule)
     folders = json.loads((d2r_data / HD_OBJECTS / "objects.json").read_text("utf-8-sig"))
     d2r = {r[0] for r in Table(excel(d2r_data) / "objects.txt").rows}
@@ -231,6 +232,8 @@ def apply_objects(rule: Path, src_data: Path, d2r_data: Path, out_data: Path) ->
     for cls, (like, particles) in likes.items():
         if cls not in new:
             raise ObjectHdError(f"'{cls}' is not a source-only objects Class")
+        if object_key(cls) in folders:
+            raise ObjectHdError(f"'{cls}': objects.json already has '{object_key(cls)}'")
         src = d2r_data / HD_OBJECTS / folders.get(like, {}).get("asset_path", "") / f"{like}.json"
         if like not in folders or not src.is_file():
             raise ObjectHdError(f"'{cls}': '{like}' has no D2R object json")
@@ -241,10 +244,15 @@ def apply_objects(rule: Path, src_data: Path, d2r_data: Path, out_data: Path) ->
             old = [d["path"] for d in json.loads(data)["dependencies"]["particles"]]
             if len(old) != 1:
                 raise ObjectHdError(f"'{cls}': '{like}' has {len(old)} particle effects, want 1 to replace")
+            if old[0].encode() not in data:
+                raise ObjectHdError(f"'{cls}': the particle path of '{like}' is escaped in its json, cannot swap it")
             data = data.replace(old[0].encode(), particles.encode())
         (out_data / HD_OBJECTS / folder / f"{object_key(cls)}.json").write_bytes(data)
         folders[object_key(cls)] = {"asset_path": folder}
     (out_data / HD_OBJECTS / "objects.json").write_text(json.dumps(folders, indent=1), "utf-8")
+    missing = sorted(new - likes.keys())
+    if missing:
+        raise ObjectHdError(f"no HD model for {len(missing)} new objects, add lines: {', '.join(missing)}")
     print(f"  objects-hd: {len(likes)} new objects drawn")
 
 

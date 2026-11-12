@@ -198,6 +198,15 @@ class ObjectTests(unittest.TestCase):
         with self.assertRaisesRegex(H.ObjectHdError, "line 1: want"):
             run_objects("onlyone\n", O_D2R)
 
+    def test_new_object_without_line_fails(self):
+        with self.assertRaisesRegex(H.ObjectHdError, "no HD model for 1 new objects.*srcnew"):
+            run_objects("srcportal_grey\tportal_permanent\n",
+                        O_D2R + "srcportal_grey\tx\r\nsrcnew\tx\r\n")
+
+    def test_existing_key_fails(self):
+        with self.assertRaisesRegex(H.ObjectHdError, "already has"):
+            run_objects("Portal_Permanent\tportal_permanent\n", O_D2R + "Portal_Permanent\tx\r\n")
+
 
 # --- overlays ---
 
