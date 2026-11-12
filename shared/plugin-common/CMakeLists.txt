@@ -26,6 +26,7 @@ add_library(plugin_common STATIC
 	src/env_guard.cpp
 	src/log.cpp
 	src/off_switch.cpp
+	src/parts.cpp
 )
 target_include_directories(plugin_common PUBLIC src)
 target_link_libraries(plugin_common PUBLIC D2RLPlugin::D2RLPlugin)
@@ -44,4 +45,11 @@ if(PROJECT_IS_TOP_LEVEL)
 		set_property(TARGET plugin_common_tests PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
 	endif()
 	add_test(NAME plugin_common_tests COMMAND plugin_common_tests)
+	add_executable(plugin_common_parts_test tests/parts_test.cpp)
+	target_link_libraries(plugin_common_parts_test PRIVATE plugin_common)
+	if(MSVC)
+		target_compile_options(plugin_common_parts_test PRIVATE /W4 /permissive- /EHsc /utf-8)
+		set_property(TARGET plugin_common_parts_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
+	endif()
+	add_test(NAME plugin_common_parts_test COMMAND plugin_common_parts_test)
 endif()
