@@ -1,0 +1,85 @@
+name: release
+
+# Template: copy to .github/workflows/release.yml in a mod repository.
+# The full build and the release package, run by hand (Actions > release > Run workflow). It runs only on the owner's
+# self-hosted runner: it needs the game's files, which never go to GitHub (README.md in this folder). A green build
+# publishes a GitHub release v<version> marked Latest, with the package and its checksums, and keeps them as a workflow
+# artifact too. The release is made from the build, so the version in VERSION_FILE must be new: the release fails if
+# its tag already exists.
+# Repository variables: RUNNER_LABELS, D2R_TOOLKIT, D2R_GAME, MODKIT_CACHE_DIR, VERSION_FILE, RELEASE_TITLE
+# (README.md has the defaults).
+on:
+  workflow_dispatch:
+
+# Least privilege by default; only the release job may write (to create the release).
+permissions:
+  contents: read
+
+# One release at a time.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["self-hosted","windows"]') }}
+    permissions:
+      contents: write
+    env:
+      PYTHONPATH: ${{ vars.D2R_TOOLKIT }}
+      MODKIT_CACHE: ${{ vars.MODKIT_CACHE_DIR || format('{0}\d2r-data', vars.D2R_TOOLKIT) }}
+      MODKIT_GAME: ${{ vars.D2R_GAME }}
+      D2R_TOOLKIT: ${{ vars.D2R_TOOLKIT }}
+      VERSION_FILE: ${{ vars.VERSION_FILE || 'mod.json' }}
+      RELEASE_TITLE: ${{ vars.RELEASE_TITLE || 'Release' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Update the toolkit checkout
+        run: git -C "$env:D2R_TOOLKIT" pull -q --ff-only
+        continue-on-error: true  # a dirty or diverged checkout, or another job's pull, must not fail the run
+      - name: Python packages
+        # EDIT: the packages the mod's tools import
+        run: py -3 -m pip install --quiet --disable-pip-version-check numpy Pillow
+      - name: Tool tests
+        run: py -3 -m unittest discover -s tests   # EDIT: the mod's test folder
+      - name: Plugins
+        # EDIT: the mod's plugin build, or delete the step for a data-only mod
+        run: powershell -ExecutionPolicy Bypass -File plugin\build.ps1
+      - name: Merged data
+        run: |
+          # EDIT: the mod's extract, merge, companion-plugin fetch and build commands, in order, each followed by an
+          # exit-code check, for example
+          #   py -3 -m modkit fetch --prefix data/global/; if ($LASTEXITCODE) { throw "modkit fetch failed" }
+          #   py -3 release\companions.py fetch --game $env:MODKIT_GAME --root . --manifest companions.json; if ($LASTEXITCODE) { throw "companions fetch failed" }
+          #   py -3 -m modkit build . --no-validate; if ($LASTEXITCODE) { throw "modkit build failed" }
+          throw "EDIT: fill in the Merged data step"
+      - name: Validation (reported, does not block the release)
+        continue-on-error: true
+        run: py -3 -m modkit validate .
+      - name: Package
+        # The toolkit's stager folds changelog fragments, checks the game image and builds the package (release/stage.py);
+        # use the mod's own packaging command here instead if it has one.
+        run: py -3 "$env:D2R_TOOLKIT\release\stage.py" --game "$env:MODKIT_GAME" --root . --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: |
+            dist/*.7z
+            dist/*.zip
+            dist/RELEASE_NOTES-*.md
+            dist/release-manifest.json
+            dist/SHA256SUMS
+            out/validation.md
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $v = (Get-Content $env:VERSION_FILE -Raw | ConvertFrom-Json).version
+          $files = @((Get-ChildItem dist -Include *.7z, *.zip -Recurse).FullName) + "dist\SHA256SUMS"
+          # fails if the tag already has a release: bump the version to publish again
+          gh release create "v$v" @files --target $env:GITHUB_SHA --title "$env:RELEASE_TITLE $v" --notes-file "dist\RELEASE_NOTES-$v.md" --latest
+          if ($LASTEXITCODE) { throw "gh release create failed" }
