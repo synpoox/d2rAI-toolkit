@@ -18,7 +18,9 @@ rules) is covered in [porting-classic-mods.md](porting-classic-mods.md).
 | [d2r-93847-addresses.md](d2r-93847-addresses.md) | Address registry for build 93847: functions, tables, record and unit offsets, entry bytes |
 | [debugging.md](debugging.md) | Symptom -> cause -> fix table from real bugs, and where every log lives |
 | [crash-triage.md](crash-triage.md) | From a player's crash report to a fix: RVA from RIP, stack return addresses, Ghidra, which logs to ask for, a worked example |
-| [d2rloader.md](d2rloader.md) | D2RLoader facts and traps: default mod, the cache-building first start, other plugins, version checks, its files |
+| [d2rloader.md](d2rloader.md) | D2RLoader facts and traps: default mod, the cache-building first start, other plugins and how to check their hooks, plugin flags and splitting, loader gaps, version checks, its files |
+| [d2rloader-capabilities.md](d2rloader-capabilities.md) | Capability matrix for D2RLoader 1.3.1 / PluginSDK 0.4.0: what each system gets (yes, plugin, data, limit), multiplayer, loader vs SDK vs game versions |
+| [charged-items.md](charged-items.md) | Reusable or charged items: triggers, the not-used-up flag, where charges can live (quantity, stat 204, a new stat), recharge, effects, runtime checks |
 | [porting-classic-mods.md](porting-classic-mods.md) | Porting a classic 1.13c-era mod: inventory, table-by-table conversion, ids that must not move, function numbers, events, art order |
 | [modkit-ops.md](modkit-ops.md) | The modkit's patch operations (JSON ops applied by `modkit build`) |
 | [cheat-commands.md](cheat-commands.md) | Setting up an in-game test from D2RLoader's console: every cheat command, item spawn lines, what they did in game |
