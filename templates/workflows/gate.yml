@@ -1,0 +1,107 @@
+name: gate
+
+# Template: copy to .github/workflows/gate.yml in a mod repository, with gate-control.yml beside it.
+# A comparison gate on every PR and push to main (the mod's own diff or lint tools; a table-diff against the game's
+# tables is the usual one). It needs the game's files, which never go to GitHub, so it runs on the owner's self-hosted
+# runner (README.md in this folder has the variables and the runner notes).
+#
+# Rules this template keeps:
+# - PRs from forks never reach the runner (it only builds this repository's own branches): their job runs on a hosted
+#   runner and fails at once, because a skipped required check counts as passing.
+# - The required check is the job named by the GATE_CHECK_NAME variable (default table-diff). Only a real gate run may
+#   carry that name, so no event may start a run of this workflow whose job is skipped. Label and close events go to
+#   gate-control.yml, which cancels or reruns the PR's gate run from a job with another name.
+# - Docs-only changes start no run (paths:). Add the inputs that gate even when they are docs to the allow list below.
+# Repository variables: RUNNER_LABELS, D2R_TOOLKIT, D2R_GAME, MODKIT_CACHE_DIR, DATA_LINK, RULE_CACHE_DIR,
+# GATE_CHECK_NAME, GATE_OK_LABEL, BASELINE_ARTIFACT (README.md has the defaults).
+on:
+  push:
+    branches: [main]
+    paths: ['**', '!**/*.md', '!docs/**', '!changelog.d/**']  # EDIT: re-include docs files that are gate inputs
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths: ['**', '!**/*.md', '!docs/**', '!changelog.d/**']  # EDIT: same list as above
+
+# One gate per PR: a push cancels the run on the old head. One group for main, so a newer main commit cancels the older
+# one's run.
+concurrency:
+  group: gate-${{ github.event_name == 'push' && 'main' || github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    # The job never skips. A fork PR runs it on a hosted runner, where the first step fails it.
+    name: ${{ vars.GATE_CHECK_NAME || 'table-diff' }}
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && fromJSON('["ubuntu-latest"]') || fromJSON(vars.RUNNER_LABELS || '["self-hosted","windows"]') }}
+    permissions:
+      contents: read
+      actions: read  # gh run download of main's baseline artifact
+      pull-requests: read  # the PR's labels, read at run time (a rerun keeps the old event payload)
+    env:
+      PYTHONPATH: ${{ vars.D2R_TOOLKIT }}
+      FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+      MODKIT_CACHE: ${{ vars.MODKIT_CACHE_DIR || format('{0}\d2r-data', vars.D2R_TOOLKIT) }}
+      MODKIT_GAME: ${{ vars.D2R_GAME }}
+      DATA_LINK: ${{ vars.DATA_LINK || 'd2r-data' }}
+      RULE_CACHE_VAR: ${{ vars.RULE_CACHE_DIR }}  # empty: <runner temp>\rule-cache, set in the data step
+      OK_LABEL: ${{ vars.GATE_OK_LABEL || 'gate-drop-ok' }}
+      BASELINE: ${{ vars.BASELINE_ARTIFACT || 'gate-baseline' }}
+    steps:
+      - name: Refuse fork PRs
+        if: ${{ env.FORK == 'true' }}
+        shell: bash
+        run: |
+          echo "::error::the gate does not run for PRs from forks: it needs the owner's runner, which only builds this repository's branches. Push the branch to this repository and open the PR from there."
+          exit 1
+      - name: Drop cache junction
+        if: ${{ env.FORK != 'true' }}
+        # a junction left in the workspace by an earlier run would be walked by checkout's clean step
+        run: if (Test-Path $env:DATA_LINK) { cmd /c rmdir $env:DATA_LINK }
+        continue-on-error: true
+      - uses: actions/checkout@v4
+      - name: Update the toolkit checkout
+        run: git -C "${{ vars.D2R_TOOLKIT }}" pull -q --ff-only
+        continue-on-error: true  # a dirty or diverged checkout, or another job's pull, must not fail the run
+      - name: Extracted data
+        run: |
+          # The game's files stay in the shared cache on the runner; the checkout only holds a junction to it.
+          New-Item -ItemType Directory -Force $env:MODKIT_CACHE | Out-Null
+          $rules = if ($env:RULE_CACHE_VAR) { $env:RULE_CACHE_VAR } else { Join-Path $env:RUNNER_TEMP "rule-cache" }
+          "RULE_CACHE=$rules" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          New-Item -ItemType Junction -Path $env:DATA_LINK -Target $env:MODKIT_CACHE | Out-Null
+          # EDIT: the mod's extraction and merge commands, each followed by an exit-code check, for example
+          #   py -3 -m modkit fetch --prefix data/global/; if ($LASTEXITCODE) { throw "modkit fetch failed" }
+          #   py -3 tools/merge.py; if ($LASTEXITCODE) { throw "merge failed" }
+          # A push to main keeps new entries in $rules; a PR replays main's and keeps its own in a scratch
+          # folder, so a buggy PR run cannot damage the entries main replays:
+          $scope = if ("${{ github.event_name }}" -eq "push") { "main" } else { "pr-${{ github.event.pull_request.number }}" }
+          "CI_SCOPE=$scope" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+      - name: Gate
+        # EDIT: the mod's gate command; a non-zero exit fails the check
+        run: py -3 tools/diff.py
+      - name: Baseline compare
+        if: ${{ !cancelled() && env.FORK != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The label now, not the event payload's: gate-control.yml reruns this run when the label changes.
+          $dropOk = "false"
+          if ("${{ github.event_name }}" -ne "push") {
+            $dropOk = gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json labels -q "[.labels[].name] | index(\"$env:OK_LABEL\") != null"
+          }
+          # PRs compare with the latest successful main run's baseline artifact.
+          if ("${{ github.event_name }}" -ne "push") {
+            $run = gh run list --repo ${{ github.repository }} --workflow gate.yml --branch main --event push --status success --limit 1 --json databaseId -q '.[0].databaseId'
+            if ($run) { gh run download $run --repo ${{ github.repository }} --name $env:BASELINE --dir baseline/main }
+            if (-not (Test-Path baseline/main)) { "::warning::no $env:BASELINE artifact from main: nothing to compare with" }
+          }
+          # EDIT: the mod's baseline command. On push write baseline/ (uploaded below); on a PR compare with
+          # baseline/main and fail on a drop unless $dropOk is "true" (then report it in the step summary only).
+          "Baseline step: replace with the mod's own command (accepted-drop label: $env:OK_LABEL, drop accepted: $dropOk)" | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && env.FORK != 'true' && github.event_name == 'push' }}
+        continue-on-error: true
+        with:
+          name: ${{ vars.BASELINE_ARTIFACT || 'gate-baseline' }}
+          path: baseline/*.tsv
+          if-no-files-found: ignore
