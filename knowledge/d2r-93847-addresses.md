@@ -794,3 +794,9 @@ pause (+0x30), put back the speed (`EnvSpeedNormal` `0x2376848`, 128) at +0x2c a
 0, 0)` before sending `{0x53, act index, 5, 0}`. The act index is the position of the unit's act (unit +0x20) in the
 game's act list (header `GameActs`, `GameActCount`). The sound is played to the players of one level by walking the
 clients (game +0x138, next +0x628) and comparing each player's room level.
+
+## Monster AI table (build 93847)
+
+| RVA | Meaning |
+|---|---|
+| `0x2396e90` | Monster AI table: 155 records of 32 bytes `{kind (u64), init fn, think fn, next}`, absolute 64-bit pointers (image base `0x140000000`). Indexed by the row of `monai.txt` (the monstats `AI` column names the row). Examples: Skeleton think `0x5b43a0`, Brute `0x5acc20`, Zombie `0x5ba780`, BloodHawk `0x5aca20`. Read from a memory-layout dump; pairs with 1.09d's AI table in [porting-classic-mods.md](porting-classic-mods.md). The generator `shared/classic_import/gen_109d_monster_ai.py` reads it |
