@@ -745,6 +745,55 @@ function (bytes in the header, checked before the patch); **D** data: a variable
 | `0x3e2aab0` | DamageTypeStepSlot | - | DamageEffects (0x44df10) runs its 12 damage types (1.13c's table, 0x40 bytes each here) through (&ctx, &type, flag), called as jmp [this slot]: D2RCore's resist step (1.13c's 0x6fcfbd00). | T |
 | `0x3e2b652` | SetUnitStateKey | (unit, key) | UnitStateKey's setter (a jmp stub) | R |
 
+## Rules the engine hard-codes: damage reduction cap, leech rounding, level packets (build 93847)
+
+Engine facts a rule-changing plugin needs. Evidence letters as in the legend above.
+
+### Damage reduction cap (stat 36, damageresist)
+
+| RVA | Signature | Meaning | Ev |
+|---|---|---|---|
+| `0x4523e0` | (unit, stat) -> value | The resist getter. A resist with no max-resist stat starts from 75 (`0x4524a5`), at most 95 | R |
+| `0x4524d0` | patch address, 13 bytes | Where the cap for stat 36 (physical damage reduction) is loaded: `41 83 7e 08 24` (cmp dword [r14+8],0x24) / `b8 32 00 00 00` (mov eax,50) / `0f 44 c8` (cmovz ecx,eax). **D2R caps damageresist at 50 (the byte at `0x4524d6`); 1.09d capped it at 75** (D2Game 0x7e580-0x7e59e: no max-resist stat gives 0 + 75, at most 95). Changing the byte to `0x4b` gives 75; check the 13 bytes first, as a patch | P |
+
+No toolkit header names this address yet (no toolkit code uses it); a plugin that patches it keeps the 13 bytes above as its expected bytes.
+
+### Life and mana leech (`0x450c90`)
+
+| RVA | Signature | Meaning | Ev |
+|---|---|---|---|
+| `0x450c90` | (game, attacker, target, &damage) | The leech of a hit (header `Leech`, entry bytes `LeechEntry`; hooked in game with an entry check). Reads the life and mana steal percents at damage +0x120 / +0x124 | H |
+| `0x3af240` | (unit) -> non-zero for a pet monster | D2R's leech asks it at `0x450e31` (header `IsPet`) | R |
+
+D2R's rule: the percents are shifted `<< 6` (1/64 fixed point) first, and divided by the difficulty's LifeStealDivisor /
+ManaStealDivisor (difficultylevels record from `0x300830(game +0x106, game +0x104)`, +0x1c / +0x20) only when the
+attacker is a player. 3% in Nightmare (divisor 2) steals 1.5%. A monster target with monstats Drain (record +0xf2,
+Nightmare +1, Hell +2) 0 ends the leech early. The elements count in the leeched damage only when damage flag 0x40 is set
+(`0x450ebf`-`0x450ec8`: physical +0x18, then +0x20, +0x2c, +0x30, +0x34). The caller `0x44ce80` (after `0x44d038`) then
+drains the target's mana by damage +0x124 and stamina by +0x128.
+
+1.09d's rule (D2Game `0x6fcaf4a0`, SUnitDmg.cpp): when the **target is a monster** (whoever attacks) the percents are
+integer-divided by the divisors first, then `damage * percent / 100`. 3% in Nightmare steals 1%. To give 1.09d's rounding
+through D2R's code, hand it a percent whose steps end the same: `pct / d * d` for a player's hit on a monster (after D2R's
+`(pct / d * d) << 6 / d` that is `(pct / d) << 6`), `pct / d` for any other attacker on a monster, `pct * d` for a
+player's hit on a player (1.09d divides only on monsters). Everything else (Drain, the damage cap, the life and mana adds)
+stays D2R's. Afterwards write back the steal fields stock D2R would have left, as the caller reads them.
+
+### Level packets: act darkness (0x53) and level sound (0x2c)
+
+The server has no PluginSDK service to send a packet or switch an act's light; both are engine calls.
+
+| Packet | Layout | How it is sent | Ev |
+|---|---|---|---|
+| `0x53` act light | 10 bytes: `0x53`, int32 period, int32 time, byte eclipse | `SendPacket10` (`0x477420`) `(client, packet)` to each client in game (client +4 == 4). The light tick `0x406550` and a2q3 (`0x5a4290`) send the same packet. The client's handler is `0x12cb50` and calls `ActLightSet` (`0x3525c0`) with the fields | R |
+| `0x2c` sound | built by `SoundPacket` (`0x5397f0`) `(player, client)` | First `ClientMessage` (`0x491960`) `(player, sound, player)` with the sound id (chest open is `0xb`), then `SoundPacket`; the client is the player's (`PlayerClient` `0x48fde0`) | R |
+
+Darkening an act the way a mod's level effect does: on the server call `ActEclipseOn` (`0x3526f0`) `(dataFlag, act)` once
+when the act's eclipse (act light +0x34) is off, send `{0x53, act index, 5, 1}` to every client, and to end it clear the
+pause (+0x30), put back the speed (`EnvSpeedNormal` `0x2376848`, 128) at +0x2c and call `ActLightSet(dataFlag, act, null, 2,
+0, 0)` before sending `{0x53, act index, 5, 0}`. The act index is the position of the unit's act (unit +0x20) in the
+game's act list (header `GameActs`, `GameActCount`). The sound is played to the players of one level by walking the
+clients (game +0x138, next +0x628) and comparing each player's room level.
 ## Unverified table addresses (tools/probe_tables.py, build 93847)
 
 Built into `tools/probe_tables.py` and printed there as "(UNVERIFIED)". No Ghidra evidence is recorded for them yet: confirm each one (what it is, how found) and move it into the sections above, or drop it. Probe-only, so none belongs in `shared/plugin-common/src/rvas_93847*` unless plugin code starts using it. `0x235f590` (CltStTable), `0x2391270` (MissileSrvDmgTable) and `0x2386bd8` (the PropertyFuncTable bound) are verified in the coverage section above and no longer listed here.
