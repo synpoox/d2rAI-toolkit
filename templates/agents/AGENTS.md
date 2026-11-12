@@ -28,13 +28,13 @@ Safety
 - Never print, echo, log or commit a token or key. Scripts read them from files in the home folder.
 - Never touch the owner's real game install. Never move, rename or delete saves of characters you did not create; use
   throwaway characters.
-- Ask the coordinator before anything public, paid or destructive.
+- Ask the orchestrator before anything public, paid or destructive.
 
 Git
 - Commit with a noreply identity. Commit messages end with `Co-Authored-By: <your model name> <noreply@anthropic.com>`.
-- Open a PR to `main`; do not merge. The coordinator reviews and merges. PR body: what changed, how it was tested,
+- Open a PR to `main`; do not merge. A separate reviewer checks it and the orchestrator squash-merges. PR body: what changed, how it was tested,
   what is left. Do not message other agents or sessions.
-- Keep docs in step with your change. Do not bump the release version unless your task says so.
+- A change players notice adds a `changelog.d/` fragment (never edit `CHANGELOG.md`). Keep docs in step with your change. Do not bump the release version unless your task says so.
 
 Game slots and tests
 - Tests run in the background only: no synthetic keyboard or mouse input (SendInput, SetCursorPos,
@@ -43,7 +43,7 @@ Game slots and tests
   every command that can touch it, run with `MODKIT_RUN=<lane>` so runs do not release your lock, and unlock straight
   away. Check slot status before and after.
 - If every slot is taken, wait in a bounded loop (up to about 30 minutes), then stop and file a `ready-for-agent`
-  issue for the run instead of polling longer.
+  issue for the run instead of polling longer. Never wait on CI and never touch runners: push, open the PR, report.
 - Install only through a script that stops when the lock fails, and check the lock is still yours right before
   installing. Kill only processes you started, by PID.
 - Run only the checks your changed files map to, plus the build validator and unit tests. For player-facing changes,

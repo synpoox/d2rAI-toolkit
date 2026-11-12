@@ -113,8 +113,8 @@ GitHub or Nexus Mods (`--nexus` writes a ready archive).
 <td valign="top">
 
 ### 🤖 Run many agents in parallel, safely
-A coordinator plus short "lanes": one job each, with its own branch, worktree and PR. The coordinator reviews and
-merges. You get templates for every prompt and list.
+An orchestrator that routes and never implements, plus short "lanes": one job each, with its own branch, worktree
+and PR, checked by a separate reviewer. The orchestrator squash-merges. You get templates for every prompt and list.
 → [AI workflow](docs/ai-workflow.md)
 
 </td>
@@ -254,7 +254,7 @@ auto Spawn(d2r::Game* game, void* room, int32_t x, int32_t y, int32_t monster, i
 }
 ```
 
-**5. Tests and ships.** Each lane runs its named checks in a game slot and opens a PR. The coordinator merges, runs
+**5. Tests and ships.** Each lane runs its named checks in a game slot and opens a PR. The orchestrator merges, runs
 the full suite, and releases. Expect several rounds: the first map run always finds something.
 
 ### A simple data change
@@ -286,7 +286,7 @@ with 0 errors, installs with the game closed, and adds a row to the project's `T
 | [`.claude/skills/`](.claude/skills/) | Step-by-step guides the agent follows ([list below](#skills)) |
 | [`.claude/skills/d2r-toolkit/SKILL.md`](.claude/skills/d2r-toolkit/SKILL.md) | The agent's standing instructions and rules for a mod; [`CLAUDE.md`](CLAUDE.md) is for working on the toolkit itself |
 | [`docs/`](docs/README.md) | Guides for running a project: AI workflow, testing, releases, [distribution](docs/distribution.md) (own host, GitHub, Nexus Mods), downloader |
-| [`templates/`](templates/) | Fill-in files: coordinator prompt, lane rules, lane prompt, bug list, plan, changelog, owner update |
+| [`templates/`](templates/) | Fill-in files: orchestrator prompt, handoff, lane rules, lane prompt, plan, changelog, owner update |
 | [`plugin-template/`](plugin-template/README.md) | D2RLoader plugin skeleton (C++): guards, off-switch, status command, a new skill function, an inline hook |
 | [`testing/`](testing/) | Game slots, game control without real input, a checks framework, release-like installs |
 | [`release/`](release/) | Packaging (7z + manifest, `--nexus` archive), delta publish over SFTP, server ingest, CDN mirror, release pages, `release.sh` |
@@ -312,7 +312,7 @@ name it ("use d2r-port").
 | [`d2r-debug`](.claude/skills/d2r-debug/SKILL.md) | Crashes, asserts, lost characters, wrong behaviour: logs, symptom to cause, bisecting |
 | [`d2r-crash`](.claude/skills/d2r-crash/SKILL.md) | A player's crash report: addresses to functions, who caused it, a fix with evidence |
 | [`d2r-port`](.claude/skills/d2r-port/SKILL.md) | Port a classic 1.10 / 1.13c-era mod to D2R (with its creators' permission), table by table, with its DLL rules in a plugin |
-| [`d2r-coordinator`](.claude/skills/d2r-coordinator/SKILL.md) | Plan and run a project with several agents: lanes, models, game slots, bug list, review |
+| [`d2r-orchestrator`](.claude/skills/d2r-orchestrator/SKILL.md) | Route a project over several agents: lanes, models, game slots, separate review, squash merges, handoff |
 | [`d2r-project-conventions`](.claude/skills/d2r-project-conventions/SKILL.md) | Issues, PRs, branch names, merge gate, worktree and junction hygiene; agent scaffold in `templates/agents/` |
 | [`d2r-release`](.claude/skills/d2r-release/SKILL.md) | Ship a version: bump, player changelog, fail-fast publish, verify, release pages |
 
@@ -346,7 +346,7 @@ A small mod is one person and one agent. A big one runs like a small studio:
 
 ```mermaid
 flowchart LR
-    Owner([You, the owner]) -- goals, approvals --> Coord[Coordinator agent]
+    Owner([You, the owner]) -- goals, approvals --> Coord[Orchestrator agent]
     Coord -- one prompt per job --> Lanes[Lanes in parallel<br/>own branch + worktree]
     Lanes -- need the game --> Slots{{Game slots<br/>queued}}
     Lanes -- pull request --> Coord
@@ -355,10 +355,10 @@ flowchart LR
     Players -- bug reports --> Owner
 ```
 
-- **You decide**, the **coordinator** plans, writes lane prompts, reviews and merges, and **lanes** each do one bug
-  or feature and open a PR. Lanes never merge.
-- Strong models where judgement matters (coordinator, engine work), cheaper ones for routine lanes.
-- One numbered bug list, targeted tests per lane, and the full test suite at milestones.
+- **You decide**, the **orchestrator** plans, writes lane prompts and squash-merges, a separate **reviewer** checks each
+  PR, and **lanes** each do one bug or feature and open a PR. Lanes never merge. The orchestrator never implements.
+- Strong models where judgement matters (orchestrator, reviewer, engine work), cheaper ones for routine lanes.
+- Issues as the work list, at most 2 fix cycles per PR, targeted tests per lane, and the full test suite at milestones.
 - Every merged fix gets released. The agent asks you before anything public, paid or destructive.
 
 The full method, with failure modes and a starter checklist, is in **[docs/ai-workflow.md](docs/ai-workflow.md)**.

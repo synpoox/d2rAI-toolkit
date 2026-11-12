@@ -21,8 +21,9 @@ testing.md, release.md, distribution.md and downloader.md, and the method in ai-
 4. **Keep the repo public-clean.** No real names, e-mails, hosts, IPs or tokens; no other projects' names. Keep a
    private-words list outside the repo (`~/.d2r-modkit/private_terms.txt`, one word per line) and run
    `python tools/check_public.py` before every commit. Commit with a noreply identity.
-5. **Working with agents:** one bug or feature per lane (own branch, own worktree, PR); lanes never merge; the
-   coordinator reviews, merges and releases; related bugs are merged in the bug list before fixing. Details:
+5. **Working with agents:** one bug or feature per lane (own branch, own worktree, PR); lanes never merge; a
+   separate reviewer checks each PR (at most 2 fix cycles), the orchestrator squash-merges and releases and never
+   implements; duplicate issues are closed before fixing. Details:
    `docs/ai-workflow.md`.
 6. **Plugins and installers:** `plugin-template/`, `downloader/` and `release/` code follows rule 9 of the
    `d2r-toolkit` skill: the game-image check, major.minor version checks (never a build number) and the item-type

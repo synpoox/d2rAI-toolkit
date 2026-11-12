@@ -3,7 +3,7 @@
 Target: Diablo II: Resurrected `<GAME VERSION>` (build `<BUILD>`) + D2RLoader `<LOADER VERSION>`.
 Mod: `<MOD NAME>`. Goal: `<one sentence>`.
 
-Update this file when a phase item is done, with the date. The coordinator owns it. Progress per phase is a rough
+Update this file when a phase item is done, with the date. The orchestrator owns it. Progress per phase is a rough
 estimate, not a promise.
 
 | Phase | What | Progress |
@@ -17,13 +17,13 @@ estimate, not a promise.
 | 6 | Release | 0% |
 
 ## Phase 0: Setup
-- [ ] Repository created from the toolkit; `main` is merged only by the coordinator
+- [ ] Repository created from the toolkit; `main` is merged only by the orchestrator
 - [ ] Toolchain: git, Python 3.12+, CMake, C++ build tools
 - [ ] Game installed at build `<BUILD>`; D2RLoader installed
 - [ ] `python -m modkit fetch` works (tables, strings, layouts)
 - [ ] Game slots set up (slot 1 is the owner's real game and is never touched)
 - [ ] Private-words list created outside the repo; `tools/check_public.py` passes
-- [ ] Lane rules, coordinator prompt, bug list, changelog created from `templates/`
+- [ ] Lane rules, orchestrator prompt, changelog (with `changelog.d/`) created from `templates/`
 - [ ] Owner decisions recorded: name, hosting, public/private, providers
 - [ ] Source mod inventory (ports only): `docs/source-inventory.md`
 
