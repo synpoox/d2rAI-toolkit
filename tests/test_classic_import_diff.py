@@ -2,6 +2,8 @@
 data."""
 from __future__ import annotations
 
+import contextlib
+import io
 import os
 import subprocess
 import sys
@@ -229,6 +231,36 @@ class GateTests(unittest.TestCase):
         text = diff.report(self.gate(), "all")
         self.assertIn("3 more not shown.", text)
         self.assertEqual(text.count("| `lvlmaze.r"), diff.SHOWN)
+
+
+class CliTests(unittest.TestCase):
+    def run_cli(self, rep_or_exc, argv=("--scope", "a")):
+        def run_gate(select):
+            if isinstance(rep_or_exc, Exception):
+                raise rep_or_exc
+            return rep_or_exc
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            return diff.cli("gate", {"a": lambda t: True, "b": lambda t: t == "x"}, run_gate, list(argv))
+
+    def test_exit_codes_are_0_clean_1_open_2_broken(self):
+        clean = diff.Report([diff.Result("t")], {"cut": 0})
+        opened = diff.Report([diff.Result("t", [("t.r.c", "1", "2")])], {"cut": 0})
+        self.assertEqual(self.run_cli(clean), 0)
+        self.assertEqual(self.run_cli(opened), 1)
+        self.assertEqual(self.run_cli(diff.GateError("bad list")), 2)
+        self.assertEqual(self.run_cli(ids.IdError("bad id list")), 2)
+
+    def test_an_unknown_scope_is_refused(self):
+        with self.assertRaisesRegex(diff.GateError, "scope 'zz' is not one of a, b"):
+            diff.scope_of({"a": lambda t: True, "b": lambda t: True}, "zz")
+
+    def test_a_merge_finish_is_applied_as_a_fix(self):
+        def finish(header, row, src, own):
+            row[header.index("rightskill")] = "0" if src.get("passive") == "1" else "1"
+        want = ["Bolt", "9"]
+        diff.fix_of(finish)("skills", ["skill", "rightskill"], want, ["skill", "passive"], ["Bolt", "1"])
+        self.assertEqual(want, ["Bolt", "0"])
+        self.assertIsNone(diff.fix_of(None))
 
 
 class PairsTests(unittest.TestCase):

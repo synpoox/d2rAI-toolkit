@@ -483,3 +483,9 @@ do `0x2390e80` (46-54 empty), client missile do `0x2358430` (14 unused). Item sp
 After `0x2dc4b0` returns, `out` is plain ASCII with one line per LF, bottom line first and no colour codes (tested in game). Lines with the same stat are already merged, so a line can hold values from more than one source.
 
 Unlike tooltip listeners, this buffer takes colour codes: U+E07E plus the code character. `;` is purple and `3` is the property blue; a code holds for the rest of its line and later lines (tested in game).
+
+## Monster AI table (build 93847)
+
+| RVA | Meaning |
+|---|---|
+| `0x2396e90` | Monster AI table: 155 records of 32 bytes `{kind (u64), init fn, think fn, next}`, absolute 64-bit pointers (image base `0x140000000`). Indexed by the row of `monai.txt` (the monstats `AI` column names the row). Examples: Skeleton think `0x5b43a0`, Brute `0x5acc20`, Zombie `0x5ba780`, BloodHawk `0x5aca20`. Read from a memory-layout dump; pairs with 1.09d's AI table in [porting-classic-mods.md](porting-classic-mods.md). The generator `shared/classic_import/gen_109d_monster_ai.py` reads it |

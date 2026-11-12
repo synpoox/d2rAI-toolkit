@@ -12,6 +12,8 @@ runs. Everything that needs Windows is behind a function, so the scripts also im
 | `testing/game_ctl.py` | Starts and stops the game in a slot, takes screenshots, sends keys, clicks and console lines. |
 | `testing/game_checks.py` | Runs named in-game checks and writes the results and screenshots. |
 | `testing/release_install.py` | Puts the **published** release into a slot, the way a player gets it. |
+| `testing/warps.py` | Makes `cheat goto` lines for a level's DS1 reference spots, or a markdown doc for a list of levels. |
+| `testing/force_ds1.py` | Test-only: pins a level to one DS1 variant in a slot's installed `lvlprest.txt`. |
 | `testing/example_checks.py` | Five example checks. Copy it and make your own. |
 | `testing/testing.example.toml` | The config. Copy it to `modkit-testing.toml`. |
 
@@ -94,12 +96,30 @@ What makes a slot independent:
 `python -m modkit --game <slot folder> install` refuses a slot folder of the testing config and points you here.
 Set `mods_policy = "copy"` to copy your own mods folder as well.
 
+## Slot owners (`~/.d2r-modkit/slots.toml`)
+
+When several projects share one machine's slots, a table says whose slot is whose. It is machine config, outside every
+repo: `~/.d2r-modkit/slots.toml` (or `--slots-file F`, or `MODKIT_SLOTS_FILE`). Example:
+
+```toml
+[owners]
+"2"   = "toolkit"
+"3"   = "mod-a"
+"4-6" = "mod-b"
+```
+
+With the file present, `game_slots.py lock` (and the lock a `game_ctl.py start` or `game_checks.py run` takes) refuses a
+slot another project owns, or an owned slot when no project is given. Give your project with `--project NAME` or
+`MODKIT_PROJECT`. `lock any` picks the project's own slots first, then unowned ones, and never another project's. Slots
+not listed are free for all. No file: nothing is enforced. A file that cannot be read refuses every lock. See
+`testing/slot_registry.py`.
+
 ## The config file
 
 All names, paths and numbers live in one TOML (or JSON) file. Nothing about your mod is written in the scripts.
 
 Where it is looked for, first match wins: `--config FILE`, the environment variable `MODKIT_TESTING_CONFIG`, then
-`./modkit-testing.toml`. Relative paths are relative to the config file. `~` and environment variables are expanded.
+`./modkit-testing.toml`. With none of the three, every tool that touches a slot refuses (exit 2, "no testing config found"); only `game_checks.py list` runs on the defaults. Relative paths are relative to the config file. `~` and environment variables are expanded.
 Every key has a default except `game.install_dir` and `game.slots_dir`. `testing/testing.example.toml` lists all of
 them with their defaults. The ones you will change:
 
@@ -346,6 +366,17 @@ Helpers in `game_ctl`: `wait_for(fn, timeout, interval, desc)` (poll until true,
 needle, timeout, offset)`, and the picture tools of `Image`: `stats()` (mean and spread of the grey level),
 `signature(box)`, `box(fx0, fy0, fx1, fy1)`, `pixel(x, y)`, and `signature_distance(a, b)`.
 
+### Ready-made parts for a mod's checks
+
+Three modules hold parts that are the same for every mod. The plugin, the mod and the character are always parameters;
+nothing about a mod is written in them.
+
+| Module | What it gives |
+|---|---|
+| `check_helpers.plugin_log(ctx, plugin, scope="auto", skip_if_missing=False, since_size=0)` | The text of `<plugin>`'s log since its last `<plugin>: <version> loaded (` line, so an old run does not count. `scope` is `mod` (`<mod>/d2rloader/logs/`), `game` (the slot's `d2rloader/logs/`), `config` (the config's `[logs] plugin_log`) or `auto` (that config key when it names `<plugin>.log`, else the mod log, else the game-wide log). `plugin_log_path` gives the path, `plugin_log_size` the size to pass as `since_size` (taken before the game starts) to ignore everything already in the file. |
+| `lod_checks.py` | `assert_plugin_loaded(ctx, plugin, mod, expect=...)`, `read_save` / `check_save` (signature, size field, checksum), `save_and_exit` (Esc, Save and Exit, waits until the whole save is written in the extended format and its `.d2rl` sidecar matches it; a half-written file counts as not yet), `delete_character`, and `create_save_reload(ctx, char, class_name=...)`, which creates a Lord of Destruction character, saves, restarts the game, loads and saves again. Needs the harness; run it only in a slot you locked. |
+| `menu_layout.py` | The click positions of the main menu, the create-character screen and the Esc menu as fractions of the window, with the class portraits. Measured for **D2R 3.3 at 1920x1080** (`D2R_VERSION`, `CLIENT`): re-measure them for another D2R version, and add a class by passing `class_pos` and `class_id` to `create_save_reload`. |
+
 ### The example checks
 
 | Check | Tags | What it checks |
@@ -419,6 +450,20 @@ not inside the slot's `mods` folder. It accepts `schemaVersion` 1 for channel fi
 Also compare the versions in a player's report with yours before you chase a ghost: game build, loader version and
 plugin version. Many "bugs" are a stale plugin copy or a loader that starts another mod.
 
+## Pin a DS1 variant
+
+A level with several DS1 variants rolls one per game. To land on the preset under test, pin the level in the slot's
+installed `lvlprest.txt`:
+
+```
+MODKIT_RUN=my-lane python testing/force_ds1.py --slot 2 "Dark Temple Map=DarktempleV2.ds1"
+MODKIT_RUN=my-lane python testing/force_ds1.py --slot 2 --reset
+```
+
+This is test-only. It needs the slot lock held by `MODKIT_RUN`, refuses slot 1 and a slot whose game runs, and touches
+only the slot's installed copy (the original is saved beside it as `lvlprest.txt.force-ds1.orig`). `--reset` or a
+reinstall of the slot undoes it. The mod must ship its own `lvlprest.txt`.
+
 ## Targeted tests and the full suite
 
 The full suite is slow and needs the game. Do not run it after every change.
@@ -443,7 +488,7 @@ python -m unittest discover -s tests -p "test_testing_*.py"
 | Symptom | Cause and fix |
 |---|---|
 | `slot 1 is the user's own game ...` | You asked for slot 1. Use a slot from 2 to `game.slot_count`. This is on purpose. |
-| `game.install_dir is not set` | No config was found. Check `--config`, `MODKIT_TESTING_CONFIG`, or that `./modkit-testing.toml` exists in the current folder. |
+| `no testing config found` | No config was found, so the tool refused to touch a slot (it never falls back to the built-in defaults). Check `--config`, `MODKIT_TESTING_CONFIG`, or that `./modkit-testing.toml` exists in the current folder. |
 | `slot 2 held by <owner> pid=...` | Somebody has the slot. Wait (`lock ... --wait`), take another (`lock any`), or look at `status`. |
 | A lock shows `STALE` | Its process died. The next `lock` replaces it. For a `pid=0` lock of a lane that has gone, `unlock N --force`. |
 | `slot 2 is not locked by MODKIT_RUN=...` | `release_install.py` needs the lock *and* the same name in `MODKIT_RUN`. Take it with `lock 2 <lane>`, then run with `MODKIT_RUN=<lane>`. |
