@@ -355,6 +355,30 @@ stops with the command that removes it: `gh release delete-asset <feed_tag> feed
 only when no other publish is running, then run `--feed dist` again.
 
 
+## Companion plugins
+
+A mod can ship community plugins next to its own (a loot filter, a stash search). `release/companions.py` fetches them
+from a manifest that pins each one by SHA-256, so a release never contains a binary nobody checked, and installs them
+with the mod. `release/companions.example.json` shows the manifest (default place: `companions/manifest.json`).
+
+```sh
+py -3 release/companions.py fetch   --root path/to/mod          # download, check, unpack into generated/companions/
+py -3 release/companions.py install --root path/to/mod --game <D2R folder>   # modkit install + overlay
+```
+
+An entry names a GitHub release asset (`repo` + `tag` + `asset`), a file at a commit (`repo` + `commit` + `asset`), or a
+URL (`url` + `asset`), the `sha256` of that download, and `files`: which files to take and where they go in the mod
+folder. Options per entry, for what only some companions need:
+
+| Option | Meaning |
+|---|---|
+| `filter_tables` | Vanilla tables the plugin reads from `<mod>.mpq/data/global/excel/`. The union over all entries is copied from the game's files when the build did not ship them. |
+| `loader_settings` | `{"section": {"key": value}}` written into `d2rloader/config/d2rloader.toml` unless the key is set already, for example `{"d2rcore.items": {"item_stat_ranges": true}}`. |
+
+The project's own settings for a companion (a filter file, plugin configs) are listed in the manifest's top-level
+`config` (default `["companions/config/"]`) and replace the zip's defaults. Bump one companion per change, after a
+coexistence check in a test slot. `fetch` never commits anything: `generated/` stays out of the repository.
+
 ## Release notes
 
 `release.sh` and `github_release.py` read the **`### <version>` section** of `CHANGELOG.md` (`repos.changelog`). The
