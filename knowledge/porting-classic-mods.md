@@ -234,3 +234,16 @@ Keep a table of what the original mod has and the port does not, with the reason
 - Test with mortal characters too: a god-mode character skips the damage path where many crashes live.
 - Reset the test character's quests between runs; finished quests skip their handlers.
 - When a crash comes from a player, go to [crash-triage.md](crash-triage.md).
+
+## Monster AI: 1.09d against D2R (engine facts)
+
+- **1.09d D2Game.dll** (stock 1.09d, hashes in `shared/classic_import/baselines/109d.json`): the AI table is at RVA
+  `0xebac8`, 266 records of 16 bytes `{kind, init fn, think fn, next}`, absolute 32-bit pointers (image base
+  `0x6fc30000`). 1.09d's monstats has no `AI` column: its `BaseId` column is the index into this table (not a
+  monstats row number).
+- **D2R build 93847**: the AI table is at RVA `0x2396e90`, 155 records of 32 bytes, same fields, indexed by the
+  `monai.txt` row ([d2r-93847-addresses.md](d2r-93847-addresses.md)).
+- The monstats rows of the two builds line up one to one (the Expansion separator row sits at the same position in
+  both), so a 1.09d monster's D2R `AI` is the `AI` of the same row. `data/109d-monster-ai.tsv` holds the pairing and
+  both think functions; 1.10 moved the `AIParam` slots (verified maps for Skeleton, Brute, Zombie and BloodHawk).
+  Regenerate with `shared/classic_import/gen_109d_monster_ai.py`.
