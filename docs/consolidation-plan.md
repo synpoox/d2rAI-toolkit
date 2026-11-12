@@ -1,6 +1,6 @@
 # Consolidation plan: one toolkit for every mod project
 
-Status: plan, 2026-11-11. This file lives on the `plan/consolidation` branch only and is never merged. It names the
+Status: plan, 2026-11-11, revised the same day to **generic items only** (section 2). This file lives on the `plan/consolidation` branch only and is never merged. It names the
 source projects (CLAUDE.md rule 11 keeps project names off `main`). Everything that moves into the toolkit is rewritten
 without project names.
 
@@ -41,33 +41,43 @@ What local first still requires (phase 1):
 
 ## 2. Rules for every move
 
-1. **Only generic tools move.**
-   - The test: would another mod use it as it is, passing in only its own data (id lists, rules maps, scopes, mod
-     name, slot numbers)? If not, it stays in its project. Section 5.10 lists what stays.
-   - A file may be split only when the generic part stands on its own. The project keeps the rest plus a thin driver.
-   - Something that is generic in principle but that only one project uses today is marked **"later"**. It moves when
-     a second mod needs it, not before.
-2. **Tests move with code.** A module never moves without its unit tests. Fixtures are made synthetic where they
+1. **Only generic items move.** This covers every tool, function, knowledge page, engine address, template and
+   method. Nothing in the toolkit may be specific to a mod.
+   - The test: does it work for, or hold true for, any mod? A tool passes when another mod could use it as it is,
+     passing in only its own data (id lists, rules maps, scopes, mod name, slot numbers). A fact passes when it is
+     about D2R or about a stock classic version, not about what one mod changed.
+   - A file may be split only when the generic part stands on its own. The mod keeps the rest plus a thin driver.
+   - Whether a mod uses it today does not matter. If it is generic, it moves.
+   - Section 5.10 lists what stays.
+2. **Version-specific is fine when documented.** An item may belong to one game version: classic 1.09d, classic
+   1.13c (the base of 1.13c-era mods), or D2R 3.3 build 93847.
+   - The version is in the file name or the first line (`classic-109d-*`, `classic-113c-*`, `rvas_93847.h`).
+   - Each fact or value is marked with its version (CLAUDE.md rule 10).
+3. **A fact learned from a mod's files is checked against the stock version first.** A 1.13c-based mod ships its own
+   tables and engine DLL. A table layout, a column meaning or a behaviour read from its files is a 1.13c fact only
+   once it matches stock 1.13c (the reference install, pinned by hash). Anything the mod changed stays with the mod.
+4. **Tests move with code.** A module never moves without its unit tests. Fixtures are made synthetic where they
    embed project data.
-3. **Copy first, switch later.**
+5. **Copy first, switch later.**
    - The toolkit gains the generic version first.
    - The project switches in a separate PR and deletes its copy.
    - pd2-resurrected switches only after its alpha (target about 2026-11-17).
-4. **No project names in moved text** (rule 11).
-   - Use "the source mod", "a classic port" or "a 1.13c-based mod".
+6. **No project or mod names in moved text** (rule 11).
+   - Use "a classic port" or "a 1.13c-based mod", or name the stock version.
    - pd2-resurrected's `PD2R_*` env vars become `MODKIT_*`.
    - Do not name other community mods either. Say "another community mod".
-5. **Contradictions are settled, not copied.** Where a project finding contradicts toolkit knowledge (section 6), the
+7. **Contradictions are settled, not copied.** Where a project finding contradicts toolkit knowledge (section 6), the
    move PR updates the toolkit text and cites the evidence.
-6. **Build-specific values are marked** with the build number (rule 10).
 
 ## 3. Phase 0: before anything moves
 
+Only what the moves need. Other housekeeping in the mod repos is out of scope.
+
 | # | Repo | Task |
 |---|---|---|
-| 0.1 | Project Forever | Commit the uncommitted `AGENTS.md`, `docs/agents/{domain,issue-tracker,triage-labels}.md` and `docs/research/*` (5 inventories plus `source-document-inventory.json`). **Do not** commit the uncommitted `GLOSSARY.md`: it is an old 6-line stub, and main has the real one. Fix the repo name in `issue-tracker.md`; main's docs mix `project-forever-clean` and `resurrected-forever`. Local `main` is behind origin, so pull first. |
-| 0.2 | resurrected-09 | Commit the uncommitted `AGENTS.md` and `docs/agents/*`; the uncommitted `GLOSSARY.md` is the old version. Fix the stale `synpoox/project-09` in `issue-tracker.md`. `domain.md` still points at `docs/adr/`, which was replaced by map issue #12: pick one. Local `main` is 31 commits behind. |
-| 0.3 | Project Forever, resurrected-09 | Adopt pd2-resurrected's rule that `research/*` branches are never merged or deleted. Most of these two projects' generic findings live only on unmerged research branches, and they are sources for phase 2. |
+| 0.1 | Project Forever | Commit the uncommitted `docs/research/*` inventories that 5.8 reads (local `main` is behind origin; pull first). Leave the uncommitted old `GLOSSARY.md` out. |
+| 0.2 | resurrected-09 | Pull (local `main` is 31 commits behind). Nothing uncommitted is a source. |
+| 0.3 | Project Forever, resurrected-09 | Keep the `research/*` and `ticket/*` branches that 5.1, 5.4 and 5.8 read; do not delete them until their content has moved. |
 | 0.4 | toolkit | Add `pd2-data/` to `.gitignore` or move it out of the repo. Delete or move `mpyq-0.2.5.tar.gz`, `hs_err_pid*.log` and `replay_pid*.log`. Commit or drop the uncommitted `tools/ghidra_scripts/{FuncsInRange,RangeAsm}.java`. |
 | 0.5 | toolkit | Hygiene. Clear out the existing rule-11 breaches (section 7). |
 
@@ -123,14 +133,14 @@ other P tools import it.
 | P | `pd2-baseline.json` | `templates/baseline.example.json`. | S |
 | 9 | Monster AI pairing (BaseId to D2R AI) | New dataset, generated. Only 9 of 169 pairs are read today. | M |
 
-### 5.2 Later: DS1 to HD presets and scoring (P, one unit)
+### 5.2 `shared/classic_import/maps`: classic DS1 levels to HD presets (P, one unit)
 
-**Stays in pd2-resurrected for now.** Only pd2-resurrected adds classic maps today, and the generator is tuned to its
-maps. Exception: the two plain file readers in the first two rows move now, because they are useful to any mod.
+Turning a classic DS1/DT1 level into a D2R HD preset is generic: it works on any classic level, stock or modded. The
+files move as one unit because they depend on each other.
 
-When a second mod adds maps, these files move to `shared/classic_import/maps` as one unit, because they depend on each
-other. The PD2 constants to leave behind then: jungle UNWALKABLE ratios, the TERRAIN preset, `merge/presets-hd.d` and
-overrides paths, the area lists and the scorer baselines.
+What stays in pd2-resurrected and is passed in: the jungle UNWALKABLE ratios, the TERRAIN preset, the
+`merge/presets-hd.d` and overrides paths, the area lists and the scorer baselines. Each pass and hook is reviewed as it
+moves. A pass that only makes sense for one mod's maps stays with that mod as a project hook.
 
 | Item | Size |
 |---|---|
@@ -162,13 +172,13 @@ overrides paths, the area lists and the scorer baselines.
 | 9 | `tests/game/leech_checks.py` @ticket/29-leech | `testing/save_edit.py`: unlock difficulties (byte 0x15 = 0x0f, bytes 0x98–0x9a, then `finalize`). | S |
 | P | `tests/game/*_checks.py` `_log(ctx)` | `check_helpers.plugin_log()`. | S |
 | P | `tests/game/missile_probe.py` | `testing/unit_probe.py`: read-only unit and missile counter; RVAs come from the address registry. | S |
-| P | `tools/pd2_edge_tour.py` | **Later, with 5.2**: it depends on `pd2_fidelity.classify`. When it moves: `testing/edge_tour.py`, reusing `check_helpers.pair` and `goto_line`. | L |
+| P | `tools/pd2_edge_tour.py` | `testing/edge_tour.py`, with 5.2 (it uses the fidelity classifier); reuse `check_helpers.pair` and `goto_line`. | L |
 | P | `tools/contact_sheet.py` | `testing/contact_sheet.py`: contact sheet plus luma and black-pixel metrics. Merge with `check_helpers.side_by_side`. | S |
 | P | `tools/pd2_warps.py` | `testing/warps.py`: generate a `cheat goto` doc for added maps. | S |
 | P | `tools/pd2_force_ds1.py` | `testing/force_ds1.py`: pin a DS1 variant in a slot; mod folder read from `mod.json`. | S |
 | P | `tests/game/fixtures/*` | Pattern only: a fixture mod.json plus patch per check, documented in `testing/README.md`. | S |
 | F | `tests/game/slot_install_checks.py` | Stock `slot-savepath` check: both modinfo savepaths equal the slot folder. | S |
-| new | Slot registry | One machine-wide slot-to-owner table that `game_slots lock` enforces. Today ownership is restated in P's `game-slots.md`, F's inventory and the owner's notes, and `lock any` can take another project's slot. Today's owners: Slot2 tools test, Slot3 Project Forever, Slot4–8 pd2-resurrected, Slot9–10 resurrected-09. | M |
+| new | Slot registry | `game_slots lock` enforces a slot-to-owner table. The mechanism is in the toolkit; the table is machine config in `~/.d2r-modkit/slots.toml`, never in the repo. Today ownership is restated in several docs, and `lock any` can take another project's slot. | M |
 | new | Testing config default | With no config, the tools refuse to touch a slot instead of silently using the toolkit's default config (a trap P documents). | S |
 
 ### 5.5 `release/` and `tools/`
@@ -221,10 +231,10 @@ Generic parts only. Each row names the file it lands in.
 |---|---|---|
 | `docs/research/d2rloader-capabilities.md` (capability matrix, loader 1.3.1 / SDK 0.4.0) | new `knowledge/d2rloader-capabilities.md` | M |
 | `docs/research/skill-function-tables.md` (all function tables, bounds, free slots, readers, router idea; cltstfunc `0x235f590`, srvdmg `0x2391270`) | `d2r-93847-addresses.md`, `engine-limits.md` | M |
-| `core-rules-inventory.md`, `pd2-engine-dll-triage.md` (bucket a source DLL's rules, slot-collision checklist, DLL triage from strings) | `porting-classic-mods.md` §1, §5 | M |
-| `pd2-data-inventory.md` (1.13c vs D2R 3.3 tables, columns, events, saves v96 vs v105) | `porting-classic-mods.md` §3 | M |
+| `core-rules-inventory.md`, `pd2-engine-dll-triage.md`: the method only (bucket a classic engine DLL's rules, slot-collision checklist, DLL triage from strings). The PD2 rules themselves stay. | `porting-classic-mods.md` §1, §5 | M |
+| `pd2-data-inventory.md`: stock 1.13c vs D2R 3.3 tables, columns, events, saves v96 vs v105. Section 2 rule 3: each row checked against stock 1.13c | new `knowledge/classic-113c-tables.md`, `porting-classic-mods.md` §3 | M |
 | `pd2-asset-inventory.md`, `pd2-strings-inventory.md` (D2R string-id budget, reversed multi-line skill text) | `strings.md` | S |
-| `plrmodes.md`, `stack-split.md`, `states-immed.md` (reading 1.13c patch tables; 1.13c never reads states `immed`) | `porting-classic-mods.md` §3, §6 | S |
+| `plrmodes.md`, `stack-split.md`, `states-immed.md` (reading 1.13c patch tables; 1.13c never reads states `immed`), checked against stock 1.13c | `classic-113c-tables.md`, `porting-classic-mods.md` §6 | S |
 | `ms2-*`, `ms3-*`, `ms4-*`, `ub2-*` (map opening, map stats, monster region, portal maker, item spell 16 / `0x236fe30`) | `d2r-93847-addresses.md`, `new-game-systems.md` | M |
 | 25 work-item notes in `docs/research/` (class skills vs D2R do/hit functions) | The D2R function signatures and slots go to `d2r-93847-addresses.md`; the rest stays | M |
 | `docs/adr/0001` (RotW bank only), `0002` (source data generated from a hash-pinned extract), `0003` (extended saves, append-only ids) | `porting-classic-mods.md` §0 "decisions to make first" and §2 | S |
@@ -236,8 +246,7 @@ Generic parts only. Each row names the file it lands in.
 | `GLOSSARY.md` fidelity terms (deviation, exact, approximated, cut, router slot, companion plugin) | `porting-classic-mods.md` §0 | S |
 | `plugin/core-ui/item_quantity.*`, `stack_split.*` (loader gaps: WidgetService has no screen rect, OverlayService draws nothing, TCP/IP clients have no game thread) | `d2rloader.md` | S |
 | `docs/agents/game-slots.md` (RotW-character trap, `cheat expansion 2` crash, LoD badge) | `cheat-commands.md` | S |
-| `@research/reimagined-map-system` (how another community mod built maps, the limits it hit, licence) | `new-game-systems.md`, without naming the mod | M |
-| `@research/suite-companions` (which community plugins coexist with your hooks) | `d2rloader.md` "Other plugins" | S |
+| `@research/suite-companions`: the method only (how to check that another plugin's hooks coexist with yours). Which plugins a mod ships stays with it. | `d2rloader.md` "Other plugins" | S |
 
 **From resurrected-09**
 
@@ -256,7 +265,7 @@ Generic parts only. Each row names the file it lands in.
 | `@history` `docs/design/technical-approach.md`, ADRs 0001–0003 (fixed game plus rolling loader, data first plus targeted hooks, extended saves from the start) | `docs/ai-workflow.md` "decisions for a port", `porting-classic-mods.md` §0 | S |
 | `GLOSSARY.md` (reference install, deviation, table set, column vs rename map, placeholder row) | `porting-classic-mods.md` glossary | S |
 | `@ticket/29-leech` leech model (D2R 1/64 fixed point, player-only divide vs 1.09d) and the DR cap | `classic-109d-vs-d2r.md` | S |
-| `docs/design/d2r-conveniences.md` (candidate list only) | new `knowledge/d2r-conveniences.md` | S |
+| `docs/design/d2r-conveniences.md`: the list of D2R 3.3 features a classic port can keep or turn off, without the mod's choices | new `knowledge/d2r-conveniences.md` | S |
 | `patches/24-d2r-only-content.json` (Terror Zones, Heralds, Colossal portal off) | `examples/patches/no-terror-zones.json` | S |
 
 **From Project Forever**
@@ -267,14 +276,14 @@ Generic parts only. Each row names the file it lands in.
 | `@research/save-freeze` (retail id widths, extended limits 1 MiB / 247 pages / Recovery, 5 to 6 migration, freeze table, retroactive-but-unstored changes, savepath hides characters) | `saves.md`, plus a "freeze before release" section in `tables.md` | L |
 | `@research/map-hosting` (clone `levels` rows onto stock tiles; level id ≤255 and Layer <100; `Red Portal,lvl=`; per-game resets; Terror Zone data in `desecratedzones.json`; no zone API) | `new-game-systems.md` "map hosting", `tables.md` Terror Zone section | L |
 | `@research/d2r-play-modes` (official vs community support, TCP/IP, ladder claims, offline auth, the 2.5 migration warning, EULA flag) | `docs/distribution.md` "play modes and policy" | M |
-| `@research/archetype-weaknesses` (3.3 dead and trap skills, patch-history facts) | optional new `knowledge/class-balance-notes.md` | L |
-| `docs/research/pd2-re-inventory.md` (hook-ownership collision at `0x43acb0`: one owner per hook site) | `engine-re.md` | S |
+| `@research/archetype-weaknesses`: the D2R 3.3 facts only (dead and trap skills, patch history). The build choices stay. | new `knowledge/class-balance-3.3.md` | L |
+| `docs/research/pd2-re-inventory.md`: the rule only (one owner per hook site; the `0x43acb0` collision as the example) | `engine-re.md` | S |
 | `docs/research/in-game-testing-inventory.md` (hazards: an acknowledgement is not command output, the background flag, zero-durability reloads, a held cursor item, broken `cheat item`/`gold` substitutes, `--no-validate` debt) | `docs/testing.md` "practical hazards" | M |
 | `docs/research/reusable-foundations.md` (prepared vs fresh characters; exit 0 ≠ no skips) | `docs/testing.md` "evidence levels" | S |
-| `docs/research/pd2-project-inventory.md` ("a decision record does not prove the work landed"; read research in date order) | `docs/ai-workflow.md` "status drift" | S |
+| `docs/research/pd2-project-inventory.md`: the method only ("a decision record does not prove the work landed"; read research in date order) | `docs/ai-workflow.md` "status drift" | S |
 | `docs/research/source-document-inventory.json` (pin sources by hash) | The pattern goes into the research template (5.9) | S |
-| `docs/adr/0001` (stored vs live rules for owned items) | `saves.md` "retention policy" note | S |
-| `docs/play-modes-and-leagues.md` (feasibility checklist) | `docs/distribution.md` | S |
+| `docs/adr/0001`: the option and its consequences (stored vs live rules for owned items), not the decision | `saves.md` "retention policy" note | S |
+| `docs/play-modes-and-leagues.md`: the feasibility checklist only | `docs/distribution.md` | S |
 | `docs/research/toolkit-inventory.md` drift list | Toolkit issues (section 6) | S |
 
 ### 5.9 Methods, templates and skills
@@ -307,33 +316,22 @@ The three repos carry drifting copies of the same agent scaffold. Write it once 
 
 ### 5.10 What stays in each project
 
-None of this moves. Where a generic tool above reads one of these, the project passes it in.
+Anything about one mod stays: its content, its choices and its plans. Where a generic tool above needs one of these, the
+mod passes it in.
 
-**pd2-resurrected**
+| Kind | pd2-resurrected | Project Forever | resurrected-09 |
+|---|---|---|---|
+| Content and rule data | `merge/**` (`ids-*.tsv`, rule JSON, `presets-hd.d`, overrides, `merge/art`), `patches/*.json` | its patches and tables | the 09 rules in `to_113c.py`, `patches/*.json` except the generic example |
+| The mod's halves of split tools | the RULES map; REFS, FORMULAS, FUNCS, FIXES and the other `pd2_ids` constants; ITEM_TABLES and the P2/P3/P4/M1/alpha scopes; the PLUGINS and staging lists; the map tuning constants in 5.2 | — | — |
+| Gameplay code | `plugin/core-maps`, `plugin/core-rules` and the `plugin/core-ui` features, apart from the engine mechanisms in 5.7 | — | the `09-rules` plugin and its values (DR cap 75, the leech rule) |
+| Game checks | `tests/game/*_checks.py` and fixtures | its checks | its checks and their mod-name assertions |
+| Configuration | `mod.json`, `release.toml`, baseline values, the companion choices (`companions/**`, FILTER_TABLES, ITEM_RANGES), workflow values, slot numbers | `mod.json`, slot number | `mod.json`, slot numbers |
+| Plans, decisions and ledgers | roadmap, ADR decisions, ledger rows, `core-rules.md` rows, `item-rules.md`, `map-system.md`, `uber-bosses.md`, `unported-rows.md`, `warlock.md`, warp locations | product docs, the ADR decision, build choices, research options sections, `source-document-inventory.json` | map issue #12, deviation rows |
+| Research about the mod itself | research on its DLL (map system, uber bosses, Pandemonium and Tristram), its inventories, `@research/pd2-merge-speed`, `@research/lp-comparisons`, the PD2 behaviour in the 25 skill notes | — | — |
+| Product text | README, CHANGELOG, `changelog.d` fragments, GLOSSARY | GLOSSARY | GLOSSARY |
 
-| What | Why it stays |
-|---|---|
-| `merge/**` rule data: `ids-*.tsv`, rule JSON, `presets-hd.d`, overrides, committed `merge/art` | PD2 content |
-| The project halves of split tools: the RULES map in `pd2_merge`; REFS, FORMULAS, FUNCS, FIXES and the other constants in `pd2_ids`; ITEM_TABLES and the P2/P3/P4/M1/alpha scopes in `pd2_diff`; the PLUGINS and staging lists in `release.py` | PD2 data and choices |
-| The specifics in `companions.py` for its chosen loot filter and item-roll-ranges plugin (FILTER_TABLES, ITEM_RANGES, the item toggle), `companions/**`, the manifest entries | PD2 product choices; only the fetch, verify and install mechanism moves |
-| DS1 to HD preset generator, scorers, `pd2_edge_tour`, `contact_sheet` baselines, `docs/coverage-baseline.tsv` | Section 5.2: later |
-| Gameplay plugin code: `plugin/core-maps` (maps, uber bosses, unique maps, key drops, event portals, the boss AIs), `plugin/core-rules` (cube, item, loot, hireling rules and PD2 skills), `plugin/core-ui` features (quantity overlay, stack split) | PD2 gameplay; only the engine mechanisms in 5.7 move |
-| `tests/game/*_checks.py` and fixtures | Checks for PD2 rules; only the `_log` helper moves |
-| `patches/*.json`, `mod.json`, `release.toml`, `pd2-baseline.json` values, `.gitmodules`, `.github/FUNDING.yml` | Project configuration |
-| Workflow specifics: runner labels, `C:\pd2r-cache`, the `parity-drop-ok` label, the release title | Project configuration; only templates with inputs move |
-| `docs/roadmap.md` (its work items and prefixes), `deviations.md` / `pd2-origin-bugs.md` / `d2r-only-content.md` rows, `core-rules.md` rows, `item-rules.md`, `map-system.md`, `uber-bosses.md`, `unported-rows.md`, `warlock.md`, `docs/agents/warp-locations.md` | PD2 plans and ledgers; only the formats move as templates |
-| The decisions in ADRs 0001–0005 | Project decisions; knowledge gains only the option and its consequences |
-| Research on the source mod's own DLL (`pd2-map-system-dll`, `pd2-uber-bosses-dll`, `pd2-pandemonium-uber-tristram`), the PD2 inventories (map system, only-levels data, remaining items, uber bosses, unported rows), `@research/pd2-merge-speed`, `@research/lp-comparisons` | About PD2, not D2R |
-| The PD2 behaviour in the 25 skill work-item notes | Only the D2R function signatures and slots move |
-| `GLOSSARY.md` map and uber terms, README, CHANGELOG entries, `changelog.d` fragments | Product text |
-| Its own test-slot numbers (Slot4–8) and testing config | Go into the slot registry as data, not code |
-
-**Project Forever:** the product docs (priorities, identity, overhaul scope, first-release strategy, play modes and
-leagues, the bow Amazon rework), `GLOSSARY.md`, the ADR's decision, the build choices in `archetype-weaknesses`, the
-options sections of its research docs, `source-document-inventory.json`.
-
-**resurrected-09:** the `09-rules` plugin and its chosen values (the DR cap of 75, the leech rule), the 09 rules in
-`to_113c.py`, `docs/deviations.md` rows, `mod.json`, map issue #12, the mod-name and character assertions in its checks.
+Dropped entirely: pd2-resurrected's research branch on another community mod's map system. It is about that mod, so it is
+mod-specific, and the toolkit never depends on that mod.
 
 ## 6. Contradictions and drift to settle in the toolkit
 
@@ -358,7 +356,6 @@ Each becomes one toolkit issue, fixed with evidence while doing the matching mov
 | 15 | Screenshots | never commit them | P: an orphan `issue-assets` branch. Reconcile: never on `main` |
 | 16 | Changelog | the coordinator writes version sections | P: fragments only |
 | 17 | Test character level | — | P AGENTS.md says 90+; the owner's rule is 95 for every test character. Use 95. |
-| 18 | 9's own map | — | `merge/column_map.py` recodes `BaseId` and AIParam the way `@research/monster-ai` shows is wrong (fix in 5.1) |
 
 ## 7. Toolkit hygiene (rule 11)
 
@@ -374,7 +371,7 @@ Each becomes one toolkit issue, fixed with evidence while doing the matching mov
 2. **Phase 1**: 1.1–1.4 in the toolkit, then 1.5 and 1.6. 1.7 waits for the pd2-resurrected alpha.
 3. **Phase 2** lanes. Each lane has its own toolkit folder, so they can run in parallel:
    - A. `classic_import` layer (5.1 P rows), first and blocking for B and C.
-   - B. DS1/DT1 and terrain readers (first two rows of 5.2). The rest of 5.2 is later.
+   - B. classic DS1 levels to HD presets (5.2) plus the edge tour (5.4), after A.
    - C. art and asset ports (5.3, plus the 5.1 rows for strings, sounds, animdata, skill icons and automap), after A.
    - D. 1.09d datasets and generators (5.1 rows from 9), independent.
    - E. testing (5.4), independent.
@@ -404,10 +401,7 @@ when that happens, kept small by phase 1:
 
 ## 10. Owner decisions
 
-1. Phase 0: commit the uncommitted agent docs in Project Forever and resurrected-09 as they are, or review them first?
+1. Phase 0.1: commit Project Forever's uncommitted research inventories as they are, or review them first?
 2. Decision records: should each project keep its own style (ADRs in pd2-resurrected and Project Forever, the map
    issue in resurrected-09), or should the toolkit pick one?
-3. Is `archetype-weaknesses` (Project Forever) worth a toolkit page, or does it stay with the mod?
-4. Review section 5.10, the list of what stays in each project. Anything there that you would share, or anything
-   in 5.1–5.9 that you see as pd2-resurrected-only, flips with one line.
-5. Confirm level 95 for the shared testing rules (contradiction 17).
+3. Confirm level 95 for the shared testing rules (contradiction 17).
