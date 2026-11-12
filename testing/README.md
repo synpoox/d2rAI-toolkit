@@ -10,9 +10,15 @@ Windows is needed to run the game; everything else (locks, config, checks, relea
 | `game_slots.py` | Slots = separate copies of the game install. Setup, sync, lock, unlock, status. |
 | `game_ctl.py` | Starts, stops and drives one slot's game: screenshots, keys, clicks, console commands. |
 | `check_helpers.py` | `pair` (warp, light up, HD|legacy side-by-side PNG) and `moved` (did the character move?), run as `game_ctl.py` subcommands. |
+| `check_helpers.py` (`plugin_log`, `plugin_log_path`) | A plugin's log since its last load line, from the mod, game-wide or configured log, for checks to read. |
+| `lod_checks.py` | Reusable Lord of Destruction checks: plugin loaded, read and verify a `.d2s`, Save and Exit, create / save / reload a character. Plugin, mod and character are parameters. |
+| `menu_layout.py` | Menu click positions (fractions of the window) for `lod_checks`; measured for D2R 3.3 at 1920x1080, re-measure for another version. |
 | `game_checks.py` | Small checks framework: `@check` registry, runner, results JSON, summary, screenshots. |
 | `example_checks.py` | Example checks to copy (`config-sane`, `game-starts`, `main-menu-visible`, `console-echo`, `no-new-crash-files`). |
+| `slot_registry.py` | The slot-to-owner table (`~/.d2r-modkit/slots.toml`, machine config): which project may lock which slot. |
+| `warps.py` | `cheat goto` lines (and a markdown doc for a list of levels) for a DS1 map's centre, waypoints and boss presets. |
 | `slot_install.py` | Installs a built mod project into a slot (`modkit install`), keeping the slot's own savepath. |
+| `force_ds1.py` | Test-only: pins a level to one DS1 variant in a slot's installed `lvlprest.txt`, so a warp lands on the preset under test. |
 | `release_install.py` | Installs the PUBLISHED release into a slot, as a player would get it. |
 
 ## Quick start
@@ -43,6 +49,17 @@ MODKIT_RUN=my-lane python testing/game_slots.py unlock 2 my-lane
   free slot from 2 up. `unlock N <owner>`, or `unlock N --force` to clear a stale lock of a finished lane.
   `status` shows each lock's age ("held 6 min"). `unlock` refuses a lock younger than 30 min or whose owner pid still
   runs, and names the age and owner, unless `<owner>` equals your own `MODKIT_RUN` (freeing your own lock) or `--force`.
+- **Slot owners.** If `~/.d2r-modkit/slots.toml` exists (or `--slots-file F` / `MODKIT_SLOTS_FILE`), `lock` refuses a slot
+  another project owns. Say who you are with `--project NAME` or `MODKIT_PROJECT`; `lock any` takes only your own slots,
+  then unowned ones. No file, no enforcement; an unreadable file refuses everything. The table is machine config and never
+  goes into a repo. Format:
+
+  ```toml
+  [owners]
+  "2"   = "toolkit"     # a slot number or a range is the key, a project name the value
+  "3"   = "mod-a"
+  "4-6" = "mod-b"
+  ```
 - Nothing here sends real mouse or keyboard input or takes focus. The window is found by PID, never by title.
 
 ## Command lines
@@ -55,7 +72,9 @@ python testing/game_slots.py unlock N [OWNER] [--force]
 python testing/game_ctl.py   --slot N status|start|stop|shot NAME|key KEY..|click FX FY [right]|console CMD|harness on|off|pair NAME LEVEL,X,Y [--light N] [--settle S]|moved click FX FY|key KEY..
 python testing/game_checks.py list [names or tags]
 python testing/game_checks.py run [names or tags] --slot N [--run-id ID] [--keep] [--stop-on-fail] [--module M] [--path DIR]
+python testing/warps.py --data DIR --level N [--level M ...] [--ds1 NAME] [--boss-word W ...] [--out FILE]   # no slot needed
 python testing/slot_install.py --slot N PROJECT
+python testing/force_ds1.py --slot N [--project DIR] "<Name or LevelId>=<ds1>" | <ds1> | --reset
 python testing/release_install.py check [--channel C] [--site S]
 python testing/release_install.py install --slot N [--channel C] [--site S] [--method auto|archive|objects] [--harness-dll FILE]
 python testing/release_install.py restore|status --slot N

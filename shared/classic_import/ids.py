@@ -21,12 +21,17 @@ Merging a row (merge_table): D2R's row, with every column the source also has (o
 source's value (source_columns), spelled by `spell` (quotes gone, references to the id-listed tables renamed,
 formulas in D2R's spelling). Columns D2R added keep D2R's value on a D2R row and stay blank on an appended one.
 NUM_REFS columns take the mod's ids, ID_COLS and `*Id` columns the row's own. A project's own fixes come in as hooks (spell, fix_row, finish).
+
+The hooks' generic part is here; the values stay the project's and are passed in: make_spell (function numbers to
+move), fix_cells (values no table defines), and Finish hooks chained by finishes: derive (DERIVED and the project's
+computed columns), stat_display (itemstatcost), missile_funcs, hit_params and props_finish (fix_props, with
+property_kinds). context_of gathers the lists, renames, ids (monstats_ids too) and property kinds a merge needs.
 """
 from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Callable
+from typing import Callable, NamedTuple
 
 from modkit.tsv import NEGATIVE
 
@@ -233,6 +238,9 @@ def renames(lists: dict[str, list[Line]]) -> dict[str, dict[str, str]]:
 def follow(lines: list[Line], src_keys: list[str], d2r: list[str], src: list[str]) -> list[Line]:
     """Lines for a table whose rows are another table's row for row (objtype: objects): source row k takes the id of
     the other list's line for source row k, and D2R's name on a merged row."""
+    if len(src_keys) != len(src):
+        raise IdError(f"follow: the source table has {len(src)} rows but the table it follows has {len(src_keys)}; "
+                      "the two must match row for row")
     at = {p.lower(): (i, n) for p, i, n in lines}
     out = []
     for key, name in zip(ident(src_keys), ident(src)):
@@ -317,11 +325,14 @@ Finish = Callable[[list[str], list[str], dict[str, str], "list[str] | None"], No
 def merge_table(table: str, src: Table, d2r: Table, lines: list[Line], ren: dict[str, dict[str, str]],
                 ids: dict[str, dict[str, str]] | None = None, *, spell: Spell = spell, fix_row: FixRow | None = None,
                 finish: Finish | None = None, d2r_columns: tuple[str, ...] = (), add_columns: tuple[str, ...] = (),
-                source: str = "the source's") -> tuple[Table, list[str]]:
+                source: str = "the source's", num_refs: dict[str, dict[str, str]] | None = None
+                ) -> tuple[Table, list[str]]:
     """The mod's table, and the source columns it drops. ids: table -> {source row number: mod id} (ids_of), for
-    NUM_REFS columns. fix_row fixes a source row (a copy) before the merge reads it; finish fixes each merged source
-    row before its key and id columns are set; d2r_columns keep D2R's value on a merged row; add_columns are columns
-    D2R's file lacks but its loader reads, added when the source has them. `source` names the source in messages."""
+    NUM_REFS columns (num_refs: the project's own map in NUM_REFS' shape, default NUM_REFS). fix_row fixes a source
+    row (a copy) before the merge reads it; finish fixes each merged source row before its key and id columns are
+    set (chain several with `finishes`); d2r_columns keep D2R's value on a merged row; add_columns are columns D2R's
+    file lacks but its loader reads, added when the source has them. `source` names the source in messages."""
+    num_refs = NUM_REFS if num_refs is None else num_refs
     added = [c for c in dict.fromkeys(add_columns) if c not in d2r.header and c in src.header]
     if added:  # a copy: the caller's D2R table stays as it was
         d2r = Table.of(d2r.header + added, [r + [""] * len(added) for r in d2r.rows], d2r.newline, d2r.key)
@@ -332,7 +343,7 @@ def merge_table(table: str, src: Table, d2r: Table, lines: list[Line], ren: dict
     src_rows = {p.lower(): [v.replace('"', "") for v in fix(table, src.header, src.rows[k])]
                 for p, k in zip(ident(src.names()), src.records())}
     id_cols = [j for j, c in enumerate(d2r.header) if c.lower() == "*id" or c == ID_COLS.get(table)]
-    nums = {j: NUM_REFS[table][c] for j, c in enumerate(d2r.header) if c in NUM_REFS.get(table, {})}
+    nums = {j: num_refs[table][c] for j, c in enumerate(d2r.header) if c in num_refs.get(table, {})}
     keep = {j for j, c in enumerate(d2r.header) if c in d2r_columns}
     out = [list(r) for r in d2r.rows]
     recs = d2r.records()
@@ -369,6 +380,256 @@ def merge_table(table: str, src: Table, d2r: Table, lines: list[Line], ren: dict
     return Table.of(d2r.header, out, d2r.newline, d2r.key), dropped
 
 
+# --- hooks for merge_table: the generic part of a 1.13c-based port's fixes; the values are the project's ---
+
+# tables whose rows hold item properties (code, [cube: chance,] param, min, max columns): fix_props
+PROPS = {"uniqueitems", "setitems", "sets", "runes", "magicprefix", "magicsuffix", "automagic", "cubemain", "gems",
+         "qualityitems"}
+# tables written by the rule of the table they follow row for row (follow): objtype's rows are objects'
+FOLLOWERS = {"objects": "objtype"}
+# D2R columns computed from the source row (the column dict a Finish gets), where D2R's own rows hold the value
+# but a 1.13c table has no such column. A function returns None to leave the cell as it is. skills rightskill: D2R
+# sets it to "not passive" on its class skills only (its non-class, monster skills hold 0), so a non-class source row
+# keeps the cell; setitems spawnable and the itemtypes socket level thresholds: the value D2R gives (nearly) every
+# one of its own rows (D2R 3.3 build 93847, knowledge/porting-classic-mods.md). Pass a table's entry to derive().
+DERIVED = {"skills": {"rightskill": lambda src: None if not src.get("charclass") else
+                      "0" if src.get("passive") == "1" else "1"},
+           "setitems": {"spawnable": lambda src: "1"},
+           "itemtypes": {"MaxSocketsLevelThreshold1": lambda src: "25", "MaxSocketsLevelThreshold2": lambda src: "40"}}
+# itemstatcost's description strings and the display columns that print them (stat_display)
+STAT_STRINGS, STAT_DISPLAY = ("descstrpos", "descstrneg"), ("descfunc", "descval")
+
+Funcs = dict[str, dict[str, dict[str, str]]]  # table -> column -> {source function number: the mod's}
+
+
+def make_spell(funcs: Funcs, refs: dict[str, dict[str, str]] | None = None,
+               formulas: dict[str, list[str]] | None = None) -> Spell:
+    """A Spell that also moves function numbers: a column in `funcs` (the project's map: function numbers D2R gave
+    its own functions move to the free slots the project's plugin fills) takes the mapped value. References
+    (`refs`, default REFS) and formulas (`formulas`, default FORMULAS) are spelled as `spell` spells them."""
+    refs = REFS if refs is None else refs
+    formulas = FORMULAS if formulas is None else formulas
+
+    def spell_funcs(table: str, col: str, v: str, ren: dict[str, dict[str, str]]) -> str:
+        v = v.replace('"', "")
+        if col in refs.get(table, {}):
+            return ren.get(refs[table][col], {}).get(v.lower(), v)
+        if col in formulas.get(table, []):
+            return rewrite_formula(fix_formula(v), ren)
+        return funcs.get(table, {}).get(col, {}).get(v, v)
+    return spell_funcs
+
+
+Fixes = dict[str, dict[tuple[str, str], dict[str, str]]]  # table -> (column, bad value) -> the row's new cells
+
+
+def prop_columns(header: list[str]) -> list[tuple[int, int | None]]:
+    """The property-code columns of a PROPS table as (column, its param column): a column holds a property code when
+    the next column's name has `par`, or the next has `chance` and the one after has `par` (cubemain `mod 1`,
+    `mod 1 chance`, `mod 1 param`); `op` and `chance` columns never do. A bare item `code` column matches nothing."""
+    low = [c.lower() for c in header] + ["", "", ""]
+    cols = []
+    for j in range(len(header)):
+        p = j + 1 if "par" in low[j + 1] else j + 2 if "chance" in low[j + 1] and "par" in low[j + 2] else None
+        if p is not None and low[j] != "op" and "chance" not in low[j]:
+            cols.append((j, p))
+    return cols
+
+
+def fix_cells(fixes: Fixes, words: dict[str, str] | None = None, word_tables: set[str] = PROPS) -> FixRow:
+    """A FixRow for values no table defines, which D2R's loader refuses: a source row whose `column` holds `bad`
+    (quotes aside) gets the new cells (a column the table lacks is skipped). `words`: cell value -> its spelling in
+    the property-code columns (prop_columns) of every table of `word_tables` (a property code in another letter
+    case, say); other columns, such as index and *ID, are left alone."""
+    def fix(table: str, header: list[str], row: list[str]) -> list[str]:
+        row = list(row)
+        if words and table in word_tables:
+            for j, _ in prop_columns(header):
+                row[j] = words.get(row[j].replace('"', ""), row[j])
+        for (col, bad), cells in fixes.get(table, {}).items():
+            if col in header and row[header.index(col)].replace('"', "") == bad:
+                for c, v in cells.items():
+                    if c in header:
+                        row[header.index(c)] = v
+        return row
+    return fix
+
+
+def finishes(*fs: Finish | None) -> Finish:
+    """One Finish that runs each of fs in order (None skipped)."""
+    todo = [f for f in fs if f]
+
+    def run(header: list[str], row: list[str], src: dict[str, str], own: list[str] | None) -> None:
+        for f in todo:
+            f(header, row, src, own)
+    return run
+
+
+def derive(columns: dict[str, Callable[[dict[str, str]], str | None]]) -> Finish:
+    """A Finish setting each column (that the mod's header has) to fn(source row by column name): DERIVED[table]
+    plus the project's own. A function that returns None leaves the cell."""
+    def run(header: list[str], row: list[str], src: dict[str, str], own: list[str] | None) -> None:
+        for c, fn in columns.items():
+            v = fn(src) if c in header else None
+            if v is not None:
+                row[header.index(c)] = v
+    return run
+
+
+def stat_display(d2r: Table) -> Finish:
+    """itemstatcost's Finish (D2R 3.3): D2R's stat strings carry the value's format code ('%+d to Strength'), where
+    a 1.13c descfunc and descval print the value before the text. A row whose description strings (STAT_STRINGS)
+    are ones D2R's rows use takes those rows' display (STAT_DISPLAY): its own D2R row's when the strings are
+    unchanged, else the D2R row with the source's descfunc (bytime rows), else the first. A merged row with no
+    strings and its D2R row's descfunc keeps D2R's strings (1.13c's descfunc 27/28 hardcode their text, D2R's read
+    it from the strings)."""
+    str_cols, desc_cols = ([d2r.header.index(c) for c in cs] for cs in (STAT_STRINGS, STAT_DISPLAY))
+    shown: dict[tuple[str, ...], list[list[str]]] = {}
+    for r in d2r.rows:
+        if any(r[j] for j in str_cols):
+            shown.setdefault(tuple(r[j] for j in str_cols), []).append([r[j] for j in desc_cols])
+
+    def run(header: list[str], row: list[str], src: dict[str, str], own: list[str] | None) -> None:
+        if own and not any(row[j] for j in str_cols) and row[desc_cols[0]] == own[desc_cols[0]]:
+            for j in str_cols:
+                row[j] = own[j]
+        strs = tuple(row[j] for j in str_cols)
+        if strs in shown:
+            same = [[own[j] for j in desc_cols]] if own and strs == tuple(own[j] for j in str_cols) else []
+            by_func = [d for d in shown[strs] if d[0] == row[desc_cols[0]]]
+            for j, v in zip(desc_cols, (same or by_func or shown[strs])[0]):
+                row[j] = v
+    return run
+
+
+def missile_funcs(rules: list[tuple[str, str, str, str]]) -> Finish:
+    """A Finish for do functions that only create a missile: rules are (function column, function number, missile
+    column, fallback column). A row with that number drops it and gets the missile in the missile column (from the
+    fallback column when the missile column is blank), which D2R's do dispatcher creates after any do function."""
+    def run(header: list[str], row: list[str], src: dict[str, str], own: list[str] | None) -> None:
+        for func, number, col, fallback in rules:
+            if func in header and row[header.index(func)] == number:
+                missing = [c for c in (col, fallback) if c not in header]
+                if missing:
+                    raise IdError(f"missile_funcs: the table has no column {', '.join(missing)} "
+                                  f"(function {number} in {func})")
+                f, m, a = header.index(func), header.index(col), header.index(fallback)
+                row[f] = ""
+                if not row[m]:
+                    row[m], row[a] = row[a], ""
+    return run
+
+
+def hit_params(params: dict[str, dict[str, str]], ids: dict[str, dict[str, str]],
+               func_col: str = "pSrvHitFunc") -> Finish:
+    """missiles' Finish for hit functions that read parameters as ids: params is {function number (the mod's, after
+    spell): {parameter column: the table it names}}; each such cell takes the mod's id (ids: table -> {source id:
+    mod id}), or stays."""
+    def run(header: list[str], row: list[str], src: dict[str, str], own: list[str] | None) -> None:
+        if func_col not in header:
+            return
+        for col, t in params.get(row[header.index(func_col)], {}).items():
+            if col in header:
+                j = header.index(col)
+                row[j] = ids.get(t, {}).get(row[j], row[j])
+    return run
+
+
+def fix_props(header: list[str], row: list[str], ren: dict[str, dict[str, str]], ids: dict[str, dict[str, str]],
+              props: dict[str, str]) -> None:
+    """Skill and state parameters of item properties (code, [cube: chance,] param, min, max columns) in the mod's
+    names and ids, by name or by source id; and a cube condition's stat (op 3-26 read `param` as an itemstatcost id,
+    D2R's data guide). props: property code -> kind (property_kinds)."""
+    def remap(table: str, v: str) -> str:
+        return ids.get(table, {}).get(v, v) if v.isdigit() else ren.get(table, {}).get(v.lower(), v)
+    if "op" in header and "param" in header:
+        op, par = header.index("op"), header.index("param")
+        if row[op].isdigit() and 3 <= int(row[op]) <= 26:
+            row[par] = ids.get("itemstatcost", {}).get(row[par], row[par])
+    for j, p in prop_columns(header):
+        kind = props.get(row[j])
+        if kind in ("skill", "state"):
+            row[p] = remap(kind + "s", row[p])
+        elif kind == "skillrange" and p + 2 < len(header):  # skill-rand: min and max are a range of skill ids
+            row[p + 1], row[p + 2] = remap("skills", row[p + 1]), remap("skills", row[p + 2])
+        elif kind == "monster" and p + 2 < len(header):
+            mon = ids.get("monstats", {})
+            row[p + 1], row[p + 2] = mon.get(row[p + 1], row[p + 1]), mon.get(row[p + 2], row[p + 2])
+
+
+def props_finish(ren: dict[str, dict[str, str]], ids: dict[str, dict[str, str]], props: dict[str, str]) -> Finish:
+    """fix_props as a Finish, for the PROPS tables."""
+    return lambda header, row, src, own: fix_props(header, row, ren, ids, props)
+
+
+def property_kinds(properties: Table, monster_stats: str | None = None) -> dict[str, str]:
+    """Property code -> what its parameter names: skill (1.13c's skill-event, charged and single-skill functions 11,
+    19, 22), skillrange (12, skill-rand: min-max ids) or state (stat1 `state`). monster_stats: a project's stat name
+    prefix whose properties roll a monstats id as min-max (kind monster)."""
+    h = {c: j for j, c in enumerate(properties.header)}
+    kinds = {}
+    for r in properties.rows:
+        func, stat = r[h["func1"]], r[h["stat1"]]
+        kind = "state" if stat == "state" else "skill" if func in ("11", "19", "22") else "skillrange" if func == "12" else ""
+        kind = "monster" if monster_stats and stat.startswith(monster_stats) else kind
+        if kind:
+            kinds[r[0]] = kind
+    return kinds
+
+
+def monstats_ids(src: Table, d2r: Table) -> dict[str, str]:
+    """Source monstats id -> the mod's, for monstats merged by name (tables.py): D2R's rows keep their ids, source-only
+    rows follow D2R's last."""
+    for who, t in (("D2R", d2r), ("source", src)):
+        low = [n.lower() for n in t.names()]
+        dup = sorted({n for n in low if low.count(n) > 1})
+        if dup:  # D2R's last duplicate would win and a source duplicate would reuse the first id
+            raise IdError(f"monstats_ids: {who} monstats names used twice (letter case aside): {', '.join(dup)}")
+    mod = {n.lower(): i for i, n in enumerate(d2r.names())}
+    added = len(d2r.names())
+    for n in src.names():
+        if n.lower() not in mod:
+            mod[n.lower()], added = added, added + 1
+    return {str(k): str(mod[n.lower()]) for k, n in enumerate(src.names())}
+
+
+def left_out_of(lists: dict[str, list[Line]], src_names: dict[str, list[str]]) -> dict[str, dict[str, str]]:
+    """table -> {source row number: ""} for the rows the lists leave out (id '-'): for a project hook that blanks a
+    reference to a left-out row instead of failing (ids_of gives such rows no id)."""
+    out = {}
+    for t, names in src_names.items():
+        mod = {p.lower(): i for p, i, _ in lists[t]}
+        out[t] = {str(k): "" for k, p in enumerate(ident(names)) if mod[p.lower()] == LEFT_OUT}
+    return out
+
+
+class Context(NamedTuple):
+    """What merging any id-listed table needs: the id lists, the names they change, source id -> mod id per table,
+    and the property kinds (property_kinds)."""
+    lists: dict[str, list[Line]]
+    ren: dict[str, dict[str, str]]
+    ids: dict[str, dict[str, str]]
+    props: dict[str, str]
+
+
+def context_of(lists: dict[str, list[Line]], src_data: Path, d2r_data: Path | None = None, *,
+               id_tables: tuple[str, ...] = ("skills", "states", "itemstatcost"),
+               num_refs: dict[str, dict[str, str]] | None = None, monster_stats: str | None = None) -> Context:
+    """The Context of id lists already read and checked (lists_for). ids covers id_tables (the tables item properties
+    and hit parameters name by id), the tables num_refs columns name and the ID_COLS tables, each that has a list
+    with lines; with D2R's data and a monstats table, monstats too (monstats_ids)."""
+    num_refs = NUM_REFS if num_refs is None else num_refs
+    want = dict.fromkeys([*id_tables, *(t for refs in num_refs.values() for t in refs.values()), *ID_COLS])
+    have = [t for t in want if lists.get(t)]
+    ids = ids_of(lists, {t: load(src_data, t).names() for t in have})
+    if d2r_data is not None and (excel(d2r_data) / "monstats.txt").is_file() \
+            and (excel(src_data) / "monstats.txt").is_file():
+        ids["monstats"] = monstats_ids(load(src_data, "monstats"), load(d2r_data, "monstats"))
+    props_file = excel(src_data) / "properties.txt"
+    props = property_kinds(Table(props_file), monster_stats) if props_file.is_file() else {}
+    return Context(lists, renames(lists), ids, props)
+
+
 def excel(root: Path) -> Path:
     return root / "global" / "excel"
 
@@ -398,10 +659,14 @@ def ids_of(lists: dict[str, list[Line]], src_names: dict[str, list[str]]) -> dic
     return out
 
 
-def write(table: str, merged: Table, out_data: Path) -> None:
+def write(table: str, merged: Table, out_data: Path, dropped: list[str] | tuple[str, ...] = (),
+          source: str = "source") -> None:
+    """Write the merged table under out_data; name the dropped source columns (merge_table's second value), if any."""
     dest = excel(out_data) / f"{table}.txt"
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_bytes(merged.text().encode("latin-1"))
+    if dropped:
+        print(f"  {table}: {source} columns D2R has no place for: {', '.join(dropped)}")
 
 
 def seed_lists(merge_dir: Path, tables: list[str], src_data: Path, d2r_data: Path, vanilla: dict[str, int],
@@ -419,13 +684,22 @@ def seed_lists(merge_dir: Path, tables: list[str], src_data: Path, d2r_data: Pat
     return added
 
 
-def apply(rule: Path, src_data: Path, d2r_data: Path, out_data: Path, tables: list[str]) -> None:
+def apply(rule: Path, src_data: Path, d2r_data: Path, out_data: Path, tables: list[str],
+          followers: dict[str, str] | None = None) -> None:
     """The merge driver's rule kind for merge/ids-<table>.tsv: check the project's lists (`tables`, bound with
     functools.partial) and write that table, references to the listed tables renamed and NUM_REFS columns in the
-    mod's ids. A project with its own fixes calls merge_table with its hooks instead."""
+    mod's ids. A table in `followers` (opt-in; pass FOLLOWERS: objects -> objtype) also writes the table that follows
+    it, when both games have it; a project with its own rule for that table leaves it out. A project with its own
+    fixes calls merge_table with its hooks instead."""
     table = rule.stem[len("ids-"):]
     lists = lists_for(rule.parent, tables, src_data, d2r_data)
     nums = {t for refs in NUM_REFS.values() for t in refs.values()} & set(tables)
     ids = ids_of(lists, {t: load(src_data, t).names() for t in nums})
-    write(table, merge_table(table, load(src_data, table), load(d2r_data, table), lists[table], renames(lists),
-                             ids)[0], out_data)
+    ren = renames(lists)
+    src_table = load(src_data, table)
+    write(table, merge_table(table, src_table, load(d2r_data, table), lists[table], ren, ids)[0], out_data)
+    f = (followers or {}).get(table)
+    if f and all((excel(d) / f"{f}.txt").is_file() for d in (src_data, d2r_data)):
+        src, d2r = load(src_data, f), load(d2r_data, f)
+        lines = follow(lists[table], src_table.names(), d2r.names(), src.names())
+        write(f, merge_table(f, src, d2r, lines, ren)[0], out_data)
