@@ -8,6 +8,7 @@ TOML (or JSON) file. Where the file is looked for:
   3. ./modkit-testing.toml in the current folder
 
 Copy testing/testing.example.toml to modkit-testing.toml and edit it. Missing keys fall back to DEFAULTS below.
+With no config found at all, load() raises ConfigError: the tools refuse to touch a slot rather than run on DEFAULTS.
 Relative paths in the file are relative to the folder of the config file. `~` and %ENV% / $ENV are expanded.
 
 This module only reads files and does path math. It never touches a game.
@@ -149,12 +150,21 @@ def read_file(path: str) -> dict:
         raise ConfigError(f"config {path} is not valid: {e}") from e
 
 
-def load(path: str | None = None, env: dict | None = None, cwd: str | None = None) -> "Config":
-    """Load the config. With no file found at all the defaults are used (install_dir is then empty and every
-    command that needs it says so)."""
+NO_CONFIG_MSG = ("no testing config found: pass --config FILE, set MODKIT_TESTING_CONFIG, or put modkit-testing.toml "
+                 "in the current folder (copy testing/testing.example.toml). The tools do not fall back to the "
+                 "built-in defaults, because those name no game folder or mod and would touch the wrong slot")
+
+
+def load(path: str | None = None, env: dict | None = None, cwd: str | None = None,
+         allow_defaults: bool = False) -> "Config":
+    """Load the config. With no file found the call raises ConfigError: a tool must never touch a slot on the
+    built-in defaults. Only a caller that touches no slot (listing checks) passes allow_defaults=True, which
+    returns the defaults (install_dir is then empty and every command that needs it says so)."""
     found = find_config_path(path, env, cwd)
     if found is None:
-        return Config({}, None)
+        if allow_defaults:
+            return Config({}, None)
+        raise ConfigError(NO_CONFIG_MSG)
     return Config(read_file(found), os.path.abspath(found))
 
 
