@@ -16,10 +16,12 @@
 // function another plugin already put there. Each slot is reported in the plugin's status command.
 //
 // Adding a function: write it below with the SrvDoFn signature (noexcept, never throw, check every pointer), add a
-// row to Functions[] with a free slot (172-190), and set that number as srvdofunc in skills.txt.
+// row to Functions[] with a free slot (172-189), and set that number as srvdofunc in skills.txt. Out of slots: skill_router.h
+// shares the last slot (190) between any number of skills by skill id (skill_router::Add before the install below).
 #include "skill_functions.h"
 
 #include "d2r.h"
+#include "skill_router.h"
 
 #include <cmath>
 #include <cstdio>
@@ -30,8 +32,6 @@ namespace {
 using d2r::At;
 using d2r::Game;
 using d2r::Unit;
-
-using SrvDoFn = int64_t (*)(Game* game, Unit* unit, int32_t skillId, int32_t level) noexcept;
 
 // Example (slot 172): a fan of missiles.
 //   calc1          number of missiles (at least 1)
@@ -108,25 +108,27 @@ struct SlotFunction {
 	SrvDoFn function;
 	const char* name;  // shown in the log and the status command
 };
+// Slot 172-189 only: 190 is the router's (skill_router::Slot)
 
 constexpr SlotFunction Functions[] = {
 	{172, SrvDoMissileFan, "missile fan"},
 	// {173, SrvDoYourSkill, "your skill"},
 };
 
-static_assert(sizeof(Functions) / sizeof(Functions[0]) <= d2r::rva::SrvDoSlots - d2r::rva::SrvDoFirstFree);
+static_assert(sizeof(Functions) / sizeof(Functions[0]) <= skill_router::Slot - d2r::rva::SrvDoFirstFree);
 
 }  // namespace
 
 auto InstallSkillFunctions(const D2RL::PluginContext* context, char* report, size_t reportSize) noexcept -> int {
 	static constexpr uint8_t Empty[8] = {};  // the slot must still be a null pointer
+	// skill_router::Add(MySkillId, SrvDoMySkill);  // routed skills share slot 190; add them here, before the router below
 	int installed = 0;
 	size_t used = 0;
 	if (reportSize > 0) {
 		report[0] = '\0';
 	}
 	for (const SlotFunction& f : Functions) {
-		bool ok = f.slot >= d2r::rva::SrvDoFirstFree && f.slot < d2r::rva::SrvDoSlots;
+		bool ok = f.slot >= d2r::rva::SrvDoFirstFree && f.slot < skill_router::Slot;
 		if (ok) {
 			const uint64_t rva = d2r::rva::SrvDoTable + static_cast<uint64_t>(f.slot) * 8;
 			ok = context->PatchWriteU64(rva, Empty, sizeof(Empty), reinterpret_cast<uint64_t>(f.function));
@@ -138,9 +140,16 @@ auto InstallSkillFunctions(const D2RL::PluginContext* context, char* report, siz
 			used += n > 0 ? static_cast<size_t>(n) : 0;
 		}
 	}
+	if (skill_router::Count() > 0) {  // the routed skills share slot 190
+		char line[160];
+		installed += skill_router::InstallRouter(context, line, sizeof(line)) ? 1 : 0;
+		if (used < reportSize) {
+			std::snprintf(report + used, reportSize - used, "%s %s", used ? ";" : "", line);
+		}
+	}
 	return installed;
 }
 
 auto SkillFunctionCount() noexcept -> int {
-	return static_cast<int>(sizeof(Functions) / sizeof(Functions[0]));
+	return static_cast<int>(sizeof(Functions) / sizeof(Functions[0])) + (skill_router::Count() > 0 ? 1 : 0);
 }

@@ -28,6 +28,7 @@ add_library(modkit_plugin SHARED
 	src/sound_guard.cpp
 	src/item_type_check.cpp
 	src/skill_functions.cpp
+	src/skill_router.cpp
 	src/hook_example.cpp
 	src/plugin.rc  # ABI manifest resource: D2RLoader rejects a plugin DLL without it
 )
@@ -42,4 +43,18 @@ set_target_properties(modkit_plugin PROPERTIES OUTPUT_NAME "${MODKIT_PLUGIN_NAME
 if(MSVC)
 	target_compile_options(modkit_plugin PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/W4 /permissive- /EHsc /utf-8>)
 	set_property(TARGET modkit_plugin PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")  # static CRT: no VC++ runtime dependency
+endif()
+
+# Tests that need no game: cmake ... -DMODKIT_BUILD_TESTS=ON, then ctest -C Release
+option(MODKIT_BUILD_TESTS "Build the template's tests" OFF)
+if(MODKIT_BUILD_TESTS)
+	enable_testing()
+	add_executable(skill_router_test tests/skill_router_test.cpp src/skill_router.cpp)
+	target_include_directories(skill_router_test PRIVATE src)
+	target_link_libraries(skill_router_test PRIVATE plugin_common)
+	if(MSVC)
+		target_compile_options(skill_router_test PRIVATE /W4 /permissive- /EHsc /utf-8)
+		set_property(TARGET skill_router_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
+	endif()
+	add_test(NAME skill_router_test COMMAND skill_router_test)
 endif()
