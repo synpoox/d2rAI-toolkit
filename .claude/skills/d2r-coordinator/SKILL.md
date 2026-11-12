@@ -25,7 +25,7 @@ You plan, brief, review, merge and report. You do not do the big implementation 
 ## Splitting work into lanes
 - **One bug or feature per lane.** If two reports share a symptom, crash address or table, merge them in
   `docs/bugs.md` first (`duplicate of #N`), then make one lane.
-- Each lane: branch `lane/<name>` from `origin/main`, its own worktree, a prompt built from
+- Each lane: branch `ticket/<n>-<slug>` (see the d2r-project-conventions skill) from `origin/main`, its own worktree, a prompt built from
   `${CLAUDE_PLUGIN_ROOT}/templates/lane-prompt.md`, a PR at the end. **Lanes never merge.**
 - Start lanes as child tasks of your session so their reports come back to you, each with a unique request id.
   Not as separate top-level conversations.

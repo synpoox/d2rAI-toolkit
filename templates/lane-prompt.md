@@ -46,7 +46,7 @@ Do not change anything else. If you find another problem, list it in your report
 - <Release-package test if player-facing.>
 
 ## Git
-- Branch `lane/<lane-name>` from `origin/main`. Open a PR to `main`. Do not merge.
+- Branch `ticket/<n>-<slug>` (or `research/<topic>`, `refactor/<topic>`; see the d2r-project-conventions skill) from `origin/main`. Open a PR to `main`. Do not merge.
 - Do not bump the release version. <Or: "Bump to the next free version after main's.">
 
 ## Game slot

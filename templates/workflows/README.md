@@ -14,14 +14,10 @@ Variables) with the defaults shown.
 | `cache-verify.yml` | Nightly check that a cached build gives byte-identical output to a fresh one. | Self-hosted |
 | `release.yml` | Manual full build, package and GitHub release. | Self-hosted |
 
-Only `tests.yml` is in this folder so far. `gate.yml` and `gate-control.yml` arrive with F9, `cache-verify.yml` with F10
-and `release.yml` with F11 (issue #49). The rows for them, the gate remarks below and the variables only they use
-(`RUNNER_LABELS` to `VERSION_FILE`) describe those templates. Drop this note once they have merged.
-
 Merge rule that goes with the gate (full text in the `d2r-project-conventions` skill): a docs-only PR skips it unless it
 touches the gate's inputs; otherwise merge on green checks for the final head and a MERGEABLE PR. With the runner
 offline, run the gate command locally on the final head and paste the report in the PR. A parity drop merges only
-with the owner's "accept this drop" label.
+with the owner's "accept this drop" label (`GATE_OK_LABEL`, default `gate-drop-ok`; `[gate].drop_ok_label` in `.d2r-project.toml`).
 
 ## Why some jobs need a self-hosted runner
 

@@ -57,7 +57,7 @@ Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you ar
 
   Project skills:
   - `d2r-coordinator`: plan and run a project with several agents (lanes, models, slots, bug list, review).
-  - `d2r-project-conventions`: issues, PRs, branches, merge gate, worktrees (with ${CLAUDE_PLUGIN_ROOT}/templates/agents/ and `.d2r-project.toml`).
+  - `d2r-project-conventions`: issues, PRs, branches, merge gate, worktrees (with `${CLAUDE_PLUGIN_ROOT}/templates/agents/` and `.d2r-project.toml`).
   - `d2r-release`: ship a version (bump, changelog, fail-fast publish, release pages, mirrors such as Nexus Mods).
 
 ## New generic work starts in the toolkit

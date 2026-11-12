@@ -7,7 +7,7 @@ dozens of short-lived worker agents ("lanes").
 You do not need all of it. A small mod can be one person and one agent. But once a project has more than a handful of
 open problems, the pieces below keep it from falling apart.
 
-Ready-made files for everything in this guide are in [`templates/`](../templates/). Two skills wrap the two main
+Ready-made files for everything in this guide are in [`templates/`](../templates/). Three skills wrap the main
 jobs: `d2r-coordinator` (plan and run lanes), `d2r-project-conventions` (issues, PRs, branches, gate) and `d2r-release` (ship a version).
 
 ## Contents
@@ -37,9 +37,9 @@ flowchart TD
     Plan[(docs/PLAN.md<br/>phases and progress)]
 
     subgraph Lanes [Lanes: one job each, run in parallel]
-        L1[Lane 1<br/>branch lane/a<br/>worktree A]
-        L2[Lane 2<br/>branch lane/b<br/>worktree B]
-        L3[Lane 3<br/>branch lane/c<br/>worktree C]
+        L1[Lane 1<br/>branch ticket/1-a<br/>worktree A]
+        L2[Lane 2<br/>branch ticket/2-b<br/>worktree B]
+        L3[Lane 3<br/>branch ticket/3-c<br/>worktree C]
     end
 
     Slots{{Game slots<br/>queue, one lane per slot}}
@@ -87,7 +87,7 @@ directory:
 
 ```bash
 git fetch origin
-git worktree add ../lanes/fix-crash-andariel -b lane/fix-crash-andariel origin/main
+git worktree add ../lanes/fix-crash-andariel -b ticket/123-fix-crash-andariel origin/main
 ```
 
 To remove a finished lane worktree, use `tools/worktree_remove.ps1 -Path <worktree> [-DeleteBranch]`. A plain recursive
@@ -96,7 +96,7 @@ the targets (and any `-Cache` folders) are unchanged, and refuses a locked, dirt
 
 Rules that keep this safe:
 
-- A lane branch is named `lane/<short-name>` and starts from the current `origin/main`. Say so in the prompt. A lane
+- A lane branch is named `ticket/<n>-<slug>` (`research/<topic>`, `refactor/<topic>`; see the `d2r-project-conventions` skill) and starts from the current `origin/main`. Say so in the prompt. A lane
   that starts from some other branch drags that branch's changes into its PR.
 - **Lanes open PRs and never merge.** The coordinator reads the diff, checks the tests, merges, and resolves
   conflicts. This is the main quality gate.
