@@ -27,7 +27,7 @@ You need CMake 3.29 or newer and Visual Studio with the C++ workload. The toolki
 (`cmake/FindD2rToolkit.cmake`, `docs/toolkit-finder.md`): `-DMODKIT_TOOLKIT_DIR` / `build.ps1 -Toolkit`, else the
 `D2R_TOOLKIT` environment variable, else the toolkit around the template, else a `d2rAI-toolkit` folder up the tree. The
 PluginSDK comes from its `third_party/PluginSDK` (a git submodule: in a fresh clone or worktree run
-`git submodule update --init third_party/PluginSDK` first) and the shared library from its `shared/plugin-common`.
+`git submodule update --init third_party/PluginSDK` first, or pass `build.ps1 -Sdk <main checkout>/third_party/PluginSDK`) and the shared library from its `shared/plugin-common`.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File build.ps1                    # -> build\Release\mod-core.dll
@@ -176,8 +176,9 @@ another plugin's function.
    tell you who owns a patch.
 3. Copy the entry bytes: **whole instructions, REX prefixes included** (for example
    `40 53` is `push rbx`, not just `53`), ending on an instruction boundary. There is no 14-byte minimum: the
-   sound guard's hooks use 8-, 11- and 12-byte signatures and run in game. D2RLoader moves the bytes you name
-   into the trampoline. If the bytes do not match the live code (wrong image, or someone else patched it), the hook
+   sound guard's hooks use 8-, 11- and 12-byte signatures and run in game. The bytes are checked against live
+   code; give whole instructions. How D2RLoader covers its 14-byte jump beyond a shorter signature is not
+   documented here, but the 8-byte signatures ran in game. If the bytes do not match the live code (wrong image, or someone else patched it), the hook
    is refused and nothing changes.
 4. Declare the function type `noexcept`, and keep an `original` pointer:
    ```cpp

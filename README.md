@@ -191,7 +191,7 @@ This is a multi-lane project, not one prompt and done. A good agent says so, and
 
 | Limit | What it means for maps |
 |---|---|
-| The cube's `Cow Portal` output is fixed to the Cow Level; `Red Portal,lvl=<id>` opens one fixed level of the same act | A pool level chosen per map still needs a plugin hook on the portal output |
+| The cube's `Cow Portal` output is fixed to the Cow Level; `Red Portal,lvl=<id>` opens one fixed level of the same act, from town (untested in game here) | A pool level chosen per map still needs a plugin hook on the portal output |
 | Portals link levels within one act only | Map areas are Act 1 levels; the device is the cube in the Rogue Encampment |
 | Portal links store the level as a byte in many places | Map areas need level ids of 255 or below: a pool of a few areas, reused, not one per map |
 | levels.txt `Layer` below 100; clear `Position` on new maze levels | Set both on every cloned level, or entering it crashes |

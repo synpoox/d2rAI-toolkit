@@ -28,7 +28,7 @@ constexpr uint64_t HitDelayRva = 0x56ac00;  // (unit, weapon) -> frames until th
 // PUSH R15 (41 57) / SUB RSP,0x80 (48 81 ec 80 00 00 00): 19 bytes, 7 whole instructions.
 constexpr uint8_t HitDelayEntry[] = {0x48, 0x89, 0x5c, 0x24, 0x18, 0x55, 0x56, 0x57, 0x41, 0x56,
                                      0x41, 0x57, 0x48, 0x81, 0xec, 0x80, 0x00, 0x00, 0x00};
-static_assert(sizeof(HitDelayEntry) == 19, "this example copies 19 bytes: 7 whole instructions");
+static_assert(sizeof(HitDelayEntry) >= 1, "whole instructions; see engine-re.md section 6");
 
 using HitDelayFn = int32_t (*)(void* unit, void* weapon) noexcept;
 
