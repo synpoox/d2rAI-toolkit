@@ -59,10 +59,11 @@ Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you ar
   - `d2r-engine`: plugins, reverse engineering and new game systems (with ${CLAUDE_PLUGIN_ROOT}/knowledge/new-game-systems.md).
   - `d2r-debug`: crashes and wrong behaviour.
   - `d2r-crash`: a player's crash report (with ${CLAUDE_PLUGIN_ROOT}/knowledge/crash-triage.md).
-  - `d2r-port`: porting a classic mod (with ${CLAUDE_PLUGIN_ROOT}/knowledge/porting-classic-mods.md).
+  - `d2r-port`: porting a classic mod (with ${CLAUDE_PLUGIN_ROOT}/knowledge/porting-classic-mods.md; from 1.09d also the ${CLAUDE_PLUGIN_ROOT}/knowledge/classic-109d-*.md and ${CLAUDE_PLUGIN_ROOT}/knowledge/classic-reference-installs.md files).
 
   Project skills:
   - `d2r-coordinator`: plan and run a project with several agents (lanes, models, slots, bug list, review).
+  - `d2r-project-conventions`: issues, PRs, branches, merge gate, worktrees (with `${CLAUDE_PLUGIN_ROOT}/templates/agents/` and `.d2r-project.toml`).
   - `d2r-release`: ship a version (bump, changelog, fail-fast publish, release pages, mirrors such as Nexus Mods).
 
 ## New generic work starts in the toolkit

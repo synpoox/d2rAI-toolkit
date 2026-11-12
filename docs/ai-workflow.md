@@ -7,8 +7,8 @@ dozens of short-lived worker agents ("lanes").
 You do not need all of it. A small mod can be one person and one agent. But once a project has more than a handful of
 open problems, the pieces below keep it from falling apart.
 
-Ready-made files for everything in this guide are in [`templates/`](../templates/). Two skills wrap the two main
-jobs: `d2r-coordinator` (plan and run lanes) and `d2r-release` (ship a version).
+Ready-made files for everything in this guide are in [`templates/`](../templates/). Three skills wrap the main
+jobs: `d2r-coordinator` (plan and run lanes), `d2r-project-conventions` (issues, PRs, branches, gate) and `d2r-release` (ship a version).
 
 ## Contents
 1. [The big picture](#1-the-big-picture)
@@ -37,9 +37,9 @@ flowchart TD
     Plan[(docs/PLAN.md<br/>phases and progress)]
 
     subgraph Lanes [Lanes: one job each, run in parallel]
-        L1[Lane 1<br/>branch lane/a<br/>worktree A]
-        L2[Lane 2<br/>branch lane/b<br/>worktree B]
-        L3[Lane 3<br/>branch lane/c<br/>worktree C]
+        L1[Lane 1<br/>branch ticket/1-a<br/>worktree A]
+        L2[Lane 2<br/>branch ticket/2-b<br/>worktree B]
+        L3[Lane 3<br/>branch ticket/3-c<br/>worktree C]
     end
 
     Slots{{Game slots<br/>queue, one lane per slot}}
@@ -65,6 +65,19 @@ flowchart TD
 The loop in one sentence: **the owner decides, the coordinator plans and merges, lanes do one job each and open a pull
 request, and every merged fix is released.**
 
+### Decisions for a port
+
+A port of a classic mod (see [porting-classic-mods.md](../knowledge/porting-classic-mods.md)) fixes these early, as
+decisions the owner approves and the repo records (one short note each, for example an ADR). They shape every lane.
+
+| Decision | Choice that worked | Why |
+|---|---|---|
+| Game and loader versions | Keep the game on one build (D2R 3.3, build 93847); the loader moves on its own schedule. Record the exact versions each test used. A loader update that breaks the port leaves it incompatible until fixed: do not change the game build to hide it | The game build is what engine addresses are tied to; the loader moves, and a silent pin hides breakage |
+| Data or code | Data first; add a plugin only for a gap the data cannot close. Prefer a loader service over a native hook, and isolate each hook with a check of the bytes it patches. Adapt D2R's tables with reproducible transformations that carry the old rules in, instead of replacing D2R's tables with the old files | Data is cheap to review and survives game updates; hooks are build-specific |
+| Saves | Decide the save format at the start. If the port needs the loader's extended saves, use them from the first build: a retail-format start with a later migration costs more. Extended saves do not load in retail D2R, so promise no compatibility outside the mod. Give the mod its own save folder, version the migrations and back up before each one; stop an incompatible setup before it touches a save | Changing the format later breaks every tester's characters |
+
+None of these decisions shows that a particular rule works; each rule still needs its own check against the original.
+
 ## 2. The roles
 
 | Role | Does | Never does |
@@ -87,7 +100,7 @@ directory:
 
 ```bash
 git fetch origin
-git worktree add ../lanes/fix-crash-andariel -b lane/fix-crash-andariel origin/main
+git worktree add ../lanes/fix-crash-andariel -b ticket/123-fix-crash-andariel origin/main
 ```
 
 To remove a finished lane worktree, use `tools/worktree_remove.ps1 -Path <worktree> [-DeleteBranch]`. A plain recursive
@@ -96,7 +109,7 @@ the targets (and any `-Cache` folders) are unchanged, and refuses a locked, dirt
 
 Rules that keep this safe:
 
-- A lane branch is named `lane/<short-name>` and starts from the current `origin/main`. Say so in the prompt. A lane
+- A lane branch is named `ticket/<n>-<slug>` (`research/<topic>`, `refactor/<topic>`; see the `d2r-project-conventions` skill) and starts from the current `origin/main`. Say so in the prompt. A lane
   that starts from some other branch drags that branch's changes into its PR.
 - **Lanes open PRs and never merge.** The coordinator reads the diff, checks the tests, merges, and resolves
   conflicts. This is the main quality gate.
@@ -265,7 +278,7 @@ say you did, and move on. When you do need an answer, ask one clear question and
 A lane starts with no memory. Your prompt is everything it knows. A good prompt is short and complete:
 
 1. **The goal in one sentence**, and why it matters.
-2. **Read first**: the rules file and the two or three docs that matter. Name them by path.
+2. **Read first**: `AGENTS.md` and the two or three docs that matter. Name them by path.
 3. **Scope**: the files and areas the lane may change. Everything else is out of bounds.
 4. **What is already known**: cause found, things already ruled out, the bug row. This stops it redoing your work
    and stops it confirming your guess too eagerly. If you suspect a cause, say it is a suspicion.
@@ -275,9 +288,9 @@ A lane starts with no memory. Your prompt is everything it knows. A good prompt 
 8. **Report format**: PR link, head commit, files changed, tests run with results, what is left, any incidents.
 9. **Never end your turn while something you started is still running.**
 
-Rules that every lane needs live in one shared file ([`templates/lane-rules.txt`](../templates/lane-rules.txt)), so
-the prompt itself starts with "read the rules and follow them" and only carries the job-specific parts. When you learn
-a new rule the hard way, add it to the file with the date, so every future lane gets it.
+Rules that every lane needs live in the repo's `AGENTS.md` (from [`templates/agents/AGENTS.md`](../templates/agents/AGENTS.md)) and the
+`d2r-project-conventions` skill, so the prompt itself starts with "read AGENTS.md and follow it" and only carries the job-specific parts. When you learn
+a new rule the hard way, add it to `AGENTS.md` with the date, so every future lane gets it.
 
 Tips:
 
@@ -313,7 +326,7 @@ Setting up a project:
 
 - [ ] Repo created, `main` protected in practice (only the coordinator merges).
 - [ ] `docs/PLAN.md`, `docs/bugs.md`, `CHANGELOG.md` created from the templates.
-- [ ] Lane rules file written; private-words list created outside the repo; `tools/check_public.py` wired in.
+- [ ] `AGENTS.md` and `docs/agents/` written; private-words list created outside the repo; `tools/check_public.py` wired in.
 - [ ] Commit identity decided (noreply address) and written into the rules.
 - [ ] Game slots set up and locked-down; the owner's real install marked untouchable.
 - [ ] Tokens and keys placed by the owner in files in their home folder.

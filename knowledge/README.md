@@ -10,9 +10,9 @@ rules) is covered in [porting-classic-mods.md](porting-classic-mods.md).
 | [engine-limits.md](engine-limits.md) | Every hard-coded limit a mod hits: rule, symptom when broken, fix (data or plugin) |
 | [new-game-systems.md](new-game-systems.md) | Planning a new game system (for example a mapping system): data vs plugin, finding the hooks, where state lives, multiplayer, UI, lanes |
 | [tables.md](tables.md) | How D2R reads its `.txt` tables: banks, indexed vs keyed, IDs, adding rows safely, per-table cheat sheet |
-| [hd-graphics.md](hd-graphics.md) | HD assets: `.sprite` format, item/skill/panel art, HD json maps, overlays, player state machines, monsters |
+| [hd-graphics.md](hd-graphics.md) | HD assets: `.sprite` format, item/skill/panel art, HD json maps, overlays, player state machines, monsters, presets for new DS1 levels (generated, override ops) |
 | [ui-layouts.md](ui-layouts.md) | `data/global/ui/layouts/*hd.json`: widget tree, grids, panels, tabs, stash/inventory/cube/skill tree |
-| [strings.md](strings.md) | String JSON files, complete-file replacement, safe new IDs, printf placeholder hazard |
+| [strings.md](strings.md) | String JSON files, complete-file replacement, safe new IDs and the id budget, reversed multi-line skill text, printf placeholder hazard |
 | [saves.md](saves.md) | `.d2s` v105 essentials, checksum, D2RLoader `.d2rl` sidecar, safe and unsafe hand edits |
 | [engine-re.md](engine-re.md) | Finding and hooking D2R code: memory dump, Ghidra headless, query scripts, hook rules, logs |
 | [d2r-93847-addresses.md](d2r-93847-addresses.md) | Address registry for build 93847: functions, tables, record and unit offsets, entry bytes |
@@ -21,8 +21,13 @@ rules) is covered in [porting-classic-mods.md](porting-classic-mods.md).
 | [d2rloader.md](d2rloader.md) | D2RLoader facts and traps: default mod, the cache-building first start, other plugins and how to check their hooks, plugin flags and splitting, loader gaps, version checks, its files |
 | [d2rloader-capabilities.md](d2rloader-capabilities.md) | Capability matrix for D2RLoader 1.3.1 / PluginSDK 0.4.0: what each system gets (yes, plugin, data, limit), multiplayer, loader vs SDK vs game versions |
 | [charged-items.md](charged-items.md) | Reusable or charged items: triggers, the not-used-up flag, where charges can live (quantity, stat 204, a new stat), recharge, effects, runtime checks |
-| [porting-classic-mods.md](porting-classic-mods.md) | Porting a classic 1.13c-era mod: inventory, table-by-table conversion, ids that must not move, function numbers, events, art order |
-| [modkit-ops.md](modkit-ops.md) | The modkit's patch operations (JSON ops applied by `modkit build`) |
+| [porting-classic-mods.md](porting-classic-mods.md) | Porting a classic 1.13c-era mod: decisions to make first, inventory and DLL triage, table-by-table conversion, ids that must not move, function numbers and slot-collision checklist, hook list, events, deviation statuses, art order |
+| [classic-113c-tables.md](classic-113c-tables.md) | Stock 1.13c against D2R 3.3: tables, columns, events, saves v96 vs v105, function-number ranges, `immed`, reading a mod's patch table |
+| [classic-109d-tables.md](classic-109d-tables.md) | Starting from Lord of Destruction 1.09d: 75 against 92 tables, number against name references, `SrcDam` x16, row shifts, `.bin` as the widened `.txt` |
+| [classic-109d-engine.md](classic-109d-engine.md) | 1.09d skill and missile code charts against D2R's function tables, class row ranges, loader-thunked slots, the monster AI table and the moved `AIParam` slots |
+| [classic-109d-vs-d2r.md](classic-109d-vs-d2r.md) | Rules the engine code changed since 1.09d, with addresses: leech, damage reduction cap, gambling, item generation, breakpoints, crushing blow, open wounds |
+| [classic-reference-installs.md](classic-reference-installs.md) | Which 1.09d files are stock: hashes, the version tool's store, the NoCD `Game.exe` trap, how to recognise a code-cave patch |
+| [modkit-ops.md](modkit-ops.md) | The modkit's patch operations (JSON ops applied by `modkit build`) and the validation errors with their causes |
 | [d2r-conveniences.md](d2r-conveniences.md) | D2R 3.3 comforts a classic port can keep or turn off (stash, gold pickup, Quick Cast, Chronicle, Terror Zones): where each lives, what to verify |
 | [cheat-commands.md](cheat-commands.md) | Setting up an in-game test from D2RLoader's console: every cheat command, item spawn lines, what they did in game |
 
