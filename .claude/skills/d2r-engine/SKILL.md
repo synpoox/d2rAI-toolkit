@@ -16,8 +16,8 @@ lives), then build it part by part with this skill.
 
 ## The plugin
 1. Copy `${CLAUDE_PLUGIN_ROOT}/plugin-template/` into the mod project (e.g. `<project>/plugin/`), build with
-   `powershell -ExecutionPolicy Bypass -File plugin\build.ps1 -Name <mod>-core` (point `-Sdk` at this repo's
-   `${CLAUDE_PLUGIN_ROOT}/third_party/PluginSDK`). Add the DLL path to mod.json `plugins`; `modkit install` copies it to
+   `powershell -ExecutionPolicy Bypass -File plugin\build.ps1 -Name <mod>-core` (add `-Toolkit ${CLAUDE_PLUGIN_ROOT}` if the build
+   does not find the toolkit by itself, see docs/toolkit-finder.md). Add the DLL path to mod.json `plugins`; `modkit install` copies it to
    `<game>/mods/<Mod>/d2rloader/plugins/`. Players run the mod through D2RLoader. Keep `src/plugin.rc` (the ABI
    manifest resource) in every plugin, including one written from scratch: without it D2RLoader rejects the DLL as
    "an old alpha plugin" (${CLAUDE_PLUGIN_ROOT}/knowledge/d2rloader.md).
