@@ -1,10 +1,15 @@
 """Read the client's units from a running D2R game, read-only and without a plugin: what is alive now, by unit type.
 
     from unit_probe import UnitProbe, MONSTER, MISSILE, bursts
-    probe = UnitProbe(ctx.game.pids()[0])
-    probe.units(MONSTER)                  # {unit id: monstats row} of the monsters alive on the client
-    probe.missiles()                      # {unit id: missiles.txt row}
-    bursts(probe, row=5, seconds=3.0)     # sizes of the groups of missiles of that row that appeared together
+    with UnitProbe.for_slot(cfg, 2) as probe:   # slot 2+, locked by MODKIT_RUN; never slot 1
+        probe.units(MONSTER)                  # {unit id: monstats row} of the monsters alive on the client
+        probe.missiles()                  # {unit id: missiles.txt row}
+        bursts(probe, row=5, seconds=3.0) # sizes of the groups of missiles of that row that appeared together
+
+`for_slot` is the only public way to attach: it refuses slot 1 (the user's own game), requires the slot lock to be held
+by MODKIT_RUN, and takes the pid from the slot's own process list. The addresses below are copies of the registry
+(shared/plugin-common/src/rvas_93847*.h, knowledge/d2r-93847-addresses.md); tests/test_testing_unit_probe.py fails when
+they differ.
 
 Build 93847 only (PE timestamp 0x6ab3782c, knowledge/d2r-93847-addresses.md): the client keeps each unit type in a
 128-bucket hash table (unit id & 0x7f), lists linked through unit +0x158. Players, monsters, objects and items are in
@@ -18,6 +23,10 @@ from __future__ import annotations
 import struct
 import time
 from typing import Callable
+
+
+class ProbeError(Exception):
+    """The probe was refused (slot rules) or cannot attach."""
 
 IMAGE_STAMP = 0x6ab3782c       # PE TimeDateStamp of build 93847 (rvas_93847.h ImageStamp)
 CLIENT_UNITS = 0x2a23910       # RVA: + type * 0x400: 128 x Unit* each, for players, monsters, objects, items
@@ -67,27 +76,74 @@ def burst_sizes(first_seen: dict[int, float], gap: float = 0.25) -> list[int]:
 
 
 class UnitProbe:
-    """Attach (read-only) to the game process `pid` and read its client units."""
+    """Read-only view of one game's client units. Make one with `UnitProbe.for_slot(cfg, n)`; close it (or use `with`)."""
 
-    def __init__(self, pid: int):
+    def __init__(self, *_a, **_k):
+        raise TypeError("use UnitProbe.for_slot(cfg, n): attaching to a bare pid could read the user's own game")
+
+    @classmethod
+    def for_slot(cls, cfg, n: int, owner: str | None = None) -> "UnitProbe":
+        """Attach to the game running in test slot `n`. Refuses slot 1, a slot the lock of which is not held by
+        `owner` (default: MODKIT_RUN), and a slot without a running game; the pid comes from the slot's own processes."""
+        import game_slots
+        import testing_config as tc
+        n = cfg.check_slot_number(n)
+        if cfg.is_slot_one(n):
+            raise ProbeError(game_slots.SLOT1_MSG)
+        owner = owner or tc.env_run()
+        info = game_slots.lock_info(cfg, n)
+        if not owner or info is None or info.owner != owner:
+            raise ProbeError(f"slot {n} is not locked by MODKIT_RUN={owner!r}: "
+                             f"python testing/game_slots.py lock {n} <lane>, then MODKIT_RUN=<lane>")
+        procs = game_slots.slot_processes(cfg, n)
+        if not procs:
+            raise ProbeError(f"slot {n} has no running game")
+        pid = next((p for p, name in procs if name.lower() == "d2r.exe"), procs[0][0])
+        return cls._attach(pid)
+
+    @classmethod
+    def _attach(cls, pid: int) -> "UnitProbe":
+        """UNSAFE: attaches to any process id with no slot check. Only for_slot (and tests) may call it."""
+        self = object.__new__(cls)
+        self._open(pid)
+        return self
+
+    def __enter__(self) -> "UnitProbe":
+        return self
+
+    def __exit__(self, *_exc) -> None:
+        self.close()
+
+    def _open(self, pid: int) -> None:
         import ctypes
         import ctypes.wintypes as wt
+        self.h = None
         self._ct, self._wt = ctypes, wt
-        self._k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        self._k32 = k32 = ctypes.WinDLL("kernel32", use_last_error=True)
         psapi = ctypes.WinDLL("psapi", use_last_error=True)
-        self._k32.OpenProcess.restype = wt.HANDLE
-        self._k32.ReadProcessMemory.argtypes = [wt.HANDLE, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t,
-                                                ctypes.POINTER(ctypes.c_size_t)]
-        self.h = self._k32.OpenProcess(0x0410, False, pid)  # QUERY_INFORMATION | VM_READ
+        k32.OpenProcess.argtypes = [wt.DWORD, wt.BOOL, wt.DWORD]
+        k32.OpenProcess.restype = wt.HANDLE
+        k32.ReadProcessMemory.argtypes = [wt.HANDLE, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t,
+                                          ctypes.POINTER(ctypes.c_size_t)]
+        k32.ReadProcessMemory.restype = wt.BOOL
+        k32.CloseHandle.argtypes = [wt.HANDLE]
+        k32.CloseHandle.restype = wt.BOOL
+        psapi.EnumProcessModulesEx.argtypes = [wt.HANDLE, ctypes.c_void_p, wt.DWORD, ctypes.POINTER(wt.DWORD), wt.DWORD]
+        psapi.EnumProcessModulesEx.restype = wt.BOOL
+        self.h = k32.OpenProcess(0x0410, False, pid)  # QUERY_INFORMATION | VM_READ
         if not self.h:
             raise OSError(f"OpenProcess({pid}) failed: {ctypes.get_last_error()}")
-        mods, need = (ctypes.c_void_p * 1)(), wt.DWORD()
-        if not psapi.EnumProcessModulesEx(self.h, mods, ctypes.sizeof(mods), ctypes.byref(need), 3):  # LIST_MODULES_ALL
-            raise OSError(f"EnumProcessModulesEx failed: {ctypes.get_last_error()}")
-        self.base = mods[0]
-        stamp = struct.unpack("<I", self.read(self.base + self.u32(self.base + 0x3c) + 8, 4))[0]
-        if stamp != IMAGE_STAMP:
-            raise RuntimeError(f"image stamp {stamp:#x}, the probe knows {IMAGE_STAMP:#x} (build 93847) only")
+        try:
+            mods, need = (ctypes.c_void_p * 1)(), wt.DWORD()
+            if not psapi.EnumProcessModulesEx(self.h, mods, ctypes.sizeof(mods), ctypes.byref(need), 3):  # LIST_MODULES_ALL
+                raise OSError(f"EnumProcessModulesEx failed: {ctypes.get_last_error()}")
+            self.base = mods[0]
+            stamp = struct.unpack("<I", self.read(self.base + self.u32(self.base + 0x3c) + 8, 4))[0]
+            if stamp != IMAGE_STAMP:
+                raise RuntimeError(f"image stamp {stamp:#x}, the probe knows {IMAGE_STAMP:#x} (build 93847) only")
+        except BaseException:
+            self.close()
+            raise
 
     def read(self, addr: int, n: int) -> bytes:
         ct = self._ct
@@ -113,14 +169,16 @@ class UnitProbe:
             self.h = None
 
 
-def bursts(probe, row: int, seconds: float, gap: float = 0.25) -> list[int]:
-    """Watch `seconds`; missiles of `row` first seen within `gap` of each other form one burst. Burst sizes."""
+def bursts(probe, row: int, seconds: float, gap: float = 0.25, clock: Callable[[], float] = time.monotonic,
+           sleep: Callable[[float], None] = time.sleep) -> list[int]:
+    """Watch `seconds`; missiles of `row` first seen within `gap` of each other form one burst. Burst sizes.
+    `clock` and `sleep` are injectable so a test needs no real time."""
     seen: dict[int, float] = {}
-    end = time.monotonic() + seconds
-    while time.monotonic() < end:
-        now = time.monotonic()
+    end = clock() + seconds
+    while clock() < end:
+        now = clock()
         for uid, r in probe.missiles().items():
             if r == row and uid not in seen:
                 seen[uid] = now
-        time.sleep(0.005)
+        sleep(0.005)
     return burst_sizes(seen, gap)

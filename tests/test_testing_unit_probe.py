@@ -1,15 +1,24 @@
 """Tests for testing/unit_probe.py: a fake process memory, no game."""
 from __future__ import annotations
 
+import os
+import re
 import struct
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "testing"))
 
+import game_slots as gs  # noqa: E402
+import testing_config as tc  # noqa: E402
 import unit_probe as up  # noqa: E402
+
+SRC = ROOT / "shared" / "plugin-common" / "src"
+KNOWLEDGE = ROOT / "knowledge" / "d2r-93847-addresses.md"
 
 BASE = 0x10000000
 
@@ -90,14 +99,130 @@ class Bursts(unittest.TestCase):
         self.assertEqual(up.burst_sizes({}), [])
 
     def test_watching_a_probe(self):
-        class Fake:
-            def __init__(self):
-                self.calls = 0
+        class Clock:
+            now = 0.0
 
-            def missiles(self):
-                self.calls += 1
-                return {1: 5, 2: 5, 3: 9} if self.calls > 2 else {}
-        self.assertEqual(up.bursts(Fake(), 5, 0.05), [2])
+            def __call__(self):
+                return self.now
+
+            def sleep(self, dt):
+                self.now += dt
+
+        clock = Clock()
+
+        class Fake:
+            def missiles(self):  # a burst of two from t=0.05, and an unrelated row
+                return {1: 5, 2: 5, 3: 9} if clock.now >= 0.05 else {}
+        self.assertEqual(up.bursts(Fake(), 5, 0.2, clock=clock, sleep=clock.sleep), [2])
+        self.assertGreaterEqual(clock.now, 0.2)
+
+
+def header_text() -> str:
+    """The per-build header(s) without comments: rvas_93847.h plus rvas_93847/*.h (before and after the split)."""
+    files = [SRC / "rvas_93847.h", *sorted((SRC / "rvas_93847").glob("*.h"))]
+    return "\n".join(re.sub(r"//[^\n]*", "", f.read_text(encoding="utf-8")) for f in files if f.is_file())
+
+
+def header_value(name: str):
+    m = re.search(rf"\b{name}\s*=\s*(0x[0-9a-fA-F]+)", header_text())
+    return int(m.group(1), 16) if m else None
+
+
+class Registry(unittest.TestCase):
+    """The probe holds copies of the registry's values; they must not drift (two homes, one fact)."""
+
+    def test_addresses_equal_the_header(self):
+        self.assertEqual(up.IMAGE_STAMP, header_value("ImageStamp"))
+        self.assertEqual(up.CLIENT_UNITS, header_value("ClientUnits"))
+        self.assertEqual(up.CLIENT_MISSILES, header_value("ClientMissiles"))
+
+    def test_unit_offsets_equal_the_header_once_it_has_them(self):
+        want = {"UnitType": up.UNIT_TYPE, "UnitClassId": up.UNIT_CLASS, "UnitIdField": up.UNIT_ID,
+                "UnitMode": up.UNIT_MODE, "UnitListNext": up.UNIT_NEXT}
+        found = {k: header_value(k) for k in want}
+        split = (SRC / "rvas_93847" / "offsets.h").is_file()  # after the split every offset is in the registry
+        for name, mine in want.items():
+            with self.subTest(name=name):
+                if found[name] is None and not split:
+                    continue  # not in the registry yet: nothing to compare
+                self.assertEqual(mine, found[name])
+
+    def test_both_rvas_have_knowledge_rows(self):
+        keyed = set()
+        for line in KNOWLEDGE.read_text(encoding="utf-8").splitlines():
+            m = re.match(r"^\|([^|]*)\|", line)
+            if m:
+                keyed.update(int(h, 16) for h in re.findall(r"`(0x[0-9a-fA-F]+)`", m.group(1)))
+        self.assertIn(up.CLIENT_UNITS, keyed)
+        self.assertIn(up.CLIENT_MISSILES, keyed)
+
+
+def make_cfg(tmp: str) -> tc.Config:
+    t = Path(tmp).as_posix()
+    data = {"game": {"install_dir": f"{t}/install", "slots_dir": f"{t}/slots", "slot_count": 3},
+            "mod": {"folder": "MyMod", "name": "My Mod", "plugin_dlls": ["my-plugin.dll"]},
+            "saves": {"root": f"{t}/saves"}, "runs": {"dir": f"{t}/runs"}}
+    return tc.Config(data, base_dir=tmp)
+
+
+class ForSlot(unittest.TestCase):
+    """Slot rules, with a temp config only: nothing here opens a process or touches a game folder."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.cfg = make_cfg(tmp.name)
+        patch = mock.patch.dict(os.environ, {"MODKIT_RUN": "lane-a"})
+        patch.start()
+        self.addCleanup(patch.stop)
+        attach = mock.patch.object(up.UnitProbe, "_attach", side_effect=AssertionError("must not attach"))
+        self.attach = attach.start()
+        self.addCleanup(attach.stop)
+
+    def test_slot_one_is_refused(self):
+        with mock.patch.object(gs, "slot_processes", return_value=[(99, "D2R.exe")]):
+            with self.assertRaises(up.ProbeError) as e:
+                up.UnitProbe.for_slot(self.cfg, 1)
+        self.assertEqual(str(e.exception), gs.SLOT1_MSG)
+
+    def test_an_unlocked_slot_is_refused(self):
+        with mock.patch.object(gs, "slot_processes", return_value=[(99, "D2R.exe")]):
+            with self.assertRaisesRegex(up.ProbeError, "not locked by MODKIT_RUN='lane-a'"):
+                up.UnitProbe.for_slot(self.cfg, 2)
+
+    def test_another_owners_lock_is_refused(self):
+        self.assertTrue(gs.acquire(self.cfg, 2, "lane-b")[0])
+        with mock.patch.object(gs, "slot_processes", return_value=[(99, "D2R.exe")]):
+            with self.assertRaisesRegex(up.ProbeError, "not locked by MODKIT_RUN='lane-a'"):
+                up.UnitProbe.for_slot(self.cfg, 2)
+            with mock.patch.dict(os.environ, {}, clear=True), self.assertRaises(up.ProbeError):
+                up.UnitProbe.for_slot(self.cfg, 2)  # no MODKIT_RUN at all
+
+    def test_a_locked_slot_without_a_game_is_refused(self):
+        self.assertTrue(gs.acquire(self.cfg, 2, "lane-a")[0])
+        with mock.patch.object(gs, "slot_processes", return_value=[]):
+            with self.assertRaisesRegex(up.ProbeError, "no running game"):
+                up.UnitProbe.for_slot(self.cfg, 2)
+
+    def test_the_pid_comes_from_the_slots_own_processes(self):
+        self.assertTrue(gs.acquire(self.cfg, 2, "lane-a")[0])
+        self.attach.side_effect = lambda pid: ("attached", pid)
+        with mock.patch.object(gs, "slot_processes", return_value=[(7, "loader.exe"), (42, "D2R.exe")]) as sp:
+            self.assertEqual(up.UnitProbe.for_slot(self.cfg, 2), ("attached", 42))
+        sp.assert_called_once_with(self.cfg, 2)
+
+    def test_a_bare_pid_cannot_construct_one(self):
+        with self.assertRaises(TypeError):
+            up.UnitProbe(1234)
+
+    def test_the_context_manager_closes_the_handle(self):
+        probe = object.__new__(up.UnitProbe)
+        probe.h = 5
+        probe._k32 = mock.Mock()
+        with probe:
+            pass
+        probe._k32.CloseHandle.assert_called_once_with(5)
+        self.assertIsNone(probe.h)
 
 
 if __name__ == "__main__":

@@ -60,7 +60,7 @@ Ghidra notes. "Hooked" = installed with the entry bytes shown and ran in game.
 | `0x32c4a0` | (dataFlag, level) -> record | levels.txt record; +0x0e u8 Teleport (0 no, 1 yes, 2 clear line) |
 | `0x3e2b5c8` | (dataFlag, level id) -> act | level's act (address as used by the port; unusual range, verify) |
 
-Client unit tables (data addresses, read from a running game with ReadProcessMemory by `testing/unit_probe.py`; unit
+Client unit tables (data addresses, read with ReadProcessMemory by `testing/unit_probe.py`; not yet confirmed against a running game: unit
 ids and offsets as in the table above, class at unit +0x04, id at +0x08, mode at +0x0c, next in the bucket at +0x158):
 
 | RVA | Meaning |
