@@ -14,6 +14,10 @@ Variables) with the defaults shown.
 | `cache-verify.yml` | Nightly check that a cached build gives byte-identical output to a fresh one. | Self-hosted |
 | `release.yml` | Manual full build, package and GitHub release. | Self-hosted |
 
+Only `tests.yml` is in this folder so far. `gate.yml` and `gate-control.yml` arrive with F9, `cache-verify.yml` with F10
+and `release.yml` with F11 (issue #49). The rows for them, the gate remarks below and the variables only they use
+(`RUNNER_LABELS` to `VERSION_FILE`) describe those templates. Drop this note once they have merged.
+
 ## Why some jobs need a self-hosted runner
 
 The game's files (and any extract of them) must never reach GitHub. A job that needs them runs on a machine the owner
@@ -46,5 +50,5 @@ names `gate.yml` and `gate-control.yml`; rename both together, or `gate-control`
 
 ## Pins
 
-Actions are pinned to major versions (`actions/checkout@v4` and so on). Pin them to a commit SHA if the repository's
+Actions are pinned to the same major versions as the toolkit's own CI (`actions/checkout@v4` and so on). Pin them to a commit SHA if the repository's
 policy asks for it.
