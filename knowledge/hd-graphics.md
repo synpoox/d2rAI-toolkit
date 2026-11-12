@@ -166,6 +166,61 @@ Other rules for new units:
 - D2RLoader's ResourceService can serve plugin files at new paths too (limits: 256 MiB per plugin load, 64 MiB per
   file), but models still need the index entry. Plain mod-folder files are simpler.
 
+## Presets for new DS1 levels
+
+D2R draws a level in HD from one HD preset per DS1 (`data/hd/env/preset/**/<ds1 stem>.json`: a terrain entity plus
+placed entities, 10 HD units per DS1 tile). A DS1 with no preset plays on flat ground with invisible walls: the
+`.ds1` and `.dt1` still give layout and collision (see
+[Legacy files](#legacy-classic-g-mode-files-still-needed)), only the HD drawing is missing. A mod that brings many new
+DS1 (for example from a classic mod) cannot hand-author a scene for each, and a hand-made scene is redone on every
+re-import, so it can generate the preset from the DS1. This is how one mod's generator worked (the method is
+reusable; the values are that mod's choices, not engine facts):
+
+- **Per-tile kit.** Read the DS1's wall and floor cells and place clones of the stock entities of a chosen stock tile
+  set on them, over a stock flat terrain textured with a stock biome. Commit the rule per tile set (which stock kit and
+  biome stand in), not the generated presets. A tile set with no stock twin is an approximation until its own art exists.
+- **Room paste.** A stock room whose tiles match most of a spot (that mod used 60% or more) is pasted whole: it brings
+  its own sculpted terrain, water and bridges, which tile-by-tile copying never draws.
+- **3x3 patch.** A tile whose 3x3 neighbourhood (else its plus-shaped cross) occurs in a stock preset gets what that
+  preset placed on the centre tile. Rooms and patches apply to every generated preset.
+- **Border painter.** For a DS1 that draws a tree-line `.dt1` tile: drop the trees past the playable area, then paint
+  them again from it outward, copying the tile set's stock trees by direction and distance to the blocked ground. Harvest
+  the tree kit per tile set from the stock presets that share its DT1 files. The playable area is the ground no DS1
+  cell marks unwalkable (collision bit `0x20000`), which also closes the plain-floor gaps of dashed tree lines; blocked
+  floor that touches walkable floor, or draws a water DT1, is a stream and gets no trees; other blocked floor lies past
+  the map edge and does.
+- **Water.** A stock room draws its stream as one room-sized mesh, so outside pasted rooms the blocked floor of each
+  water DT1 gets a stock water plane, scaled to cover it in near-square rectangles.
+
+Cost check before shipping a generated level: in the largest one, compare frame rate with a stock area of the same size
+and biome. The entity pool and the JSON pool are fixed size (EntityPool and JsonPool in
+[d2r-93847-addresses.md](d2r-93847-addresses.md), build 93847: a preset over about 34k entities, or a generated
+preset JSON of tens of MB, ran them dry and crashed); if a level is clearly slower, merge entities or bake terrain.
+
+### Override ops (fixing one generated map)
+
+A generated preset is wrong in places no general rule should fix (a prefab floating above the ground, a rock on open
+floor). Keep the generator rule-only and fix the one map in data after generation, as a list of ops per preset, so the
+fix is a reviewed diff. The ops that mod used:
+
+- **Selectors** (all given must match; every op but `add` and `entity` needs one): `at [x, y]` (a DS1 tile, = position
+  // 10 HD units), `area [x0, y0, x1, y1]` (tiles, inclusive), `model` and `name` (case-insensitive globs),
+  `pos [x, z]` (one entity by its generated position, tolerance 0.01), `expect` (how many it must match). Never select
+  by entity `id` or array index: a re-serialised preset renumbers them. The terrain entity is never selected.
+- **Ops:** `remove`; `ground` (set y to the ground plane under the entity: the floating fix); `move` (`by` in HD units,
+  or `to` a tile, y re-grounded); `swap` (change the model or prefab path, merging the new model's dependencies from a
+  stock preset); `add` (copy the first entity of a stock preset whose model matches, to a tile, with a fresh id and that
+  preset's dependencies); `entity` (an inline entity with a fresh id, what a diff writes for an entity an editor added).
+  Merge the `dependencies` of anything added, or its model does not load.
+- **Stale ops fail.** An op that matches nothing, or not its `expect`, means the generator moved what it aimed at:
+  report it and fail the build, then re-aim or drop the op.
+- **Editor round trip:** edit a copy of the generated preset in an editor, compute the ops that turn the generated one
+  into the edited one (entities only in the generated file become `remove`, a removed and added pair of one model within
+  two tiles becomes a `move`, the rest inline `entity`), commit those ops, and check that replaying them on the
+  generated preset gives the edited one. Prefer a selector op over inline `entity` when the fix is a rule of the map.
+- **Proof:** an override changes what players see. Check it in game: pin the level's DS1 variant, warp there and look
+  at the spot before and after.
+
 ## Stand-ins first
 
 Make the rules work before the art. For each new thing, ship the closest vanilla HD look:

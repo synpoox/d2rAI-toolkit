@@ -38,8 +38,11 @@ with `tabSize` + `tabPadding`; hidden tabs (e.g. stash extra tabs) still take th
 
 ## Skill tree
 skillstreepanelhd.json: tabs, icon positions per row/column (skilldesc SkillPage/Row/Column feed it), the
-background sprites `data/hd/global/ui/spells/skill_trees/<xx>skilltree.sprite`. More than 3 tabs means new
-TabWidgets in the layout and the game still only knows pages 1-3 from skilldesc (more pages = engine work).
+background sprites `data/hd/global/ui/spells/skill_trees/<xx>skilltree.sprite`. More than 3 tabs is layout work,
+not engine work: 8 TabWidgets (`ActivateTab:0` .. `ActivateTab:7`) with their own `TextBoxWidget` labels were
+confirmed in HD (knowledge/ui-layouts.md, "Skill tree tabs"). What stops at 3 is the stock tab titles (`textTab0-2`),
+so draw titles in art or add labels of your own. Beyond 8 tabs is untested; point skilldesc `SkillPage` at the new
+tabs and check each in game.
 
 ## Build and test
 Build, install with the game closed. Ask for a screenshot of each changed screen: check grid lines against the art,

@@ -4,7 +4,7 @@
       <Name>.mpq/modinfo.json         {"name": "<Name>", "savepath": "<Name>/"}  (own save folder)
       <Name>.mpq/data/...             the project's out/data (only files the mod changes)
       modinfo.json                    a copy (D2RLoader's guide layout)
-      d2rloader/metadata.json         D2RLoader mod metadata
+      d2rloader/metadata.json         D2RLoader mod metadata (+ "namespace" when mod.json has one: namespaced strings)
       d2rloader/config/d2rloader.toml [d2rcore.save_format] mode = "extended" when mod.json extendedSaves
       d2rloader/plugins/*.dll         mod.json "plugins" (built D2RLoader plugins; mod-scoped)
 
@@ -94,6 +94,8 @@ def install(project: Path, game: Path, savepath: str | None = None, check_runnin
             "metadata": {"name": mod.get("title", name), "modVersion": mod.get("version", "0.1.0"),
                          "author": mod.get("author", ""), "description": mod.get("description", ""),
                          "website": mod.get("website", "")}}
+    if mod.get("namespace"):  # opts in to D2RLoader string namespaces (knowledge/strings.md): top level, by schemaVersion
+        meta["namespace"] = mod["namespace"]
     (d2rl / "metadata.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     plugins = []
     for p in mod.get("plugins", []):

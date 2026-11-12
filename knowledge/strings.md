@@ -53,7 +53,8 @@ legal keys and stay as they are.
 From the PluginSDK's `LOCALIZATION.md`:
 
 - Opt in with a top-level `"namespace": "<name>"` in `<mod>/d2rloader/metadata.json` (next to `schemaVersion`).
-  Without it, mod strings use native loading (rules above).
+  Without it, mod strings use native loading (rules above). `modkit install` (and the release stager) writes it when
+  `mod.json` has `"namespace": "<name>"`; without that key it writes none.
 - Namespaced string files: any filename under `data/local/lng/strings/`, records `{ "Key": ..., "enUS": ... }`
   without `id` (ignored). No fallback to English for missing languages.
 - Table cells: unqualified keys always mean `d2r:<key>`; your own strings must be written `namespace:Key` in table

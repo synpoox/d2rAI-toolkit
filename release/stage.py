@@ -130,6 +130,8 @@ def stage(root: Path, out: Path, cfg: dict, read: Callable[[str], bytes] | None 
     meta = {"schemaVersion": 1, "metadata": {"name": mod.get("title", name), "modVersion": mod.get("version", ""),
                                               "author": mod.get("author", ""), "description": mod.get("description", ""),
                                               "website": mod.get("website", "")}}
+    if mod.get("namespace"):  # same as modkit/install.py: opts in to D2RLoader string namespaces
+        meta["namespace"] = mod["namespace"]
     (d2rl / "metadata.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     if mod.get("extendedSaves"):
         (d2rl / "config" / "d2rloader.toml").write_text('[d2rcore.save_format]\nmode = "extended"\n', encoding="utf-8")
