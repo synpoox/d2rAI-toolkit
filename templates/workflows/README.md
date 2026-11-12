@@ -9,8 +9,8 @@ Variables) with the defaults shown.
 | Template | What it does | Runs on |
 |---|---|---|
 | `tests.yml` | Unit tests of the mod's tools on synthetic fixtures, on every push to `main` and every PR. | Hosted runner |
-| `gate.yml` | A table-diff style gate on every PR and push to `main`: needs the game's files, so it runs on the owner's runner. | Self-hosted |
-| `gate-control.yml` | Cancels a closed PR's gate run and reruns it when the "accept this drop" label changes. Pair of `gate.yml`. | Hosted runner |
+| `gate.yml` | A table-diff style gate on every PR and push to `main`: needs the game's files, so it runs on the owner's runner. A docs-only PR runs the same job on a hosted runner and passes at once, so the required check always reports. | Self-hosted (hosted for docs-only and fork PRs) |
+| `gate-control.yml` | Cancels a closed PR's gate run and reruns it when the "accept this drop" label changes. Pair of `gate.yml`. It pauses auto-merge on a label removal and leaves it paused (see below). | Hosted runner |
 | `cache-verify.yml` | Nightly check that a cached build gives byte-identical output to a fresh one. | Self-hosted |
 | `release.yml` | Manual full build, package and GitHub release. | Self-hosted |
 
@@ -21,9 +21,22 @@ and `release.yml` with F11 (issue #49). The rows for them, the gate remarks belo
 ## Why some jobs need a self-hosted runner
 
 The game's files (and any extract of them) must never reach GitHub. A job that needs them runs on a machine the owner
-controls, with a runner registered to the repository. Keep that runner for the repository's own branches only: a PR
-from a fork would run the fork's code on that machine, so the gate template fails fork PRs at once on a hosted runner
-(a skipped required check counts as passing, so the job must never skip).
+controls, with a runner registered to the repository.
+
+A fork PR can reach that runner. A `pull_request` run uses the workflow file of the PR's merge commit, so the PR can
+edit `gate.yml` and set `runs-on: self-hosted` itself; the `runs-on` expression in the template only keeps honest PRs
+off the runner and fails fork PRs at once, it is not a guard. The protection is repository settings: keep the
+repository private, or set Settings > Actions > General > "Require approval for all external contributors", and put the
+runner in a runner group limited to this repository. Never approve a fork run that touches `.github/workflows/`.
+
+A required check that is never created stays "Expected" and blocks the PR, and a skipped one counts as passing. So
+`gate.yml` has no `paths:` filter on `pull_request` and its job never skips: a `changes` job on a hosted runner finds
+docs-only PRs, and the gate job runs for them on a hosted runner and ends green in its first step.
+
+Auto-merge and the "accept this drop" label: removing the label pauses auto-merge while the gate reruns, and
+`gate-control.yml` does not turn it back on. A merge made with the workflow token starts no `push` workflows, so
+`gate.yml` would never run on that `main` commit and the baseline artifact would go stale. The job posts a PR comment
+instead; the owner re-enables auto-merge once the gate has passed. No secret is needed.
 
 ## Repository variables
 
