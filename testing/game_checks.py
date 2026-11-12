@@ -45,6 +45,7 @@ if __name__ == "__main__":
     sys.modules.setdefault("game_checks", sys.modules["__main__"])
 import game_ctl  # noqa: E402
 import game_slots  # noqa: E402
+import slot_registry  # noqa: E402
 import testing_config as tc  # noqa: E402
 
 
@@ -265,7 +266,8 @@ def run(selected, slot: int, cfg: tc.Config | None = None, game=None, run_id: st
         raise RunRefused(f"bad run id {run_id!r}: use letters, digits, dot, dash and underscore")
     taken = False
     if game is None:
-        ok, msg, taken = game_slots.ensure_lock(cfg, slot, run_id)
+        ok, msg, taken = game_slots.ensure_lock(cfg, slot, run_id, registry=slot_registry.load(),
+                                                    project=slot_registry.env_project())
         if not ok:
             raise RunRefused(msg + " (take it with: game_slots.py lock N <lane>, and run with MODKIT_RUN=<lane>)")
         game = game_ctl.Game(cfg, slot, owner=run_id)
@@ -339,7 +341,7 @@ def main(argv: list[str] | None = None) -> int:
         print(__doc__)
         return 0
     try:
-        cfg = tc.load(a.config)
+        cfg = tc.load(a.config, allow_defaults=(a.cmd == "list"))  # listing touches no slot
         load_checks(cfg, a.module, a.path)
         infos = select(a.select)
         if a.cmd == "list":

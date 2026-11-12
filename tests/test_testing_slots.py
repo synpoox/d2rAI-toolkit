@@ -22,6 +22,27 @@ import game_slots as gs  # noqa: E402
 import testing_config as tc  # noqa: E402
 
 
+# Tests never read the machine's real slot table: every test here sees an empty one unless it sets its own.
+_ISOLATION = None
+
+
+def setUpModule():
+    global _ISOLATION
+    tmp = tempfile.TemporaryDirectory()
+    path = os.path.join(tmp.name, "slots.toml")
+    Path(path).write_text("[owners]\n", encoding="utf-8")
+    patch = mock.patch.dict(os.environ, {"MODKIT_SLOTS_FILE": path})
+    patch.start()
+    os.environ.pop("MODKIT_PROJECT", None)
+    _ISOLATION = (tmp, patch)
+
+
+def tearDownModule():
+    tmp, patch = _ISOLATION
+    patch.stop()
+    tmp.cleanup()
+
+
 def make_cfg(tmp: str, **over) -> tc.Config:
     t = Path(tmp).as_posix()
     data = {
@@ -48,8 +69,28 @@ class ConfigTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.dir = self.tmp.name
 
-    def test_defaults_without_a_file(self):
-        c = tc.load(None, env={}, cwd=self.dir)
+    def test_no_file_is_refused(self):
+        with self.assertRaises(tc.ConfigError) as e:
+            tc.load(None, env={}, cwd=self.dir)
+        self.assertIn("no testing config found", str(e.exception))
+
+    def test_slot_tools_refuse_without_a_config(self):
+        import game_ctl
+        import release_install
+        import slot_install
+        with mock.patch.dict(os.environ, {}, clear=False), mock.patch("os.getcwd", return_value=self.dir):
+            os.environ.pop(tc.ENV_CONFIG, None)
+            for mod, argv in ((gs, ["status"]), (game_ctl, ["--slot", "2", "status"]),
+                              (release_install, ["restore", "--slot", "2"]),
+                              (slot_install, ["--slot", "2", self.dir])):
+                err = io.StringIO()
+                with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+                    rc = mod.main(argv)
+                self.assertEqual(rc, 2, mod.__name__)
+                self.assertIn("no testing config found", err.getvalue(), mod.__name__)
+
+    def test_defaults_only_when_asked(self):
+        c = tc.load(None, env={}, cwd=self.dir, allow_defaults=True)
         self.assertIsNone(c.source)
         self.assertEqual(c.slot_count, 3)
         with self.assertRaises(tc.ConfigError):
