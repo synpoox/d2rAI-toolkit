@@ -1,0 +1,35 @@
+# .d2r-project.toml: per-repo values a mod keeps at its root. The agent scaffold in templates/agents/ and the
+# d2r-project-conventions skill read these instead of hard-coding them. Copy to the repo root, rename to
+# `.d2r-project.toml`, and edit. Every key is optional unless marked required.
+
+[project]
+repo = "owner/mod-repo"          # required: GitHub "owner/name"; agents verify it before creating issues
+default_branch = "main"
+glossary = "GLOSSARY.md"         # domain vocabulary file ("" if none)
+adr_dir = "docs/adr"             # architecture decisions ("" if none)
+
+[issues]
+prs_are_triage_surface = false   # true: external PRs run through the triage labels like issues
+extra_labels = ["bug", "enhancement"]   # labels beyond the five triage labels (describe them in docs/agents/triage-labels.md)
+wayfinder = false                # true: use a map issue with typed children (see the d2r-project-conventions skill)
+
+[branches]
+# Prefixes the conventions skill uses. Never merged or deleted: research/*, issue-assets, handoff/*, snapshot/*.
+ticket = "ticket/"
+research = "research/"
+refactor = "refactor/"
+snapshot = "snapshot/"
+protected = ["research/*", "issue-assets", "handoff/*", "snapshot/*"]
+
+[gate]
+# The check that guards parity with the source being ported (leave out if the repo has none).
+check_name = "table-diff"        # required status check name
+command = "py -3 tools/diff.py"  # local fallback when runners are offline
+inputs = ["files/", "tools/", ".github/workflows/"]   # paths that make a docs-only PR gate-relevant
+drop_ok_label = "gate-drop-ok"   # owner-only label that accepts an intended parity drop
+
+[testing]
+game_slots = [4, 5, 6, 7, 8]     # slots agents may lock (never the owner's real install)
+shared_cache = ""                # machine-wide cache folder that worktree junctions point to
+junctions = ["d2r-data", "generated", "out"]   # folders in a worktree that are junctions into the cache
+generated = ["generated/"]       # folders made by a script; never hand-edited

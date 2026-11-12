@@ -8,7 +8,7 @@ You do not need all of it. A small mod can be one person and one agent. But once
 open problems, the pieces below keep it from falling apart.
 
 Ready-made files for everything in this guide are in [`templates/`](../templates/). Two skills wrap the two main
-jobs: `d2r-coordinator` (plan and run lanes) and `d2r-release` (ship a version).
+jobs: `d2r-coordinator` (plan and run lanes), `d2r-project-conventions` (issues, PRs, branches, gate) and `d2r-release` (ship a version).
 
 ## Contents
 1. [The big picture](#1-the-big-picture)
@@ -265,7 +265,7 @@ say you did, and move on. When you do need an answer, ask one clear question and
 A lane starts with no memory. Your prompt is everything it knows. A good prompt is short and complete:
 
 1. **The goal in one sentence**, and why it matters.
-2. **Read first**: the rules file and the two or three docs that matter. Name them by path.
+2. **Read first**: `AGENTS.md` and the two or three docs that matter. Name them by path.
 3. **Scope**: the files and areas the lane may change. Everything else is out of bounds.
 4. **What is already known**: cause found, things already ruled out, the bug row. This stops it redoing your work
    and stops it confirming your guess too eagerly. If you suspect a cause, say it is a suspicion.
@@ -275,9 +275,9 @@ A lane starts with no memory. Your prompt is everything it knows. A good prompt 
 8. **Report format**: PR link, head commit, files changed, tests run with results, what is left, any incidents.
 9. **Never end your turn while something you started is still running.**
 
-Rules that every lane needs live in one shared file ([`templates/lane-rules.txt`](../templates/lane-rules.txt)), so
-the prompt itself starts with "read the rules and follow them" and only carries the job-specific parts. When you learn
-a new rule the hard way, add it to the file with the date, so every future lane gets it.
+Rules that every lane needs live in the repo's `AGENTS.md` (from [`templates/agents/AGENTS.md`](../templates/agents/AGENTS.md)) and the
+`d2r-project-conventions` skill, so the prompt itself starts with "read AGENTS.md and follow it" and only carries the job-specific parts. When you learn
+a new rule the hard way, add it to `AGENTS.md` with the date, so every future lane gets it.
 
 Tips:
 
@@ -313,7 +313,7 @@ Setting up a project:
 
 - [ ] Repo created, `main` protected in practice (only the coordinator merges).
 - [ ] `docs/PLAN.md`, `docs/bugs.md`, `CHANGELOG.md` created from the templates.
-- [ ] Lane rules file written; private-words list created outside the repo; `tools/check_public.py` wired in.
+- [ ] `AGENTS.md` and `docs/agents/` written; private-words list created outside the repo; `tools/check_public.py` wired in.
 - [ ] Commit identity decided (noreply address) and written into the rules.
 - [ ] Game slots set up and locked-down; the owner's real install marked untouchable.
 - [ ] Tokens and keys placed by the owner in files in their home folder.

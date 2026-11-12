@@ -55,8 +55,8 @@ on d2rAI-toolkit: `python -m modkit`, the knowledge base in `knowledge/` and the
    - the **hosting** location `<HOSTING>`;
    - **public or private**, and when;
    - which **providers and models** they have access to.
-6. Set up game slots (see section 4), the private-words list outside the repo, and the lane rules
-   (`lane-rules.txt`, from the template).
+6. Set up game slots (see section 4), the private-words list outside the repo, and the agent scaffold
+   (`AGENTS.md` and `docs/agents/`, from `templates/agents/`; per-repo values in `.d2r-project.toml`).
 
 ## 2. Providers, models, and who does what
 
@@ -85,8 +85,8 @@ a follow-up telling it to keep going.
 
 ## 3. Standing rules (give every lane these)
 
-Create `<RUNS PATH>/lane-rules.txt` from `templates/lane-rules.txt` and adapt it. Every lane prompt starts with
-"read the rules and follow them". Summary of what they must say:
+Create `AGENTS.md` and `docs/agents/` in the repo from `templates/agents/` and adapt them. Every lane prompt starts with
+"read AGENTS.md and follow it". Summary of what they must say:
 
 1. Commit identity and trailers (noreply only).
 2. The forge token is read from a file by scripts, never printed.

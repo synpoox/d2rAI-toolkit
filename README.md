@@ -313,6 +313,7 @@ name it ("use d2r-port").
 | [`d2r-crash`](.claude/skills/d2r-crash/SKILL.md) | A player's crash report: addresses to functions, who caused it, a fix with evidence |
 | [`d2r-port`](.claude/skills/d2r-port/SKILL.md) | Port a classic 1.10 / 1.13c-era mod to D2R (with its creators' permission), table by table, with its DLL rules in a plugin |
 | [`d2r-coordinator`](.claude/skills/d2r-coordinator/SKILL.md) | Plan and run a project with several agents: lanes, models, game slots, bug list, review |
+| [`d2r-project-conventions`](.claude/skills/d2r-project-conventions/SKILL.md) | Issues, PRs, branch names, merge gate, worktree and junction hygiene; agent scaffold in `templates/agents/` |
 | [`d2r-release`](.claude/skills/d2r-release/SKILL.md) | Ship a version: bump, player changelog, fail-fast publish, verify, release pages |
 
 ## Knowledge index

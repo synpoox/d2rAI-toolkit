@@ -1,10 +1,10 @@
 # Lane prompt: <short title, e.g. "Bug 17: crash when entering Andariel's lair">
 
 > One job per lane prompt. Fill in the placeholders, delete the notes, and send it as the lane's task. The shared
-> rules live in the rules file, so this prompt only carries what is specific to this job.
+> rules live in `AGENTS.md`, so this prompt only carries what is specific to this job.
 > Guide: [docs/ai-workflow.md](../docs/ai-workflow.md#10-writing-a-good-lane-prompt).
 
-Read `<RUNS PATH>/lane-rules.txt` and follow it exactly. You are the lane `<lane-name>` of `<MOD NAME>`.
+Read `AGENTS.md` and follow it exactly. You are the lane `<lane-name>` of `<MOD NAME>`.
 
 ## Goal
 <One sentence: what must be true when you are done, and who it matters to.>
