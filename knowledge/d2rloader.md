@@ -2,7 +2,8 @@
 
 What a mod that ships through D2RLoader 1.3.1 (PluginSDK 0.4.0) runs into on players' machines. Seen in a large
 overhaul released to players. Plugin API details: [engine-re.md](engine-re.md) and
-`third_party/PluginSDK`.
+`third_party/PluginSDK`. What the loader and SDK can do, system by system, with the versions they ship:
+[d2rloader-capabilities.md](d2rloader-capabilities.md).
 
 ## How D2RLoader picks the mod
 
@@ -68,9 +69,36 @@ How to detect: list the process's modules (`CreateToolhelp32Snapshot` / `Module3
 contains `\d2rloader\plugins\`; ask each for `D2RLoaderGetPluginInfo` to read its `id`. d2rloader.log's `[PLUGIN]`
 lines list them too. See `shared/plugin-common/src/env_guard.cpp`.
 
+## How to check that another plugin's hooks coexist with yours
+
+Do this before you bundle, recommend or merely tolerate a companion plugin. It is a reading task first, a game check
+second.
+
+1. **List its hook sites.** From its source (the `*Rva` constants and `InstallInlineHook` calls) or, without source,
+   from its DLL (disassemble the install code; a hook writes `FF 25` or `E9` at a function entry). Also list the table
+   slots it writes: function-table slots (`srvdofunc`, missile, aura and property tables), item event slots, and the
+   itemstatcost rows and stat ids it claims.
+2. **Compare with yours, by byte span, not by function name.** A hook at `function+24` and one at `function+30` clash
+   when their patched spans overlap. A shared function entry, a shared table slot or a shared event slot is a hard
+   clash: only one of the two can work.
+3. **Read what each does on a clash.** Both check the entry bytes before they hook. The plugin that installs second
+   sees bytes that differ from stock and either refuses that part or turns itself off (some accept one named owner).
+   Load order decides the winner: mod-scoped plugins load before game-wide ones. Never "fix" this by skipping the
+   byte check.
+4. **Write the result down per plugin:** its hooks, which of them you share, and which of its features overlap yours
+   as data (the same stat, the same table row). Shared hooks mean the two cannot run together; shared data means one
+   must give way.
+5. **Prove it in the game.** Load both, in the order players will have, and read the loader log and both plugins' logs:
+   every part `on`, no "bytes differ" line. Repeat after you add a hook of your own.
+
+If two plugins share a hook, do not try to make yours compatible: pick one, or move the feature into one plugin
+(*Other plugins* above). If a companion is bundled with the mod, pin one version of it per release, so host and client
+run the same one in TCP/IP games.
+
 ## Item service on D2RCore 1.3.1-beta
 
-The SDK is newer than this loader. `ItemService` is 88 bytes here against 112 in PluginSDK 0.4.0, so `getItemDetails`,
+The SDK is newer than this loader (the release notes pair loader 1.3.1 with SDK 0.3.0; see
+[d2rloader-capabilities.md](d2rloader-capabilities.md)). `ItemService` is 88 bytes here against 112 in PluginSDK 0.4.0, so `getItemDetails`,
 `getItemTooltip` and `getItemPreviewTooltip` are missing, and calling them crashes the plugin. Check
 `HasItemServiceField` before any optional field.
 
@@ -134,6 +162,28 @@ The template declares `Shared | ModScopedOnly | NativeHooks`:
 - **ModScopedOnly**: loads only from the mod's plugin folder while that mod runs.
 - **NativeHooks**: may patch game code.
 
+### Which plugin holds what: split by multiplayer scope
+
+D2RLoader requires `Shared` plugins to match between host and client, so a plugin that is only a client change must
+never force that match. A way to cut a mod's engine code into plugins:
+
+- **One plugin per multiplayer scope, not per feature.** Gameplay rules (skill and hit functions, cube ops, item
+  rules, server hooks) go in a `Shared` plugin that is host-authoritative from the start. Client-only code (panels,
+  pictures, quantity numbers, automap) goes in a client-only plugin, so it can be dropped without changing gameplay and
+  never forces a version match. One DLL for everything makes everything `Shared`; one DLL per feature leaves dozens of
+  versions to keep matched.
+- **A system gets its own plugin only when all three hold:** (1) a player or another mod would turn it on or off as a
+  whole; (2) it shares no hook point or function slot with another plugin; (3) it never calls another plugin. If the
+  second fails, the code stays together: for example item rules that share one event slot and the damage path.
+- **Size is no reason to split.** Split a large plugin into source files; the off-switch words already leave single
+  parts out ([new-game-systems.md](new-game-systems.md), *Make it debuggable from day one*).
+- **Plugins do not call each other.** A client-only plugin reads what it needs from the tables or from D2R's synced unit
+  state. The SDK has plugin-to-plugin events (`plugin_communication.h`); this is a design choice to keep each plugin
+  removable, not a loader rule.
+- **Per-build RVAs live in one header per build**, shared by all plugins as a static library. On an unknown build a
+  plugin logs and leaves the feature off.
+- A bundled companion may be `Shared`; pin one version of each per release.
+
 ## Plugin panels (D2RLoader 1.3.1-beta, build 93847)
 
 - `setWidgetEventMessage` is a null entry on this loader, and calling it crashes: check `HasWidgetServiceField` first.
@@ -143,3 +193,16 @@ The template declares `Shared | ModScopedOnly | NativeHooks`:
   `PanelManager:OpenPanel:<plugin-id>/<name>`, then read `event->text` in a UI message listener and consume it.
 - Retail saves allow one custom player page: a second `registerPlayerPage` returns `Conflict`. Items on a page are saved
   with the character and stay there when the panel closes.
+
+## Loader gaps (D2RLoader 1.3.1-beta, build 93847)
+
+Things the SDK 0.4.0 headers promise or imply that this loader does not do. Found by building client UI and item
+handling on it. Each has a native workaround, so check the service first and keep the SDK path as the plan.
+
+| Gap | What happens | Workaround |
+|---|---|---|
+| `WidgetService` has no screen rect | The service is 64 bytes and the headers need 208 (the log reads `widget 1 (size 64, needs 208)`). There is no `getWidgetScreenRect`, so a plugin cannot learn where a widget is on screen | Hook D2R's item draw `0x2A72D0` (widget, item), which every item widget calls once per item: do what it does, then draw. The position comes from the grid's vtable ([d2r-93847-addresses.md](d2r-93847-addresses.md), *Inventory grid widget*). The loader's author has said the call is coming: re-check the service size on each loader update |
+| `OverlayService` draws nothing | The service exists and accepts calls, but nothing appears on screen | Draw with D2R's own text draw `0x902E20` (text, int32 rect[4] in screen px, font block, scale) from a hook; build the font block like D2R's defaults |
+| TCP/IP clients have no game thread | `runOnGameThread` returns `Unavailable` on a TCP/IP client, so work queued to the game thread (finding the server's copy of an item, `splitStack`) does nothing there | Send a plugin message to the host (<= 224 bytes) and do the work on its game thread. Until then, say in the status line that the feature is host-only |
+| No mouse event, and no event for an item put down from the cursor | `ItemInteractionService` skips cursor paths, so a plugin cannot see a click or a drop | Watch the cursor item on every UI update (UI thread), note what left it and which modifier keys were down, then act in a game-thread job |
+| UI-thread handles are stale on the game thread | The UI thread's player handle points at the client's unit; item seeds and item level read 0 and 1 there | Find the server's item by `runtimeId` on the game thread |

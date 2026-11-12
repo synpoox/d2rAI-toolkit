@@ -7,7 +7,7 @@ description: Create or change Diablo II Resurrected items in a modkit mod - base
 
 Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you are inside the toolkit repo: use its root). Run `python -m modkit` with that folder as the working directory and the mod project as an argument.
 
-Read ${CLAUDE_PLUGIN_ROOT}/knowledge/tables.md (item tables section) and ${CLAUDE_PLUGIN_ROOT}/knowledge/engine-limits.md first in a session. Always start
+Read ${CLAUDE_PLUGIN_ROOT}/knowledge/tables.md (item tables section) and ${CLAUDE_PLUGIN_ROOT}/knowledge/engine-limits.md first in a session. An item with charges or one that is not used up: ${CLAUDE_PLUGIN_ROOT}/knowledge/charged-items.md. Always start
 from a vanilla row: `python -m modkit show weapons "Crystal Sword"`, `show uniqueitems "The Gnasher"`.
 
 ## Base items (weapons.txt, armor.txt, misc.txt)

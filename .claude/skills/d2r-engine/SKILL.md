@@ -9,7 +9,10 @@ Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you ar
 
 Data first: check ${CLAUDE_PLUGIN_ROOT}/knowledge/engine-limits.md and the vanilla function catalogs (`python -m modkit functions`)
 before writing code. When code is needed, read ${CLAUDE_PLUGIN_ROOT}/knowledge/engine-re.md and ${CLAUDE_PLUGIN_ROOT}/knowledge/d2r-93847-addresses.md, and
-${CLAUDE_PLUGIN_ROOT}/knowledge/d2rloader.md for what the loader does on players' machines. Porting a classic engine DLL: the `d2r-port`
+${CLAUDE_PLUGIN_ROOT}/knowledge/d2rloader.md for what the loader does on players' machines. Check
+${CLAUDE_PLUGIN_ROOT}/knowledge/d2rloader-capabilities.md (the capability matrix for loader 1.3.1 / SDK 0.4.0, and the
+loader gaps) before you plan a service call or a hook; an item that is reusable or holds charges starts with
+${CLAUDE_PLUGIN_ROOT}/knowledge/charged-items.md. Porting a classic engine DLL: the `d2r-port`
 skill first. A whole new game system (a mapping system, a new crafting bench, a new panel): plan it with
 ${CLAUDE_PLUGIN_ROOT}/knowledge/new-game-systems.md first (player steps, data vs plugin split, an RE spike for every hook, where state
 lives), then build it part by part with this skill.

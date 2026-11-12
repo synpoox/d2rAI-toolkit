@@ -334,6 +334,8 @@ in an area. It's also good reading for human modders.
 | [debugging.md](knowledge/debugging.md) | Symptom → cause → fix, from real bugs, and where every log lives |
 | [crash-triage.md](knowledge/crash-triage.md) | From a player's crash report to a function and a fix, with a worked example |
 | [d2rloader.md](knowledge/d2rloader.md) | D2RLoader facts and traps: default mod, the first start, other plugins, version checks |
+| [d2rloader-capabilities.md](knowledge/d2rloader-capabilities.md) | Capability matrix for D2RLoader 1.3.1 / PluginSDK 0.4.0, multiplayer, loader vs SDK vs game versions |
+| [charged-items.md](knowledge/charged-items.md) | Reusable or charged items: the not-used-up flag, charge stores, recharge, runtime checks |
 | [porting-classic-mods.md](knowledge/porting-classic-mods.md) | Porting a classic mod: inventory, table conversion, fixed ids, function numbers, art order |
 | [modkit-ops.md](knowledge/modkit-ops.md) | Every patch operation `modkit build` understands |
 
