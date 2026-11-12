@@ -74,6 +74,13 @@ inline constexpr int SkCalc1 = 0x190;         // int32 calc index
 inline constexpr int SkCalc2 = 0x194;
 inline constexpr int SkCalc3 = 0x198;
 
+// --- Client unit tables (data, read by testing/unit_probe.py) -------------------------------------------------------
+// 128 buckets of Unit* by unit id & 0x7f, the next unit in a bucket at unit +0x158. Players, monsters, objects and
+// items are 0x400 bytes apart from ClientUnits (index by unit type); missiles have their own table. Dead monsters
+// stay in the table (mode 0 or 12).
+inline constexpr uint64_t ClientUnits = 0x2a23910;
+inline constexpr uint64_t ClientMissiles = 0x2a25d10;
+
 }  // namespace rva
 
 // --- Structures ---------------------------------------------------------------------------------------------------

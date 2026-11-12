@@ -13,6 +13,7 @@ Windows is needed to run the game; everything else (locks, config, checks, relea
 | `game_checks.py` | Small checks framework: `@check` registry, runner, results JSON, summary, screenshots. |
 | `example_checks.py` | Example checks to copy (`config-sane`, `game-starts`, `main-menu-visible`, `console-echo`, `no-new-crash-files`). |
 | `slot_install.py` | Installs a built mod project into a slot (`modkit install`), keeping the slot's own savepath. |
+| `unit_probe.py` | Reads the client's units (monsters, missiles) from a running game, read-only, build 93847 only. |
 | `release_install.py` | Installs the PUBLISHED release into a slot, as a player would get it. |
 
 ## Quick start
