@@ -33,7 +33,8 @@ Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you ar
 - `${CLAUDE_PLUGIN_ROOT}/docs/`: how to run a project. `${CLAUDE_PLUGIN_ROOT}/docs/ai-workflow.md` is the method for a mod built with AI
   agents: a coordinator plus parallel lanes, model choice, game slots, the bug list, releases, safety.
 - `${CLAUDE_PLUGIN_ROOT}/templates/`: fill-in files for a new project: coordinator prompt, lane rules, lane prompt,
-  `bugs.md`, `PLAN.md`, `CHANGELOG.md`, owner update.
+  `bugs.md`, `PLAN.md` (roadmap), `ADR.md`, `deviations.md`, `research.md`, `README-player.md`, `GLOSSARY.md`, owner update,
+  `changelog.d/` (see `${CLAUDE_PLUGIN_ROOT}/templates/README.md`).
 - `${CLAUDE_PLUGIN_ROOT}/testing/`: how to test a mod in the real game without a human: game slots (frozen copies of
   the install, queued with locks), named game checks driven through a plugin test harness, release-like installs.
 - `${CLAUDE_PLUGIN_ROOT}/release/`: packaging and publishing: the release package, a manifest, a fail-fast release

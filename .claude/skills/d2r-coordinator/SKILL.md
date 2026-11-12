@@ -14,8 +14,8 @@ You plan, brief, review, merge and report. You do not do the big implementation 
 1. Fill in `${CLAUDE_PLUGIN_ROOT}/templates/coordinator-prompt.md` (name, game version and build, loader, repo, hosting, providers). Ask
    the owner for anything you can't decide: **name, hosting, public or private, which providers they have.** Pick
    sensible defaults for everything else and say which.
-2. Copy `${CLAUDE_PLUGIN_ROOT}/templates/agents/` into the repo (`AGENTS.md`, `docs/agents/`) and a `.d2r-project.toml` from `${CLAUDE_PLUGIN_ROOT}/templates/d2r-project.example.toml`; adapt them. Create `docs/PLAN.md`, `docs/bugs.md` and
-   `CHANGELOG.md` from the templates.
+2. Copy `${CLAUDE_PLUGIN_ROOT}/templates/agents/` into the repo (`AGENTS.md`, `docs/agents/`) and a `.d2r-project.toml` from `${CLAUDE_PLUGIN_ROOT}/templates/d2r-project.example.toml`; adapt them. Create `docs/PLAN.md`, `docs/bugs.md` and a `changelog.d/` folder
+   (`CHANGELOG.md` starts from its README) from the templates.
 3. Make the private-words list **outside** the repo (`~/.d2r-modkit/private_terms.txt` or similar) and run
    `py -3 ${CLAUDE_PLUGIN_ROOT}/tools/check_public.py --root <mod repo>` before every commit (it scans `--root`, default the current directory, so never run it from the toolkit folder).
 4. Set up game slots (frozen copies of the install, each with its own saves) and mark the owner's real game

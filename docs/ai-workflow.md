@@ -133,6 +133,17 @@ Rules that keep this safe:
    checks for the merged code.
 5. When a batch of fixes is merged: release ([section 7](#7-releasing)).
 
+### Decision records
+
+There is one baseline for what the mod is held to, and decisions about how it differs from it are **ADRs**, not
+chat or a long-lived issue. One file per decision, `docs/adr/NNNN-<slug>.md`, from [`templates/ADR.md`](../templates/ADR.md):
+Status, Context, Considered Options, Decision, Consequences, and dated Amendments at the end (later changes are added
+there, not written over the original). A research document ([`templates/research.md`](../templates/research.md))
+lists options and chooses nothing; the owner's choice becomes an ADR. A row of the deviations ledger
+([`templates/deviations.md`](../templates/deviations.md)) cites its ADR, and the table-diff gate checks the ledger
+against the tables. The roadmap ([`templates/PLAN.md`](../templates/PLAN.md)) links the ADRs that shape it and keeps
+status on the issues, not in the file.
+
 ## 4. Choosing models and providers
 
 Match the model to the risk of the job. Cheap models are fine for work where a mistake is obvious and easy to fix.
@@ -219,7 +230,8 @@ The steps (the `d2r-release` skill walks through them):
 
 1. All fixes for the version are merged and the targeted checks pass.
 2. Bump the version (once, in one place).
-3. Write the changelog section in the player's words ([`templates/CHANGELOG.md`](../templates/CHANGELOG.md)).
+3. Write the changelog section in the player's words: rename `### Unreleased` and let the release fold in the
+   fragments ([`templates/changelog.d/README.md`](../templates/changelog.d/README.md)).
 4. Run the **whole release as one script** with `set -euo pipefail`, which stops at the first failed step and refuses
    to run if the version, the changelog and the build disagree.
 5. Create the public release pages only after the version is confirmed live.
@@ -325,7 +337,7 @@ Tips:
 Setting up a project:
 
 - [ ] Repo created, `main` protected in practice (only the coordinator merges).
-- [ ] `docs/PLAN.md`, `docs/bugs.md`, `CHANGELOG.md` created from the templates.
+- [ ] `docs/PLAN.md`, `docs/bugs.md`, `changelog.d/` (and `CHANGELOG.md` from its README) created from the templates.
 - [ ] `AGENTS.md` and `docs/agents/` written; private-words list created outside the repo; `tools/check_public.py` wired in.
 - [ ] Commit identity decided (noreply address) and written into the rules.
 - [ ] Game slots set up and locked-down; the owner's real install marked untouchable.
