@@ -13,6 +13,7 @@ Windows is needed to run the game; everything else (locks, config, checks, relea
 | `game_checks.py` | Small checks framework: `@check` registry, runner, results JSON, summary, screenshots. |
 | `example_checks.py` | Example checks to copy (`config-sane`, `game-starts`, `main-menu-visible`, `console-echo`, `no-new-crash-files`). |
 | `slot_install.py` | Installs a built mod project into a slot (`modkit install`), keeping the slot's own savepath. |
+| `force_ds1.py` | Test-only: pins a level to one DS1 variant in a slot's installed `lvlprest.txt`, so a warp lands on the preset under test. |
 | `release_install.py` | Installs the PUBLISHED release into a slot, as a player would get it. |
 
 ## Quick start
@@ -56,6 +57,7 @@ python testing/game_ctl.py   --slot N status|start|stop|shot NAME|key KEY..|clic
 python testing/game_checks.py list [names or tags]
 python testing/game_checks.py run [names or tags] --slot N [--run-id ID] [--keep] [--stop-on-fail] [--module M] [--path DIR]
 python testing/slot_install.py --slot N PROJECT
+python testing/force_ds1.py --slot N [--project DIR] "<Name or LevelId>=<ds1>" | <ds1> | --reset
 python testing/release_install.py check [--channel C] [--site S]
 python testing/release_install.py install --slot N [--channel C] [--site S] [--method auto|archive|objects] [--harness-dll FILE]
 python testing/release_install.py restore|status --slot N

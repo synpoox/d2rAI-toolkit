@@ -111,12 +111,34 @@ class OnDisk(unittest.TestCase):
     def test_mod_folder_from_mod_json(self):
         proj = Path(self.tmp.name) / "proj"
         proj.mkdir()
-        (proj / "mod.json").write_text(json.dumps({"name": "OtherMod"}), "utf-8")
-        self.assertEqual(fd.mod_folder(self.cfg, str(proj)), "OtherMod")
+        (proj / "mod.json").write_text(json.dumps({"name": "MyMod"}), "utf-8")
+        self.assertEqual(fd.mod_folder(self.cfg, str(proj)), "MyMod")
         self.assertEqual(fd.mod_folder(self.cfg), "MyMod")
-        self.assertIn("OtherMod", str(fd.lvlprest_path(self.cfg, 2, str(proj), owner="lane")))
+        self.assertIn("MyMod", str(fd.lvlprest_path(self.cfg, 2, str(proj), owner="lane")))
         with self.assertRaises(fd.ForceError):
             fd.mod_folder(self.cfg, str(proj / "nope"))
+
+    def test_mod_json_name_must_match_config_and_be_plain(self):
+        proj = Path(self.tmp.name) / "proj2"
+        proj.mkdir()
+        for name, text in (("../x", "plain folder"), ("a/b", "plain folder"), ("a\\b", "plain folder"),
+                           ("C:x", "plain folder"), ("..", "plain folder"), ("", "plain folder"),
+                           ("Different", "mod.folder")):
+            (proj / "mod.json").write_text(json.dumps({"name": name}), "utf-8")
+            with self.assertRaises(fd.ForceError, msg=name) as e:
+                fd.mod_folder(self.cfg, str(proj))
+            self.assertIn(text, str(e.exception))
+
+    def test_non_numeric_files(self):
+        rows = [["Bad", "9", "20", "two", "a.ds1", "0", "0", "0", "0", "0"]]
+        with self.assertRaises(fd.ForceError) as e:
+            fd.force(table(rows), "Bad=a.ds1")
+        self.assertIn("Files is not a number", str(e.exception))
+
+    def test_missing_file_message(self):
+        with self.assertRaises(fd.ForceError) as e:
+            fd.apply(self.path.with_name("nope.txt"), ["x=a.ds1"])
+        self.assertIn("does not ship its own lvlprest.txt", str(e.exception))
 
 
 if __name__ == "__main__":

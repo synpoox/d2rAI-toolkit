@@ -50,9 +50,14 @@ def mod_folder(cfg: tc.Config, project: str | None = None) -> str:
     if not project:
         return cfg.mod_folder()
     try:
-        return json.loads(Path(project, "mod.json").read_text("utf-8-sig"))["name"]
-    except (OSError, ValueError, KeyError) as e:
+        name = json.loads(Path(project, "mod.json").read_text("utf-8-sig"))["name"]
+    except (OSError, ValueError, KeyError, TypeError) as e:
         raise ForceError(f"cannot read the mod name from {project}/mod.json: {e}") from e
+    if not isinstance(name, str) or not name or name in (".", "..") or Path(name).name != name or any(c in name for c in '/\\:'):
+        raise ForceError(f"{project}/mod.json: name {name!r} is not a plain folder name")
+    if name != cfg.mod_folder():
+        raise ForceError(f"{project} is mod {name!r} but mod.folder is {cfg.mod_folder()!r}")
+    return name
 
 
 def read_table(path: Path) -> Table:
@@ -65,7 +70,10 @@ def norm(ds1: str) -> str:
 
 def variants(t: Table, row: list[str]) -> list[str]:
     """The DS1s the game can roll for a row: File1..File<Files> (at least File1), without the 0 placeholders."""
-    n = min(max(int(row[t.col("Files")] or 0), 1), 6)
+    try:
+        n = min(max(int(row[t.col("Files")] or 0), 1), 6)
+    except ValueError:
+        raise ForceError(f"{row[t.col('Name')]}: Files is not a number ({row[t.col('Files')]!r})") from None
     out = [row[t.col(f"File{i}")] for i in range(1, n + 1)]
     return [v for v in out if v and v != "0"]
 
@@ -127,7 +135,8 @@ def lvlprest_path(cfg: tc.Config, slot: int, project: str | None = None, owner: 
 
 def apply(path: Path, selectors: list[str]) -> list[str]:
     if not path.is_file():
-        raise ForceError(f"{path} not found: install the slot first")
+        raise ForceError(f"{path} not found: install the slot first, or the mod does not ship its own lvlprest.txt "
+                         "(copy the vanilla table into the project's data and rebuild)")
     t = read_table(path)
     backup = path.with_name(path.name + BACKUP_SUFFIX)
     orig = read_table(backup) if backup.is_file() else None  # already forced: the original row says what may be forced
