@@ -12,6 +12,7 @@ runs. Everything that needs Windows is behind a function, so the scripts also im
 | `testing/game_ctl.py` | Starts and stops the game in a slot, takes screenshots, sends keys, clicks and console lines. |
 | `testing/game_checks.py` | Runs named in-game checks and writes the results and screenshots. |
 | `testing/release_install.py` | Puts the **published** release into a slot, the way a player gets it. |
+| `testing/force_ds1.py` | Test-only: pins a level to one DS1 variant in a slot's installed `lvlprest.txt`. |
 | `testing/example_checks.py` | Five example checks. Copy it and make your own. |
 | `testing/testing.example.toml` | The config. Copy it to `modkit-testing.toml`. |
 
@@ -418,6 +419,20 @@ not inside the slot's `mods` folder. It accepts `schemaVersion` 1 for channel fi
 
 Also compare the versions in a player's report with yours before you chase a ghost: game build, loader version and
 plugin version. Many "bugs" are a stale plugin copy or a loader that starts another mod.
+
+## Pin a DS1 variant
+
+A level with several DS1 variants rolls one per game. To land on the preset under test, pin the level in the slot's
+installed `lvlprest.txt`:
+
+```
+MODKIT_RUN=my-lane python testing/force_ds1.py --slot 2 "Dark Temple Map=DarktempleV2.ds1"
+MODKIT_RUN=my-lane python testing/force_ds1.py --slot 2 --reset
+```
+
+This is test-only. It needs the slot lock held by `MODKIT_RUN`, refuses slot 1 and a slot whose game runs, and touches
+only the slot's installed copy (the original is saved beside it as `lvlprest.txt.force-ds1.orig`). `--reset` or a
+reinstall of the slot undoes it. The mod must ship its own `lvlprest.txt`.
 
 ## Targeted tests and the full suite
 
