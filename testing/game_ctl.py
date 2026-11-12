@@ -35,6 +35,7 @@ import zlib
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import game_slots  # noqa: E402
+import slot_registry  # noqa: E402
 import testing_config as tc  # noqa: E402
 
 
@@ -686,7 +687,8 @@ class Game:
         window. Raises GameCtlError when something is missing; never starts slot 1."""
         need_windows("starting the game")
         timeout = timeout or self.cfg["checks"]["start_timeout"]
-        ok, msg, self.took_lock = game_slots.ensure_lock(self.cfg, self.slot, self.owner)
+        ok, msg, self.took_lock = game_slots.ensure_lock(
+            self.cfg, self.slot, self.owner, registry=slot_registry.load(), project=slot_registry.env_project())
         self.log(msg)
         if not ok:
             raise GameCtlError(msg)

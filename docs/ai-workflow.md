@@ -90,6 +90,10 @@ git fetch origin
 git worktree add ../lanes/fix-crash-andariel -b lane/fix-crash-andariel origin/main
 ```
 
+To remove a finished lane worktree, use `tools/worktree_remove.ps1 -Path <worktree> [-DeleteBranch]`. A plain recursive
+delete walks through a junction to a shared data cache and destroys it; the script unlinks every junction first, checks
+the targets (and any `-Cache` folders) are unchanged, and refuses a locked, dirty or main-checkout target.
+
 Rules that keep this safe:
 
 - A lane branch is named `lane/<short-name>` and starts from the current `origin/main`. Say so in the prompt. A lane
@@ -365,6 +369,11 @@ Notes:
   loads from the plugin. Every toolkit file a skill names (`knowledge/`, `docs/`, `templates/`, `tools/`, `testing/`)
   is written as `${CLAUDE_PLUGIN_ROOT}/...`, so it resolves from any project. Inside this repository nothing
   substitutes it, and the placeholder means the repository root. Write new skills the same way.
+- The plugin also registers a `SessionStart` hook (`hooks/hooks.json`, script `hooks/stale_branch.sh`) that runs in
+  every session which loads the plugin. It fetches `origin/main` (capped at 5 seconds, never prompts) and prints a
+  one-line warning when the checkout's HEAD does not contain it, so a lane does not build or open a PR on a stale
+  base. It only warns, always exits 0, and prints nothing outside a git repo, without `origin/main`, or when HEAD is current. Set
+  `D2R_STALE_NO_FETCH=1` to skip the fetch (offline work).
 - `python -m modkit build <project>` still runs with the toolkit checkout as the working directory and the mod
   project as the argument. `tools/check_public.py` scans its `--root` (default: the current directory), so run it
   as `py -3 <path-to-toolkit>/tools/check_public.py --root <mod repo>` or from inside the mod repo.

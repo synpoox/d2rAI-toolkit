@@ -8,12 +8,15 @@ Target: **D2R 3.3.0 build 93847 + D2RLoader 1.3.1, PluginSDK 0.4.0.** `plugin-te
 | File | What it is |
 | --- | --- |
 | `src/build_guard.h` | Image check: the PE TimeDateStamp of the running game against `rva::ImageStamp` (`0x6ab3782c`), and the log/status line |
-| `src/rvas_93847.h` | Engine facts for build 93847: RVAs, record offsets, `MissileParams` / `SummonParams`. One header per build |
+| `src/rvas_93847.h` | Engine facts for build 93847: `ImageStamp`, and the RVAs and record offsets by area in `src/rvas_93847/` (tables, damage, units, offsets, stats, items, levels, ai, client, pools). One header per build. The structures (`MissileParams`, `SummonParams` and the rest) and helpers are in `d2r.h` |
 | `src/d2r.h`, `src/d2r.cpp` | `d2r::Bind()` (fails closed: binds nothing on any other image), the typed function table `d2r::api`, `Engine<Fn>`, `At<T>`, `UnitXY`, `EvalCalc`, `ValidMissile`, D2 RNG |
+| `src/ai_registry.*` | `ai_registry::Register(context, monaiRow, d2rThink, classId, think)`: a monster think function by monai row and monstats class, D2R's think for every other monster (`ai_registry::Vanilla(row)`) |
 | `src/env_guard.*` | Environment guard: another mod running, the DLL outside its mod folder, a second copy, other plugins |
 | `src/off_switch.*` | Reads `<name>-off.txt` beside the path you pass (the DLL or the plugin's config): part words to leave out |
 | `src/log.*` | Log helper (`plog::Info/Warn/Error`, `plog::Sample` for hot paths) |
 | `src/crash_guard.h` | Logs a FAULT line when the game faults: address, why, whether this plugin is on the stack |
+
+**Policy:** every RVA in these headers has a row in `knowledge/d2r-93847-addresses.md` (RVA, signature, meaning, evidence H/C/T/R/P/D). Add the row with the value; `tests/test_rva_knowledge.py` fails when one is missing.
 
 Only generic engine facts go in here. A value or helper only one project uses stays in that project until a second
 project needs the same code.
