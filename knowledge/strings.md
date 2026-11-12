@@ -35,6 +35,13 @@ legal keys and stay as they are.
    - That gives roughly 37,000 free IDs (28106..65535 minus used 16-bit values). Table string references use a
      two-byte pool (65,535) shared by all strings.
    - Use the same ID for a key in both `strings/` and `strings-legacy/`.
+   - **Budget, counted in build 93847** (the `strings/` and `strings-legacy/` records): 21,904 records carry 12,138
+     distinct ids. The ids have 12,138 distinct low-16-bit values and **no two distinct ids share them**, so D2R
+     itself never relies on the collision. Only one id is 65,536 or more (251780). Free values from 28106 to 65535:
+     37,429 (55172 is taken by the low bits of 251780). So appending numeric ids is safe **while they stay below
+     65,536 and skip used low-16 values**; an id of 65,536 or more is the one that collides. (Older advice
+     to avoid appending numeric ids at all was too broad: the hazard is the high ids.)
+   - A key may keep a numeric name (`"115"`); that is the key, not the id, and has no limit.
 3. **printf placeholders are a contract.** D2R formats some strings itself with `sprintf`-style calls, e.g.
    `sysmsg7-9` (the "was slain by" fragments joined to unit names), tooltip lines ("Durability: %d of %d",
    "Required Strength: %d"). When overriding a D2R key keep **the same placeholder list in the same order**
@@ -47,6 +54,12 @@ legal keys and stay as they are.
    support. Filling all 13 languages with your text stops non-English clients showing vanilla text that
    contradicts the mod.
 6. Duplicate keys: D2R itself ships 121 duplicate IDs; don't add more.
+7. **Multi-line skill text is stored in reverse line order.** Compared with the stock 1.13c string tables (found
+   in the patch's `string.tbl`, `expansionstring.tbl` and `patchstring.tbl`), 195 multi-line strings in D2R's
+   `skills.json` that stock also has: **162 are exactly stock's lines in reverse order**, none has the same order, and
+   31 of the other 33 are an edited text with the first and last lines swapped. Other files with multi-line text
+   (`item-gems`) keep stock order (6 of 7 identical). So when a classic skill description (lines separated by `\n`) is put into `skills.json`, reverse its lines or the description reads upside down. Check
+   one description in game after the first import.
 
 ## D2RLoader namespaces (alternative, not used by the port)
 

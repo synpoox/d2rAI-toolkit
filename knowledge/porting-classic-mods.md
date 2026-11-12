@@ -20,6 +20,42 @@ Read with: [tables.md](tables.md) (how D2R reads tables), [engine-limits.md](eng
 | **Keep an unported list** (section 10) | So "missing" never gets mistaken for "broken" |
 | First milestone: **a new character in Act 1** as early as possible | From then on, work from what breaks in game |
 
+### 0a. Decisions to make first
+
+Three decisions shape the whole port. Make each one before converting data, write down the choice, and record
+who approved it. Each is shown as options and consequences, not as the one right answer.
+
+**Bank choice.** D2R 3.3 loads two banks of tables: Reign of the Warlock (RotW) and the Lord of Destruction (LoD/classic) bank.
+
+| Option | Consequence |
+|---|---|
+| RotW bank only | Half the tables to maintain. LoD and Classic characters cannot use the mod. D2R-only rows keep their ids (a RotW-only row such as `warl` sits at id 67) |
+| LoD bank only | The class and rows RotW added are absent |
+| **Both banks** (this guide's default; see "Banks" in section 3) | Double the maintenance and the testing |
+
+**Generated data, hash-pinned.** Data comes from a pinned extract of the original and is never committed (section 2).
+
+**Extended saves, append-only ids.** Retail D2R saves hold 30 class skills per class and 9-bit stat ids (up to 511).
+Ids that appear in a save are assigned once and are append-only: renumbering a row breaks every existing character.
+
+| Option | Consequence |
+|---|---|
+| Stay within retail saves | Cut or merge what does not fit; characters stay portable between installs |
+| Extended saves (a plugin-owned save sidecar) | More skills and wider stats; the characters need the mod ([saves.md](saves.md)) |
+
+### 0b. Glossary of fidelity terms
+
+| Term | Meaning |
+|---|---|
+| **Baseline** | The original mod, as its own players know it |
+| **Deviation** | Any observable difference from the baseline |
+| **Exact** | The player observes the same values as in the baseline |
+| **Approximated** | Reproduced roughly, with the difference stated |
+| **Cut** | Not reproduced |
+| **Not yet** | Intended, not built |
+| **Router slot** | One free table slot (for example srvdofunc 190) holding a plugin function that picks among several of the mod's functions by skill id. It is a plugin pattern, not part of D2RLoader |
+| **Companion plugin** | A plugin built outside the port and bundled to stand in for a feature. What it lacks is a deviation |
+
 ## 1. Inventory the mod
 
 Before converting anything, write down:
@@ -38,6 +74,24 @@ Before converting anything, write down:
 Triage the engine DLL by its source files: its assert strings usually name them (`..\SkillFoo.cpp`). Sort each into
 (a) data only, (b) a D2RLoader service, (c) a native hook, (d) a UI rebuild, (e) cut, and keep the list.
 
+### 1a. DLL triage from strings
+
+1. Hash the mod's DLLs against stock 1.13c ([classic-113c-tables.md](classic-113c-tables.md) section 1). A mod DLL
+   that is a separate file patching stock code in memory is read through its patch table (section 6a).
+2. Extract the strings. Assert strings name source files (`..\SkillFoo.cpp`); table names and column names the DLL
+   opens show which extra tables it reads; format strings show messages it builds.
+3. One row per source file or per rule in the hook list (section 5b). Bucket it:
+
+| Bucket | Test | Result |
+|---|---|---|
+| a data | A table column D2R reads already expresses the rule | Convert the rows; no code |
+| b service | A D2RLoader/PluginSDK service does it (strings, sounds, saves, shared parts) | Use the service |
+| c native hook | Only code can do it (skill function, missile function, event raise) | Plugin hook; slot per section 5a |
+| d UI rebuild | A screen the engine draws (stash pages, panels) | UI work, HD first |
+| e cut | The rule has no reachable data or the cost is not worth it | Unported list (section 10) |
+
+4. Put the unknowns last. A source file with no assert strings gets its bucket from what its patch records change.
+
 ## 2. The data pipeline
 
 1. Extract the mod's archives (MPQ) and D2R's files (CASC; `python -m modkit fetch`) into folders that git ignores.
@@ -47,6 +101,15 @@ Triage the engine DLL by its source files: its assert strings usually name them 
 5. Install into `<game>/mods/<Mod>/` with the game closed; start through D2RLoader; read `d2rloader.log`.
 
 Rebuild from scratch every time; never hand-edit the build output.
+
+**Decisions this pipeline implies** (see section 0a): the data is **generated from a hash-pinned extract of the
+original's files and never committed**. Write the merge output into git-ignored folders, and record the hash of each
+source archive in the generator so a different extract fails loudly.
+
+| Option | Consequence |
+|---|---|
+| Commit the generated patches | The repo then holds the original's data: not allowed (section 0) |
+| Generate into git-ignored `files/` from the pinned extract (default) | Every build needs the install; CI cannot build it; re-baselining the source is a hash change plus fixes to the merge rules |
 
 ## 3. Table by table
 
@@ -60,6 +123,10 @@ Rebuild from scratch every time; never hand-edit the build output.
 | **Keyed** (the rest) | | The mod's rows, then D2R's rows whose key the mod lacks |
 
 Anything that has no D2R column goes to an overflow report. Nothing is dropped silently.
+
+Which tables, columns, events and save fields differ between **stock** 1.13c and D2R 3.3 (checked against stock files,
+not against a mod) is in [classic-113c-tables.md](classic-113c-tables.md). Use it to tell the original game from what
+a mod added.
 
 ### Column differences (1.13c -> D2R 3.x)
 
@@ -149,6 +216,47 @@ Before writing code, look for a D2R function that does the same with other table
 is D2R's 109; a timed potion is `pSpell` 3; resurrect is Revive's function; a storm of missiles is Armageddon's.
 Audit every row against D2R's function tables and fail the build on a classic number that D2R reassigned.
 
+### 5a. Slot-collision checklist
+
+Run it per function column before writing code. Stock ranges are in
+[classic-113c-tables.md](classic-113c-tables.md) section 8.
+
+1. List the **distinct function numbers** per column in the mod's tables.
+2. Compare with stock 1.13c's range for that column. A value above it is the mod's own function; a value inside it
+   is stock's.
+3. Compare with D2R's used range and free slots (table above). srvdofunc has 191 slots at `0x238ea00` (build 93847);
+   free slots: srvdofunc 172-190, cltdofunc 110-129, pSrvHitFunc 61-70, pSpell 16-19.
+4. **Same-name comparison**: does D2R use that number for a skill or missile of the same name? If yes the number
+   probably still means the same thing; keep it and mark `verify`.
+5. Check numbers **inside** D2R's range that mean something else (misc `pSpell` 12 is D2R's Resist Scroll, 13 its
+   respec token).
+6. Several kinds of function column may need one pool of slots (the `prg` functions with the do tables). This is a
+   hypothesis, not verified.
+7. Port **events by name**, not by index (section 6).
+8. D2R's function tables are filled at run time: **log the non-null slots** once the game is up instead of trusting
+   a static dump.
+9. **Reachability pass**: which rows can the data reach at all (spawnable, in a tree, in a treasure class, in a
+   recipe)? A rule no row reaches is `unreachable` in the hook list below.
+
+### 5b. Hook list (template)
+
+One row per rule of the original engine DLL. Keep it in the repo next to the port; it is the contract for the plugin.
+
+| Column | Holds |
+|---|---|
+| Rule | What the original does, in one sentence |
+| Source | The table column and value, or the engine DLL source file named by its assert strings |
+| Bucket | a data, b service, c native hook, d UI rebuild, e cut (section 1) |
+| D2R slot | The free slot the function takes; `->` marks a re-map (`153 -> 172`) |
+| RVAs | Names only; the values live in the per-build header. `?` = not located |
+| Tier | Exact or Function-equivalent |
+| Size | S under 1 session, M 1-2, L 3+ |
+| Status | spiked, open, verify, data, unreachable, cut |
+| Test | The in-game check |
+| Work item | The issue |
+
+Prefer a PluginSDK service before a native hook, and a data change before either.
+
 ## 6. Events and behaviour D2R never raises
 
 The mod's DLL may raise events that vanilla 1.13c also had in its table but never sent, or add its own rows to
@@ -175,6 +283,18 @@ Others seen:
 | A classic timed potion added its stat as is | D2R's timed potion (`pSpell` 3, `0x57ecb0`) treats a stat's calc as the **total over the duration**, except hitpoints, mana, manarecovery and hpregen; every other stat is stored as calc / len | Multiply the calc by the `len` formula for those stats |
 | Quest kill handlers | D2R runs a quest's kill handler only while the quest is still open in that difficulty | Test with a character whose quest is open |
 
+### 6a. Rules stock 1.13c never reads, and reading a patch table
+
+- **`states.immed`**: stock 1.13c carries the column but its states loader has no field for it and no stock DLL looks
+  it up. A mod that sets `immed` changed nothing: cut the column, build no rule. Evidence and the method for any
+  doubtful column: [classic-113c-tables.md](classic-113c-tables.md) section 7.
+- **Events past row 12** (`levelup`) are the mod's or D2R's own; match by name (section 4 of
+  [classic-113c-tables.md](classic-113c-tables.md) lists the three banks).
+- A classic mod's engine DLL usually patches stock code with a table of patch records (`dll, offset, target, type`).
+  Read it as facts about stock 1.13c: each offset is a place in a stock DLL (hash the mod's DLLs first), each `call`
+  names the vanilla function it replaces. Method: [classic-113c-tables.md](classic-113c-tables.md) section 6. A
+  record gives a **rule** to re-check in D2R, never bytes to port.
+
 ## 7. Skills that can't be selected
 
 D2R's skill picker uses `leftskill` / `rightskill`; many classic DLLs did not.
@@ -189,8 +309,9 @@ D2R's skill picker uses `leftskill` / `rightskill`; many classic DLLs did not.
 ## 8. Strings, sounds, icons
 
 **Strings.** Use a D2RLoader string namespace for the mod's own keys; put new text for keys D2R already has into
-one override file. Never append new strings with numeric ids: D2R matches ids by their low 16 bits and they collide
-(an NPC greets with a skill name). Keep D2R's printf placeholders per key (`sysmsg7-9` "was slain by" crashed the
+one override file. Never append a numeric id of 65,536 or more: D2R matches ids by
+their low 16 bits, so such an id collides with a lower one (an NPC greets with a skill name). Ids below 65,536 that
+no string uses are safe; the budget and the evidence are in [strings.md](strings.md). Keep D2R's printf placeholders per key (`sysmsg7-9` "was slain by" crashed the
 client on death when the classic text had a different `%s` count). Details: [strings.md](strings.md).
 
 **Sounds.** New sound rows are appended to `sounds.txt` and referenced by name. A name that does not resolve becomes
@@ -226,6 +347,33 @@ Keep a table of what the original mod has and the port does not, with the reason
 | Cross-act portals | D2R links portals within one act | Portal opens only in its own act |
 | Classic-mode panel art | HD first | Classic panels are vanilla |
 | A rule the original engine DLL implemented and no plugin does yet | Not ported yet | Name the rule and its workaround |
+
+### 10a. Deviation status vocabulary and the D2R-only ledger
+
+Every difference from the original is a **deviation** (section 0 glossary). Give each one a status from this list, in
+the unported table or a deviation register, and no other words:
+
+| Status | Meaning | Next step |
+|---|---|---|
+| **cut** | Not reproduced, by decision | Reason and what players see; reopen only by a new decision |
+| **not yet** | Intended, not built | Owner, work item, size |
+| **approximated** | Reproduced roughly | State the difference in numbers or behaviour |
+| **exact** | Matches the original (for a hook, the parity tier is Exact or Function-equivalent, section 5) | Test that proves it |
+
+**D2R-only content.** D2R has content the original never had (rows past the original's last, new areas, items, recipes,
+runes, monsters). Rule: it is **ON by default**. It is turned off only by a recorded approval, one ledger row per item
+or group:
+
+| Column | Holds |
+|---|---|
+| Content | The D2R rows, by table and name |
+| Decision | Keep (default) or turn off |
+| Approved by, date | Who said so, and where it is recorded |
+| How it is off | Keep the row in place for id stability (section 4) and switch it off in data: `spawnable 0` (or `disabled`), removed from treasure classes, recipe disabled, area unlinked. Never delete the row |
+| Test | How you check it is off (a drop run, a recipe attempt, a walk to the area) |
+
+Large items (a whole area, a class, a system) get a decision ticket first and an approval before the ledger row.
+Without a recorded approval, D2R's content stays on.
 
 ## 11. Testing a port
 

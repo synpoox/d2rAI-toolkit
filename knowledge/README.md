@@ -12,14 +12,15 @@ rules) is covered in [porting-classic-mods.md](porting-classic-mods.md).
 | [tables.md](tables.md) | How D2R reads its `.txt` tables: banks, indexed vs keyed, IDs, adding rows safely, per-table cheat sheet |
 | [hd-graphics.md](hd-graphics.md) | HD assets: `.sprite` format, item/skill/panel art, HD json maps, overlays, player state machines, monsters |
 | [ui-layouts.md](ui-layouts.md) | `data/global/ui/layouts/*hd.json`: widget tree, grids, panels, tabs, stash/inventory/cube/skill tree |
-| [strings.md](strings.md) | String JSON files, complete-file replacement, safe new IDs, printf placeholder hazard |
+| [strings.md](strings.md) | String JSON files, complete-file replacement, safe new IDs and the id budget, reversed multi-line skill text, printf placeholder hazard |
 | [saves.md](saves.md) | `.d2s` v105 essentials, checksum, D2RLoader `.d2rl` sidecar, safe and unsafe hand edits |
 | [engine-re.md](engine-re.md) | Finding and hooking D2R code: memory dump, Ghidra headless, query scripts, hook rules, logs |
 | [d2r-93847-addresses.md](d2r-93847-addresses.md) | Address registry for build 93847: functions, tables, record and unit offsets, entry bytes |
 | [debugging.md](debugging.md) | Symptom -> cause -> fix table from real bugs, and where every log lives |
 | [crash-triage.md](crash-triage.md) | From a player's crash report to a fix: RVA from RIP, stack return addresses, Ghidra, which logs to ask for, a worked example |
 | [d2rloader.md](d2rloader.md) | D2RLoader facts and traps: default mod, the cache-building first start, other plugins, version checks, its files |
-| [porting-classic-mods.md](porting-classic-mods.md) | Porting a classic 1.13c-era mod: inventory, table-by-table conversion, ids that must not move, function numbers, events, art order |
+| [porting-classic-mods.md](porting-classic-mods.md) | Porting a classic 1.13c-era mod: decisions to make first, inventory and DLL triage, table-by-table conversion, ids that must not move, function numbers and slot-collision checklist, hook list, events, deviation statuses, art order |
+| [classic-113c-tables.md](classic-113c-tables.md) | Stock 1.13c against D2R 3.3: tables, columns, events, saves v96 vs v105, function-number ranges, `immed`, reading a mod's patch table |
 | [modkit-ops.md](modkit-ops.md) | The modkit's patch operations (JSON ops applied by `modkit build`) |
 | [cheat-commands.md](cheat-commands.md) | Setting up an in-game test from D2RLoader's console: every cheat command, item spawn lines, what they did in game |
 
