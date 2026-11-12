@@ -20,12 +20,15 @@ slot every time; set `MODKIT_TESTING_CONFIG` if the machine's config is not `./m
 1. **Lock a slot.** `python ${CLAUDE_PLUGIN_ROOT}/testing/game_slots.py status`, then `python ${CLAUDE_PLUGIN_ROOT}/testing/game_slots.py lock <N> <lane>` on a
    free slot that is yours. No free slot: wait (`--wait`), or stop and hand the steps to whoever plans the work.
 2. **Install the build** into that slot with the game closed: `python ${CLAUDE_PLUGIN_ROOT}/testing/slot_install.py --slot <N> <project>`
-   (or `${CLAUDE_PLUGIN_ROOT}/tools/install_plugins.ps1`, or `release_install.py` for the published release). Then run the stock check
-   `slot-savepath` (`python ${CLAUDE_PLUGIN_ROOT}/testing/game_checks.py run slot-savepath --slot <N>`): the slot's `modinfo.json` must name the
+   (or, for the mod's plugins, `powershell -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}/tools/install_plugins.ps1 -Game <N> -Project <mod> -Plugins <name>[,<name>]`,
+   or, for the published release, `python ${CLAUDE_PLUGIN_ROOT}/testing/release_install.py install --slot <N>`). Then run the stock check
+   `slot-savepath` (`python ${CLAUDE_PLUGIN_ROOT}/testing/game_checks.py --module stock_checks run slot-savepath --slot <N>`; `--module` goes
+   before `run`, and `stock_checks` is not in `checks.modules` by default): the slot's `modinfo.json` must name the
    slot's own save folder, or the test plays on, and writes to, somebody else's saves.
 3. **Pin the DS1 variant** when the level has several (`python ${CLAUDE_PLUGIN_ROOT}/testing/force_ds1.py --slot <N> "<Level>=<File>.ds1"`),
    game closed. Otherwise the warp can land on another layout. `--reset` undoes it.
-4. **Start the game** in HD on a character that meets "The test character" below:
+4. **Start the game** in HD on a character that meets "The test character" below (make it first, with the game closed; the
+   order is in that section):
    `python ${CLAUDE_PLUGIN_ROOT}/testing/game_ctl.py --slot <N> start`.
 5. **Set the cheats** through the console, one line each: `debug_mode`, then for example `cheat god 1`,
    `cheat nogethit 1`, `cheat speedup 300` (`python ${CLAUDE_PLUGIN_ROOT}/testing/game_ctl.py --slot <N> console "cheat god 1"`).
@@ -61,13 +64,20 @@ One shot should answer the question. Before each shot:
 ## The test character
 
 Every test character is **level 99 with experience 3520485254, 490 stat points and 98 skill points** (owner rule,
-2026-11-11). Make it with the game closed, on the slot's own save folder (`modkit save-set` backs the folder up first):
-`python -m modkit save-set <save.d2s> level=99 experience=3520485254 statpts=490 newskills=98` (stat names are
-itemstatcost's; ${CLAUDE_PLUGIN_ROOT}/knowledge/saves.md). Hell is not open on a fresh character: `${CLAUDE_PLUGIN_ROOT}/testing/save_edit.py` (`unlock_difficulties`).
+2026-11-11). Order of work, game closed unless said otherwise:
 
-Create it with the **Reign of the Warlock** game version, which is the default at character creation. A Classic or Lord of
-Destruction character plays D2R's vanilla base tables, not the mod's (the LoD character shows an X badge on the
-character select banner), and `cheat expansion 2` does not convert it: it crashed the game
+1. Create the character in the slot's game with the **Reign of the Warlock** game version (the default at character
+   creation), save and exit, then `python ${CLAUDE_PLUGIN_ROOT}/testing/game_ctl.py --slot <N> stop`.
+2. Set the stats on the slot's own save folder (`modkit save-set` backs the folder up first):
+   `python -m modkit save-set <save.d2s> level=99 experience=3520485254 statpts=490 newskills=98` (stat names are
+   itemstatcost's; ${CLAUDE_PLUGIN_ROOT}/knowledge/saves.md). This line is checked offline against the field names and bit widths only; it has
+   not yet been run on a real save, so look at the character's level in game once.
+3. Open Hell (a fresh character has it closed). `save_edit.py` has no command line, call the function:
+   `python -c "import sys; sys.path.insert(0, r'${CLAUDE_PLUGIN_ROOT}/testing'); from save_edit import unlock_difficulties; unlock_difficulties(r'<save.d2s>')"`.
+4. Start the game on it (recipe step 4).
+
+A Classic or Lord of Destruction character plays D2R's vanilla base tables, not the mod's (the LoD character shows an X
+badge on the character select banner), and `cheat expansion 2` does not convert it: it crashed the game
 (${CLAUDE_PLUGIN_ROOT}/knowledge/cheat-commands.md).
 
 ## Rules
@@ -77,7 +87,8 @@ character select banner), and `cheat expansion 2` does not convert it: it crashe
    the monster, the level and the stats. Clicks and movement are hard to get right; use them only for what the console
    cannot do.
 3. **Ten minutes without significant progress on what the check checks: stop.** Stop the game, unlock the slot, and file
-   an issue labelled `ready-for-human` with the steps left and what you already verified.
+   an issue labelled `ready-for-human` (or the project's equivalent; the label may not exist in a mod repo, so create it
+   first with `gh label create ready-for-human`) with the steps left and what you already verified.
 4. **Hold one lock from install to cleanup.** Take the slot once, install, test, stop, unlock. Do not release and retake
    it between steps; another lane can take it in the gap and your install is gone.
 5. **Never `lock any`.** Name the slot. `any` takes the first free slot, which can be another project's.

@@ -85,10 +85,11 @@ address, a fix), add it to `${CLAUDE_PLUGIN_ROOT}/knowledge/` in the toolkit and
    - formula syntax;
    - sequence skills need SQ plus an HD state;
    - new missiles need an HD model, new items need an HD picture entry.
-6. **Install only with the game closed**; restart the game after every install (in a slot, `game_ctl.py start`).
+6. **Install only with the game closed**; restart the game after every install (in a slot, `python ${CLAUDE_PLUGIN_ROOT}/testing/game_ctl.py --slot <N> start`).
 7. **You run the in-game checks, in a game slot; you diagnose from files.** The `d2r-in-game-testing` skill has the
    recipe and the rules. Ask the human only when a check needs one. Keep a TESTING.md in the mod project with a row per
-   installed change (what, how, expected) and keep working; don't stop to ask for each test. On "it crashed", read
+   installed change (what, how, expected) and keep working. Every test character is level 99 (experience 3520485254,
+   490 stat points, 98 skill points), made with the Reign of the Warlock game version; don't stop to ask for each test. On "it crashed", read
    the logs (d2r-debug skill) before asking anything. A player's crash report goes through the d2r-crash skill and
    ${CLAUDE_PLUGIN_ROOT}/knowledge/crash-triage.md. Porting a classic mod goes through the d2r-port skill and
    ${CLAUDE_PLUGIN_ROOT}/knowledge/porting-classic-mods.md, and only with the mod creators' permission: confirm it with the user first.

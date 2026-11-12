@@ -43,7 +43,7 @@ Every test character is level 99 with experience 3520485254, 490 stat points and
 2026-11-11), made with the Reign of the Warlock game version (the default):
 `save-set <save> level=99 experience=3520485254 statpts=490 newskills=98`.
 `python -m modkit save-info <save.d2s> [--extended] [--project <dir>]` shows stats and class skill points;
-`save-set <save> level=30 strength=100 --skill 12=1` edits them (backs up the save folder first, fixes the
+`save-set` takes any stat by its itemstatcost name and `--skill <id>=<points>`, for example `save-set <save> strength=100 --skill 12=1`; it edits them (backs up the save folder first, fixes the
 checksum and D2RLoader's .d2rl hashes). Never hand-write items into saves; use D2R's debug Item Spawner.
 
 ## Shipping

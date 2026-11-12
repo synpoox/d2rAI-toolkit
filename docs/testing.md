@@ -550,7 +550,7 @@ testing rules are in the `d2r-in-game-testing` skill (`.claude/skills/d2r-in-gam
 
 Every test character is **level 99 with experience 3520485254, 490 stat points and 98 skill points** (owner rule,
 2026-11-11). Make it with the game closed: `python -m modkit save-set <save.d2s> level=99 experience=3520485254
-statpts=490 newskills=98` (backs the folder up first), and open Hell with `testing/save_edit.py`. Create it with the
+statpts=490 newskills=98` (backs the folder up first), and open Hell with `save_edit.unlock_difficulties(<save.d2s>)` (a function, no command line; the call is in the `d2r-in-game-testing` skill). The level-99 line has not yet been run on a real save. Create it with the
 Reign of the Warlock game version (the default). A Classic or Lord of Destruction character plays D2R's vanilla base
 tables, not the mod's; see [cheat-commands.md](../knowledge/cheat-commands.md).
 

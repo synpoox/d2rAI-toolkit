@@ -1,6 +1,6 @@
 # Installs a mod's built plugins into a TEST SLOT of the testing config, and optionally the mod project's data. The
 # game must be closed. -Game is required and must be a configured test slot (slot 2 and up, MODKIT_TESTING_CONFIG):
-# the script never touches slot 1 or the real install (CLAUDE.md rule 7). The slot lock must be held by MODKIT_RUN
+# the script never touches slot 1 or the real install (CLAUDE.md rule 8). The slot lock must be held by MODKIT_RUN
 # (testing\game_slots.py lock <n> <owner>); this is checked first, on every run, before anything is copied or moved.
 #   powershell -ExecutionPolicy Bypass -File tools\install_plugins.ps1 -Game <slot> -Project <mod> -Plugins my-rules,my-ui
 #   powershell -ExecutionPolicy Bypass -File tools\install_plugins.ps1 -Game <slot> -Project <mod> -Plugins my-rules -Data
