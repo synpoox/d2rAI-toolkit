@@ -26,13 +26,15 @@
 // srvdofunc: non-zero = the skill ran (zero refuses the cast).
 using SrvDoFn = int64_t (*)(d2r::Game* game, d2r::Unit* unit, int32_t skillId, int32_t level) noexcept;
 
-// Missile functions. Return values as D2R's callers read them:
+// Missile functions (signatures as documented in knowledge/ for build 93847):
 using MissileSrvDoFn = int64_t (*)(d2r::Game* game, d2r::Unit* missile) noexcept;
-// D2R's collision deals the missile's damage only when the result has bit 2 (srvhit 4 returns 3, or 1 without a
-// missile row).
-using MissileSrvHitFn = int32_t (*)(d2r::Game* game, d2r::Unit* missile, d2r::Unit* hit) noexcept;
-using MissileCltDoFn = void (*)(d2r::Unit* missile, int32_t a2) noexcept;
-using MissileSrvDmgFn = void (*)(d2r::Game* game, d2r::Unit* missile, d2r::Unit* target, uint8_t* damage) noexcept;
+// srvhit: `hit` is null when the missile hit nothing. Its return value is not confirmed for build 93847 (see
+// knowledge/d2r-93847-addresses.md), so the type is the documented void and nothing here reads a result.
+using MissileSrvHitFn = void (*)(d2r::Game* game, d2r::Unit* missile, d2r::Unit* hit) noexcept;
+// cltdo: the second argument is a float (xmm1 on x64), not an int.
+using MissileCltDoFn = void (*)(d2r::Unit* missile, float partFrame) noexcept;
+// d2r::Damage is opaque: its layout is not mapped yet.
+using MissileSrvDmgFn = void (*)(d2r::Game* game, d2r::Unit* missile, d2r::Unit* target, d2r::Damage* damage) noexcept;
 // Zero skips the rest of the client's hit (for example the explosion missile).
 using MissileCltHitFn = int32_t (*)(d2r::Unit* missile, d2r::Unit* hit) noexcept;
 
@@ -43,8 +45,8 @@ inline constexpr int MaxRoutes = 64;
 // The router's slot: the last srvdofunc slot (190).
 inline constexpr int Slot = d2r::rva::SrvDoSlots - 1;
 
-// Routes `skillId` to `function`. False when the table is full, the id is already routed, or an argument is invalid.
-// Call it before InstallRouter, never from a skill function.
+// Routes `skillId` to `function`. False when the table is full, the id is already routed, an argument is invalid, or
+// the router is already installed. Call it before InstallRouter, never from a skill function.
 auto Add(int32_t skillId, SrvDoFn function) noexcept -> bool;
 
 // The srvdofunc the router's slot holds: picks the route of `skillId`. Exposed for tests.

@@ -115,19 +115,20 @@ constexpr SlotFunction Functions[] = {
 	// {173, SrvDoYourSkill, "your skill"},
 };
 
-static_assert(sizeof(Functions) / sizeof(Functions[0]) <= d2r::rva::SrvDoSlots - d2r::rva::SrvDoFirstFree);
+static_assert(sizeof(Functions) / sizeof(Functions[0]) <= skill_router::Slot - d2r::rva::SrvDoFirstFree);
 
 }  // namespace
 
 auto InstallSkillFunctions(const D2RL::PluginContext* context, char* report, size_t reportSize) noexcept -> int {
 	static constexpr uint8_t Empty[8] = {};  // the slot must still be a null pointer
+	// skill_router::Add(MySkillId, SrvDoMySkill);  // routed skills share slot 190; add them here, before the router below
 	int installed = 0;
 	size_t used = 0;
 	if (reportSize > 0) {
 		report[0] = '\0';
 	}
 	for (const SlotFunction& f : Functions) {
-		bool ok = f.slot >= d2r::rva::SrvDoFirstFree && f.slot < d2r::rva::SrvDoSlots;
+		bool ok = f.slot >= d2r::rva::SrvDoFirstFree && f.slot < skill_router::Slot;
 		if (ok) {
 			const uint64_t rva = d2r::rva::SrvDoTable + static_cast<uint64_t>(f.slot) * 8;
 			ok = context->PatchWriteU64(rva, Empty, sizeof(Empty), reinterpret_cast<uint64_t>(f.function));
