@@ -75,7 +75,7 @@ Only what the moves need. Other housekeeping in the mod repos is out of scope.
 
 | # | Repo | Task |
 |---|---|---|
-| 0.1 | Project Forever | Commit the uncommitted `docs/research/*` inventories that 5.8 reads (local `main` is behind origin; pull first). Leave the uncommitted old `GLOSSARY.md` out. |
+| 0.1 | Project Forever | **Done 2026-11-11:** the `docs/research/*` inventories, committed as written, are on branch `docs/research-inventories` (00d1e38), cut from `origin/main`. The local `main` checkout shares no history with origin; re-clone or reset it before other work. |
 | 0.2 | resurrected-09 | Pull (local `main` is 31 commits behind). Nothing uncommitted is a source. |
 | 0.3 | Project Forever, resurrected-09 | Keep the `research/*` and `ticket/*` branches that 5.1, 5.4 and 5.8 read; do not delete them until their content has moved. |
 | 0.4 | toolkit | Add `pd2-data/` to `.gitignore` or move it out of the repo. Delete or move `mpyq-0.2.5.tar.gz`, `hs_err_pid*.log` and `replay_pid*.log`. Commit or drop the uncommitted `tools/ghidra_scripts/{FuncsInRange,RangeAsm}.java`. |
@@ -300,7 +300,7 @@ The three repos carry drifting copies of the same agent scaffold. Write it once 
 | Gate rule: docs-only PRs skip CI unless they touch gate inputs; otherwise green checks on the final head plus MERGEABLE; runners offline means a local run with the report pasted; a parity drop needs the owner's label | P | `d2r-project-conventions`, `templates/workflows/` | S |
 | Changelog fragments and "new pass or hook = new module with `ORDER`, never a shared list" | P | `d2r-release` skill, `templates/` | S |
 | Roadmap: lettered work-item prefixes, one session per item, status kept on issues, a Blocked-by column | P | `templates/PLAN.md` | S |
-| Decision records: an ADR template with Considered Options, Consequences and dated Amendments, **or** a single map issue with "owner's call #N" in the deviation rows. Document both; each project picks one. | P (ADRs), 9 (map issue), F (ADR) | `templates/ADR.md`, `docs/ai-workflow.md` | S |
+| Decision records: **one baseline, ADRs** (owner, 2026-11-11). `docs/adr/NNNN-<slug>.md` with Status, Context, Considered Options, Decision, Consequences and dated Amendments. A deviation row cites its ADR. resurrected-09's map issue #12 becomes ADRs when it switches. | P, F (ADRs), 9 (map issue) | `templates/ADR.md`, `docs/ai-workflow.md`, `d2r-project-conventions` | S |
 | Ledgers: deviations (kept / cut / not yet / approximated, each with why, feeding `diff.gate`), origin bugs, D2R-only approvals | P, 9 | `templates/deviations.md`, `templates/origin-bugs.md`, `templates/d2r-only-content.md` | S |
 | Research docs: one `research/<topic>` branch per ticket; header with question, ticket and date read; evidence labels; sources pinned by SHA or hash; short answer; options with cost and risk and "no choice made"; an unverified list with runtime checks | F, 9 | `templates/research.md` | S |
 | Orchestrator: never implements, separate implementer and Opus reviewer, at most 5 agents, at most 2 fix cycles, workers never wait on CI, never touch runners, handoff on an orphan `handoff/*` branch | P (`.claude/skills/orchestrator`, `handoff/orchestrator-*`) | Merge into `d2r-coordinator`, `templates/coordinator-prompt.md`, new `templates/handoff.md` | M |
@@ -355,7 +355,7 @@ Each becomes one toolkit issue, fixed with evidence while doing the matching mov
 | 14 | No free slot | lane rules: poll up to about 30 minutes | P: stop and file `ready-for-agent`; workers never wait on CI |
 | 15 | Screenshots | never commit them | P: an orphan `issue-assets` branch. Reconcile: never on `main` |
 | 16 | Changelog | the coordinator writes version sections | P: fragments only |
-| 17 | Test character level | — | P AGENTS.md says 90+; the owner's rule is 95 for every test character. Use 95. |
+| 17 | Test character level | — | P AGENTS.md says 90+. The owner's rule (2026-11-11): every test character is level 99 with matching experience (3520485254), 490 stat points and 98 skill points. |
 
 ## 7. Toolkit hygiene (rule 11)
 
@@ -401,7 +401,10 @@ when that happens, kept small by phase 1:
 
 ## 10. Owner decisions
 
-1. Phase 0.1: commit Project Forever's uncommitted research inventories as they are, or review them first?
-2. Decision records: should each project keep its own style (ADRs in pd2-resurrected and Project Forever, the map
-   issue in resurrected-09), or should the toolkit pick one?
-3. Confirm level 95 for the shared testing rules (contradiction 17).
+Settled 2026-11-11:
+
+1. Project Forever's research inventories: committed as written (0.1).
+2. Decision records: the toolkit sets one baseline, ADRs (5.9).
+3. Test characters: level 99 (contradiction 17).
+
+No decisions are open.
