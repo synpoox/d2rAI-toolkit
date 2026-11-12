@@ -178,7 +178,7 @@ Getter `0x97790` (dataFlag, skillId) -> record.
 | 65 | `0x563d90` | stat aura (aurastate on caster, auratargetstate on targets) |
 | 66 | `0x5630e0` | damage aura (Holy Fire/Shock); finder callback `0x561280` |
 | 68 | `0x567500` | nova + buff (Shout style) |
-| 76 | `0x568f40` | Whirlwind do (hit delay `0x56ac00`, called at `0x56916d`, `0x569186`, `0x5691e2`) |
+| 76 | `0x568f30` | Whirlwind do: the slot holds a 5-byte `jmp` thunk to the body at `0x568f40`, the address to hook (hit delay `0x56ac00`, called at `0x56916d`, `0x569186`, `0x5691e2`) |
 | 109 | `0x5822b0` | itemless town portal (skill 411); `0x46fa70` finds destination town and makes the portal, `0x470ae0` links the town side |
 | 113 | `0x584b60` | scroll/book skills: only sends packet 0x3f to the client (`0x47f520`) |
 | 121 | `0x576bb0` | Rabies (melee + state + missile; missile choice `0x571700`) |
@@ -245,7 +245,7 @@ empty). Functions holding one inline its destruction (see `0x5630e0`'s epilogue)
 | `0x3bb0f0` | (missile) -> frames elapsed |
 | `0x3bb1e0` | (missile) -> frames left |
 | `0x3bdbc0` / `0x3bd450` / `0x3bd8a0` | total frames / set frames left / set step counter |
-| `0x2390e80` | **server do table** (record +0x2c), no bound, dispatcher `0x466ce0`; 46-54 empty |
+| `0x2390e80` | **server do table** (record +0x2c), no bound, dispatcher `0x466ce0`; 46-53 empty (the next table starts at `0x2391030` after slot 53) |
 | `0x2391030` | **server hit table** (record +0x2e), bound 71 at `0x2391404`, dispatcher `0x464ac0` (game, missile, target or null); **61-70 empty** |
 | `0x2358430` | **client do table** (record +0x28), called (missile, float part-frame) from `0x1ba040`; slot 14 unused |
 | `0x2358710` | **client hit table** (record +0x2a), bound 81 at `0x2358a64`; slots 6, 7 empty |
@@ -452,7 +452,7 @@ pairs and `scha`/`pelt`. The plugin template's `item_type_check.cpp` checks them
 Table slots are written with `PatchWriteU64(table + 8*slot, expected, 8, function)`: expected 0 for an empty slot,
 the current pointer when wrapping a D2R function. srvdofunc `0x238ea00` (free 172-190), cltdofunc `0x235f7d0` (free
 110-129), server missile hit `0x2391030` (free 61-70), client missile hit `0x2358710` (6, 7 empty), server missile
-do `0x2390e80` (46-54 empty), client missile do `0x2358430` (14 unused). Item spell flag:
+do `0x2390e80` (46-53 empty), client missile do `0x2358430` (14 unused). Item spell flag:
 `PatchWriteU32(0x236fe30 + 12*slot + 8, 0 -> 1)`.
 
 ## Inventory grid widget (build 93847)
@@ -475,3 +475,21 @@ do `0x2390e80` (46-54 empty), client missile do `0x2358430` (14 unused). Item sp
 After `0x2dc4b0` returns, `out` is plain ASCII with one line per LF, bottom line first and no colour codes (tested in game). Lines with the same stat are already merged, so a line can hold values from more than one source.
 
 Unlike tooltip listeners, this buffer takes colour codes: U+E07E plus the code character. `;` is purple and `3` is the property blue; a code holds for the rest of its line and later lines (tested in game).
+
+## Unverified table addresses (tools/probe_tables.py, build 93847)
+
+Built into `tools/probe_tables.py` and printed there as "(UNVERIFIED)". No Ghidra evidence is recorded for them yet: confirm each one (what it is, how found) and move it into the sections above, or drop it. Probe-only, so none belongs in `shared/plugin-common/src/rvas_93847*` unless plugin code starts using it.
+
+| RVA | Guess | Status |
+|---|---|---|
+| `0x235f590` | cltstfunc (client start function) table, bound u32 at `0x235f7c0` | unverified |
+| `0x2391270` | missile damage function table (`msrvdmg`), bound u32 at `0x2391408` | unverified |
+| `0x2386bd8` | u32 bound of the property function table `0x2386ab0` | unverified |
+| `0x1d1945c` | u32 read as the compiled-formula (prgcalc) count, named `prgcalc_bound` | unverified |
+| `0x238e710` | srvstfunc table size: the tool reads up to the next table `0x238ea00` (94 slots); an earlier draft used 91 | unverified |
+
+## Monster AI table (build 93847)
+
+| RVA | Meaning |
+|---|---|
+| `0x2396e90` | Monster AI table: 155 records of 32 bytes `{kind (u64), init fn, think fn, next}`, absolute 64-bit pointers (image base `0x140000000`). Indexed by the row of `monai.txt` (the monstats `AI` column names the row). Examples: Skeleton think `0x5b43a0`, Brute `0x5acc20`, Zombie `0x5ba780`, BloodHawk `0x5aca20`. Read from a memory-layout dump; pairs with 1.09d's AI table in [porting-classic-mods.md](porting-classic-mods.md). The generator `shared/classic_import/gen_109d_monster_ai.py` reads it |

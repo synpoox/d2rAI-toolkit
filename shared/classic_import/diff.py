@@ -10,9 +10,11 @@ project's `statuses`, which the project always names); a table with a Gate colum
 """
 from __future__ import annotations
 
+import argparse
 import fnmatch
 import re
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
@@ -171,13 +173,14 @@ def triage(res: Result, patterns: list[str]) -> Result:
 
 def gate(src_excel: Path, mod_excel: Path, d2r_excel: Path, deviation_list: Path, statuses: tuple[str, ...],
          select: Callable[[str], bool] = lambda table: True, lists: dict[str, list[ids.Line]] | None = None,
-         tables_json: dict | None = None,
+         tables_json: dict | None = None, renames: dict[str, dict[str, str]] | None = None,
          compare_args: Callable[[str], dict] = lambda table: {}, source: str = "source",
          extract_hint: str = "run the extract") -> Report:
     """Compare every source table `select` picks with the mod's: the merged one in mod_excel, else D2R's (not merged
     yet), else none (a deviation of the whole table). `statuses` are the project's deviation statuses, in the order
     the report counts them (no default: each project names its own). `lists` are the project's id lists, `tables_json` its
-    tables.json (for each table's `rows`); compare_args(table) gives that table's extra compare() arguments (id_map,
+    tables.json (for each table's `rows`); `renames` are the merge's other renames (tables.extra_renames), added to
+    the id lists'; compare_args(table) gives that table's extra compare() arguments (id_map,
     by_row, list_paired, fix_row, fix, spell). A deviation list pattern for a whole merged table fails the run."""
     if not d2r_excel.is_dir():  # else every unmerged table would read as unshipped
         raise GateError(f"no D2R tables under {d2r_excel}: run `modkit fetch` or pass the D2R data root")
@@ -185,7 +188,7 @@ def gate(src_excel: Path, mod_excel: Path, d2r_excel: Path, deviation_list: Path
     if not any(src_excel.glob("*.txt")):  # else the gate compares nothing and passes
         raise GateError(f"no {source} tables under {src_excel}: {extract_hint}")
     lists = lists or {}
-    ren = ids.renames(lists)
+    ren = {**ids.renames(lists), **(renames or {})}
     results = []
     for p in sorted(p for p in src_excel.glob("*.txt") if select(p.stem.lower())):
         found = next(((s, f / p.name) for s, f in (("merged", mod_excel), ("D2R", d2r_excel)) if (f / p.name).is_file()),
@@ -202,6 +205,39 @@ def gate(src_excel: Path, mod_excel: Path, d2r_excel: Path, deviation_list: Path
                                 "row")
         results.append(triage(res, patterns))
     return Report(results, entries)
+
+
+def fix_of(finish: ids.Finish | None) -> Fix | None:
+    """A merge's `finish` hook (ids.finishes, ids.props_finish, ...) as the `fix` compare() takes, so the gate spells a
+    source row exactly as the merge fixed it. The D2R row a finish may read is not known here (None), as for a row
+    the merge appended."""
+    if finish is None:
+        return None
+    return lambda table, header, want, src_header, src_row: finish(header, want, dict(zip(src_header, src_row)), None)
+
+
+def scope_of(scopes: dict[str, Callable[[str], bool]], name: str) -> Callable[[str], bool]:
+    """The `select` of a named scope; an unknown scope is a GateError."""
+    if name not in scopes:
+        raise GateError(f"scope {name!r} is not one of {', '.join(scopes)}")
+    return scopes[name]
+
+
+def cli(prog: str, scopes: dict[str, Callable[[str], bool]], run_gate: Callable[[Callable[[str], bool]], Report],
+        argv: list[str] | None = None, root: Path | None = None, source: str = "Source", description: str = "") -> int:
+    """A project's gate command line: `--scope NAME` picks a table selection of `scopes`, `run_gate(select)` returns the
+    Report (the project calls gate() with its paths, id lists and compare_args). Prints the markdown report; exit 0 when
+    nothing is open, 1 when something is, 2 when the deviation list, an id list or the scope is broken."""
+    ap = argparse.ArgumentParser(prog=prog, description=description)
+    ap.add_argument("--scope", required=True, help="one of: " + ", ".join(scopes))
+    a = ap.parse_args(argv)
+    try:
+        rep = run_gate(scope_of(scopes, a.scope))
+    except (GateError, ids.IdError) as e:
+        print(f"{prog}: {e}", file=sys.stderr)
+        return 2
+    print(report(rep, a.scope, commit_of(root) if root else "", source))
+    return 0 if rep.ok else 1
 
 
 def escape_pipes(v: str) -> str:
