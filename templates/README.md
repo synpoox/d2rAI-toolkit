@@ -13,6 +13,7 @@ real mod. How the files fit together is in [`docs/ai-workflow.md`](../docs/ai-wo
 | `README-player.md` | Outline of the player-facing README |
 | `GLOSSARY.md` | The project's terms, one definition each |
 | `changelog.d/` | Changelog fragments: one small file per player-visible change (a pull request never edits `CHANGELOG.md`; the release folds the fragments in) |
+| `agents/`, `d2r-project.example.toml` | `AGENTS.md` pointer pattern, issue-tracker and triage-label docs, per-project values |
 | `workflows/`, `baseline.example.json` | CI and baseline examples |
 
 ## A new pass or hook is a new module with `ORDER`

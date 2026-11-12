@@ -14,7 +14,7 @@ You plan, brief, review, merge and report. You do not do the big implementation 
 1. Fill in `${CLAUDE_PLUGIN_ROOT}/templates/coordinator-prompt.md` (name, game version and build, loader, repo, hosting, providers). Ask
    the owner for anything you can't decide: **name, hosting, public or private, which providers they have.** Pick
    sensible defaults for everything else and say which.
-2. Copy `${CLAUDE_PLUGIN_ROOT}/templates/lane-rules.txt` to the runs folder and adapt it. Create `docs/PLAN.md`, `docs/bugs.md` and a `changelog.d/` folder
+2. Copy `${CLAUDE_PLUGIN_ROOT}/templates/agents/` into the repo (`AGENTS.md`, `docs/agents/`) and a `.d2r-project.toml` from `${CLAUDE_PLUGIN_ROOT}/templates/d2r-project.example.toml`; adapt them. Create `docs/PLAN.md`, `docs/bugs.md` and a `changelog.d/` folder
    (`CHANGELOG.md` starts from its README) from the templates.
 3. Make the private-words list **outside** the repo (`~/.d2r-modkit/private_terms.txt` or similar) and run
    `py -3 ${CLAUDE_PLUGIN_ROOT}/tools/check_public.py --root <mod repo>` before every commit (it scans `--root`, default the current directory, so never run it from the toolkit folder).
@@ -25,7 +25,7 @@ You plan, brief, review, merge and report. You do not do the big implementation 
 ## Splitting work into lanes
 - **One bug or feature per lane.** If two reports share a symptom, crash address or table, merge them in
   `docs/bugs.md` first (`duplicate of #N`), then make one lane.
-- Each lane: branch `lane/<name>` from `origin/main`, its own worktree, a prompt built from
+- Each lane: branch `ticket/<n>-<slug>` (see the d2r-project-conventions skill) from `origin/main`, its own worktree, a prompt built from
   `${CLAUDE_PLUGIN_ROOT}/templates/lane-prompt.md`, a PR at the end. **Lanes never merge.**
 - Start lanes as child tasks of your session so their reports come back to you, each with a unique request id.
   Not as separate top-level conversations.

@@ -4,6 +4,7 @@ A project is a folder:
 
     mymod/
       mod.json          {"name": "MyMod", "savepath": "MyMod/", "extendedSaves": false, "plugins": []}
+                        (optional "namespace": "<name>" opts in to D2RLoader string namespaces, see modkit/install.py)
       patches/*.json    change lists, applied in file-name order (each: {"ops": [...]} or a bare list)
       assets/           PNGs and other inputs the patches name
       files/data/...    files copied as they are into the mod (applied before the patches)

@@ -55,8 +55,8 @@ on d2rAI-toolkit: `python -m modkit`, the knowledge base in `knowledge/` and the
    - the **hosting** location `<HOSTING>`;
    - **public or private**, and when;
    - which **providers and models** they have access to.
-6. Set up game slots (see section 4), the private-words list outside the repo, and the lane rules
-   (`lane-rules.txt`, from the template).
+6. Set up game slots (see section 4), the private-words list outside the repo, and the agent scaffold
+   (`AGENTS.md` and `docs/agents/`, from `templates/agents/`; per-repo values in `.d2r-project.toml`).
 
 ## 2. Providers, models, and who does what
 
@@ -85,19 +85,20 @@ a follow-up telling it to keep going.
 
 ## 3. Standing rules (give every lane these)
 
-Create `<RUNS PATH>/lane-rules.txt` from `templates/lane-rules.txt` and adapt it. Every lane prompt starts with
-"read the rules and follow them". Summary of what they must say:
+Create `AGENTS.md` and `docs/agents/` in the repo from `templates/agents/` and adapt them. Every lane prompt starts with
+"read AGENTS.md and follow it". Its "Working rules" must say (the template does):
 
-1. Commit identity and trailers (noreply only).
-2. The forge token is read from a file by scripts, never printed.
+1. Commit identity and trailers (noreply only); PR body and final report format.
+2. Tokens and keys are read from a file by scripts, never printed.
 3. Never commit game files, dumps, saves or screenshots.
 4. No real input in tests (no synthetic keyboard or mouse, no focus stealing).
-5. Never touch the owner's real game install.
-6. Game slots are shared and queued, not added. Lock for the session, put the slot on every command, wait in a
-   bounded loop when all are taken.
+5. Never touch the owner's real game install, or saves of characters the lane did not create.
+6. Game slots are shared and queued, not added. Lock for the session, put the slot on every command, `MODKIT_RUN`,
+   check the lock is still yours before installing. When all are taken, wait in a bounded loop, then stop and file a
+   `ready-for-agent` issue rather than polling long.
 7. Targeted tests only; full suite only at milestones.
 8. Test what players get (release-like install).
-9. Lanes open PRs and never merge. You merge.
+9. Lanes open PRs and never merge. You merge. Ask you before anything public, paid or destructive.
 10. Never end a turn while something you started is still running.
 
 <ADD PROJECT-SPECIFIC RULES HERE, e.g. "follow the source mod over vanilla D2R where they differ; unportable gaps go

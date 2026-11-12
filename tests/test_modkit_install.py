@@ -77,5 +77,39 @@ class InstallTests(unittest.TestCase):
                 self.assertIn("(0 written", mi.install(proj, game))
 
 
+class NamespaceTests(unittest.TestCase):
+    def metadata(self, mod: dict) -> dict:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            proj, game = tmp / "proj", tmp / "game"
+            write(proj / "mod.json", json.dumps(mod))
+            write(proj / "out" / "data" / "a.txt", "1")
+            write(game / "D2R.exe", "")
+            with mock.patch.object(mi, "game_running", lambda: False), \
+                    mock.patch.object(mi, "configured_slot", lambda g: None):
+                mi.install(proj, game)
+            return json.loads((game / "mods" / "M" / "d2rloader" / "metadata.json").read_text("utf-8"))
+
+    def test_mod_json_namespace_is_written_at_the_top_level(self):
+        meta = self.metadata({"name": "M", "namespace": "mymod"})
+        self.assertEqual(meta["namespace"], "mymod")
+        self.assertEqual(meta["schemaVersion"], 1)
+        self.assertNotIn("namespace", meta["metadata"])
+
+    def test_no_namespace_key_without_one_in_mod_json(self):
+        self.assertNotIn("namespace", self.metadata({"name": "M"}))
+
+    def test_invalid_or_reserved_namespace_is_refused(self):
+        for ns in ("my mod", "d2r", "d2rloader", "", 5, "x" * 257, "a:b"):
+            with self.subTest(ns=ns):
+                with self.assertRaises(ValueError):
+                    mi.namespace({"namespace": ns})
+
+    def test_valid_namespaces_pass(self):
+        for ns in ("a", "My-Mod_1.x", "x" * 256, "d2rl-sample"):
+            self.assertEqual(mi.namespace({"namespace": ns}), ns)
+        self.assertIsNone(mi.namespace({}))
+
+
 if __name__ == "__main__":
     unittest.main()
