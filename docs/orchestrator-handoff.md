@@ -20,10 +20,10 @@ Write the confirmation in plain words, no plan jargon, in this shape:
 
 > **Phase 2, lane A: the 1.13c table layer.** 6 moves, about 3 sessions, 1 PR per move.
 >
-> | What | From | To (its toolkit name) | Why |
-> |---|---|---|---|
-> | Game-file cache | pd2-resurrected `tools/pd2_cache.py` | `shared/classic_import/cache.py` (`classic_import.cache`) | Every port extracts the same game files; one shared cache instead of one per mod |
-> | Id rules | pd2-resurrected `tools/pd2_ids.py` (the algorithm only) | merged into `shared/classic_import/ids.py` | The toolkit already has an older copy; the PD2 id lists stay in pd2-resurrected |
+> | Item | What it does | From | To (its toolkit name) | Why |
+> |---|---|---|---|---|
+> | Game-file cache | Extracts the game files once per game build and reuses them, so builds don't unpack the game every time | pd2-resurrected `tools/pd2_cache.py` | `shared/classic_import/cache.py` (`classic_import.cache`) | Every port extracts the same game files; one shared cache instead of one per mod |
+> | Id rules | Gives new table rows ids that never shift existing ones, and rewrites references to renamed rows | pd2-resurrected `tools/pd2_ids.py` (the algorithm only) | merged into `shared/classic_import/ids.py` | The toolkit already has an older copy; the PD2 id lists stay in pd2-resurrected |
 >
 > **Stays behind:** the PD2 rules map and id lists (they are PD2 content).
 > **What changes for the mods:** nothing yet; each mod switches later in its own PR.
@@ -34,6 +34,8 @@ Write the confirmation in plain words, no plan jargon, in this shape:
 Rules for the table:
 
 - One row per thing that moves. Group small files only when they move as one unit.
+- "What it does" says in one plain sentence what the tool does, or what the page, header or template provides,
+  without code names.
 - "To" gives the path and the name people will use for it (Python module, CLI command, skill, header, or knowledge
   page title). Names never contain a mod name. Versioned items carry the version (`classic-113c-tables.md`).
 - "Why" is one short sentence a non-programmer can follow.
