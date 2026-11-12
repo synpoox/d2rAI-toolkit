@@ -61,6 +61,14 @@ Ghidra notes. "Hooked" = installed with the entry bytes shown and ran in game.
 | `0x32c4a0` | (dataFlag, level) -> record | levels.txt record; +0x0e u8 Teleport (0 no, 1 yes, 2 clear line) |
 | `0x3e2b5c8` | (dataFlag, level id) -> act | level's act (address as used by the port; unusual range, verify) |
 
+Client unit tables (build 93847; data addresses, read with ReadProcessMemory by `testing/unit_probe.py`; not yet confirmed against a running game: unit
+ids and offsets as in the table above, class at unit +0x04, id at +0x08, mode at +0x0c, next in the bucket at +0x158):
+
+| RVA | Meaning |
+|---|---|
+| `0x2a23910` | `ClientUnits`: 128 x Unit* per unit type, `type * 0x400` apart (players, monsters, objects, items), bucket = unit id & 0x7f. Dead monsters stay in the table (mode 0 or 12) |
+| `0x2a25d10` | `ClientMissiles`: 128 x Unit* of the client's missiles, same bucket rule; found in the client owner lookup `0x9a7b0` |
+
 ## Stats and stat lists
 
 | RVA | Signature | Meaning |

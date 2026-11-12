@@ -11,6 +11,11 @@ namespace d2r::rva {
 inline constexpr uint64_t LocalPlayerSlot = 0x8b2d0;  // () -> slot of the local player
 inline constexpr uint64_t ClientPlayer = 0x9a480;  // (slot) -> the client's player unit in that slot
 inline constexpr uint64_t ClientFindUnit = 0x9a5d0;  // (id, type) -> the client's unit or null
+// The client's unit tables (data, read by testing/unit_probe.py): 128 buckets of Unit* by unit id & 0x7f, the next unit
+// in a bucket at unit +0x158. ClientUnits holds players, monsters, objects and items 0x400 bytes apart (index by unit
+// type); missiles have their own table. Dead monsters stay in the table (mode 0 or 12).
+inline constexpr uint64_t ClientUnits = 0x2a23910;
+inline constexpr uint64_t ClientMissiles = 0x2a25d10;  // found in the client owner lookup ClientMissileOwner (0x9a7b0)
 inline constexpr uint64_t ClientMessage = 0x491960;  // (player, message, player); 0x15 is "can't do that"
 // (*(game + GameClients), packet): sends a chat packet 0x26 (type at +1, unit type +3, unit id +4, colour +8, name at
 // +10 up to 60 bytes, text at +0x47 up to 255) to the game's clients; it breaks on longer text. D2R's own GameChat
