@@ -94,6 +94,12 @@ What makes a slot independent:
 `python -m modkit --game <slot folder> install` refuses a slot folder of the testing config and points you here.
 Set `mods_policy = "copy"` to copy your own mods folder as well.
 
+`tools/install_plugins.ps1 -Game <folder> -Project <mod> -Plugins a,b [-Data]` wraps these for a mod with built plugins:
+it copies `<Project>\plugin\build\Release\<name>.dll` into the folder's `d2rloader\plugins\`, moves every other file
+there (stray third-party plugins) to a backup folder instead of deleting it (`-KeepExtras` leaves them), and with
+`-Data` builds and installs the project's data through `modkit install` (or `slot_install.py` for a slot) and restores
+each `modinfo.json` savepath.
+
 ## The config file
 
 All names, paths and numbers live in one TOML (or JSON) file. Nothing about your mod is written in the scripts.
