@@ -94,6 +94,24 @@ What makes a slot independent:
 `python -m modkit --game <slot folder> install` refuses a slot folder of the testing config and points you here.
 Set `mods_policy = "copy"` to copy your own mods folder as well.
 
+## Slot owners (`~/.d2r-modkit/slots.toml`)
+
+When several projects share one machine's slots, a table says whose slot is whose. It is machine config, outside every
+repo: `~/.d2r-modkit/slots.toml` (or `--slots-file F`, or `MODKIT_SLOTS_FILE`). Example:
+
+```toml
+[owners]
+"2"   = "toolkit"
+"3"   = "mod-a"
+"4-8" = "mod-b"
+```
+
+With the file present, `game_slots.py lock` (and the lock a `game_ctl.py start` or `game_checks.py run` takes) refuses a
+slot another project owns, or an owned slot when no project is given. Give your project with `--project NAME` or
+`MODKIT_PROJECT`. `lock any` picks the project's own slots first, then unowned ones, and never another project's. Slots
+not listed are free for all. No file: nothing is enforced. A file that cannot be read refuses every lock. See
+`testing/slot_registry.py`.
+
 ## The config file
 
 All names, paths and numbers live in one TOML (or JSON) file. Nothing about your mod is written in the scripts.

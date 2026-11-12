@@ -7,7 +7,7 @@ Slots 2..game.slot_count are copies in game.slots_dir. See docs/testing.md.
   python testing/game_slots.py [--config F] status
   python testing/game_slots.py list
   python testing/game_slots.py setup [N ...] [--link] [--dry-run]      (alias: sync)
-  python testing/game_slots.py lock N|any [OWNER] [--wait SECONDS]
+  python testing/game_slots.py [--slots-file F] lock N|any [OWNER] [--project NAME] [--wait SECONDS]
   python testing/game_slots.py unlock N [OWNER] [--force]
 
 `status` shows each lock's age. `unlock` refuses a lock younger than 30 min or whose owner process still runs, unless
@@ -17,7 +17,11 @@ Environment: MODKIT_RUN is the default OWNER, MODKIT_SLOT the default N. A lock 
 <runs.dir>/game.lock.N holding owner.txt: `<owner> pid=<pid> <time>`. A lock whose pid is dead is stale and is
 replaced. pid=0 marks a manual lock (made by `lock`): it lasts until `unlock`.
 
-Exit codes: 0 ok, 1 the lock is held by somebody else, 2 bad usage / config / refused (slot 1).
+A slot table (`~/.d2r-modkit/slots.toml`, see slot_registry.py) says which project owns which slot. When it exists,
+`lock` refuses a slot another project owns, or any owned slot when no project is given (--project / MODKIT_PROJECT);
+`lock any` takes only slots the project owns, else unowned ones.
+
+Exit codes: 0 ok, 1 the lock is held by somebody else, 2 bad usage / config / refused (slot 1, or another project's slot).
 """
 from __future__ import annotations
 
@@ -32,6 +36,7 @@ import uuid
 from dataclasses import dataclass
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import slot_registry as sr  # noqa: E402
 import testing_config as tc  # noqa: E402
 
 SLOT1_MSG = ("slot 1 is the user's own game: these tools never write to it, start it or lock it "
@@ -307,14 +312,20 @@ def _remove_lock(path: str) -> None:
     shutil.rmtree(tmp, ignore_errors=True)
 
 
-def acquire(cfg: tc.Config, n: int, owner: str, pid: int | None = None, alive=None) -> tuple[bool, str]:
+def acquire(cfg: tc.Config, n: int, owner: str, pid: int | None = None, alive=None,
+            registry: sr.SlotRegistry | None = None, project: str | None = None) -> tuple[bool, str]:
     """Take the lock of slot N. Returns (ok, message).
 
     Slot 1 is refused. A stale lock (its pid is dead) is replaced. pid=0 makes a manual lock that is never stale.
-    Asking again with the same owner succeeds ("already ours")."""
+    Asking again with the same owner succeeds ("already ours"). With a slot table (registry), a slot owned by another
+    project than `project` is refused."""
     n = cfg.check_slot_number(n)
     if cfg.is_slot_one(n):
         return False, SLOT1_MSG
+    if registry is not None:
+        why = registry.refusal(n, project)
+        if why:
+            return False, why
     if not valid_owner(owner):
         return False, f"bad owner name {owner!r}: use letters, digits, dot, dash, underscore"
     pid = os.getpid() if pid is None else pid
@@ -361,32 +372,42 @@ def release(cfg: tc.Config, n: int, owner: str | None = None, manual: bool = Fal
     return True, f"slot {n} unlocked"
 
 
-def ensure_lock(cfg: tc.Config, n: int, owner: str, alive=None) -> tuple[bool, str, bool]:
+def ensure_lock(cfg: tc.Config, n: int, owner: str, alive=None, registry: sr.SlotRegistry | None = None,
+                project: str | None = None) -> tuple[bool, str, bool]:
     """For tools that run a game: (ok, message, taken). taken is True when this call made the lock.
     Without a lock the call takes a manual (pid=0) session lock: a short-lived command must not leave a lock that
     looks stale the moment the command ends. Only `unlock` removes it, so a game started this way keeps its slot."""
     info = lock_info(cfg, n)
     if info is not None and info.owner == owner:
         return True, f"slot {n} locked by {owner}", False
-    ok, msg = acquire(cfg, n, owner, pid=0, alive=alive)
+    ok, msg = acquire(cfg, n, owner, pid=0, alive=alive, registry=registry, project=project)
     if ok:
         msg += f" (manual lock: run `MODKIT_RUN={owner} unlock {n} {owner}` when you are done)"
     return ok, msg, ok
 
 
 def acquire_wait(cfg: tc.Config, n: int | str, owner: str, wait_s: float = 0, poll_s: float = 5.0,
-                 sleep=time.sleep, clock=time.monotonic, out=print, pid: int | None = None
+                 sleep=time.sleep, clock=time.monotonic, out=print, pid: int | None = None,
+                 registry: sr.SlotRegistry | None = None, project: str | None = None
                  ) -> tuple[bool, str, int | None]:
     """Like acquire, but queues: while the slot is held, say who holds it and poll until wait_s ran out.
-    n may be "any": the first free slot from 2 to slot_count. Returns (ok, message, slot)."""
+    n may be "any": the first free slot from 2 to slot_count; with a slot table (registry) only the slots `project`
+    owns, then the unowned ones. Returns (ok, message, slot)."""
     deadline = clock() + wait_s
     while True:
         slots = list(range(2, cfg.slot_count + 1)) if n == "any" else [cfg.check_slot_number(n)]
         if not slots:
             return False, "there is no slot besides slot 1 (game.slot_count)", None
+        if n == "any" and registry is not None:
+            slots = registry.candidates(slots, project)
+            if not slots:
+                return False, (f"every slot is owned by another project in the slot table ({registry.source}); "
+                               f"project {project or '(none given: --project or MODKIT_PROJECT)'} owns none"), None
         msg = ""
         for s in slots:
-            ok, msg = acquire(cfg, s, owner, pid=pid)
+            ok, msg = acquire(cfg, s, owner, pid=pid, registry=registry, project=project)
+            if not ok and registry is not None and registry.refusal(s, project):
+                return False, msg, None  # not queued: waiting never makes another project's slot ours
             if ok:
                 return True, msg, s
             if cfg.is_slot_one(s):
@@ -641,6 +662,7 @@ def format_status(st: dict) -> str:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     tc.add_config_arg(ap)
+    ap.add_argument("--slots-file", help=f"slot table (default: ${sr.ENV_FILE}, then {sr.DEFAULT_FILE})")
     sub = ap.add_subparsers(dest="cmd")
     sub.add_parser("status")
     sub.add_parser("list")
@@ -653,6 +675,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("slot", nargs="?", help="slot number or 'any'")
     p.add_argument("owner", nargs="?")
     p.add_argument("--wait", type=float, default=0, help="queue: wait up to this many seconds")
+    p.add_argument("--project", default=sr.env_project(), help="your project, for the slot table (default MODKIT_PROJECT)")
     p = sub.add_parser("unlock")
     p.add_argument("slot", nargs="?")
     p.add_argument("owner", nargs="?")
@@ -664,7 +687,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         cfg = tc.load(a.config)
         return _run(cfg, a)
-    except (tc.ConfigError, SlotError) as e:
+    except (tc.ConfigError, SlotError, sr.RegistryError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
 
@@ -703,9 +726,11 @@ def _run(cfg: tc.Config, a) -> int:
     if a.cmd == "lock":
         owner = owner or "manual"
         # pid 0 (manual): this process ends right away, and a lock tied to a dead pid counts as stale
-        ok, msg, _ = acquire_wait(cfg, n, owner, a.wait, pid=0)
+        registry = sr.load(a.slots_file)  # None: no table, nothing enforced; a broken table raises (fail closed)
+        ok, msg, _ = acquire_wait(cfg, n, owner, a.wait, pid=0, registry=registry, project=a.project)
         print(msg)
-        if not ok and n == 1:
+        if not ok and (n == 1 or msg.startswith("every slot is owned")
+                       or (registry is not None and n != "any" and registry.refusal(n, a.project))):
             return 2
         return 0 if ok else 1
     if a.cmd == "unlock":
