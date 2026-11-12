@@ -17,6 +17,7 @@ Target: **D2R 3.3.0 build 93847 + D2RLoader 1.3.1, PluginSDK 0.4.0.** Every addr
 | `src/item_type_check.*`, `src/item_type_ids.h` | Item type id self-check: the ids D2R.exe tests by number, against the mod's |
 | `tools/item_type_ids.py` | Checks a built itemtypes.txt and writes `item_type_ids.h` |
 | `src/skill_functions.*` | Example of a new server skill function (`srvdofunc` 172, a missile fan) |
+| `src/skill_router.*` | One srvdofunc slot (190) shared by any number of skills by skill id (`skill_router::Add`, `InstallRouter`), and the signatures of D2R's missile function tables |
 | `src/hook_example.*` | Example inline hook (Whirlwind's hit delay `0x56ac00`, passed through and counted) |
 | `CMakeLists.txt`, `build.ps1` | Build |
 
