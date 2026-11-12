@@ -9,7 +9,7 @@ projects all land on the same folder.
 |---|---|---|
 | Python | `tools/toolkit_path.py` | `from toolkit_path import find_toolkit`, or the CLI `py -3 toolkit_path.py` (prints the path) |
 | PowerShell | `tools/ToolkitPath.ps1` | dot-source it, then `Find-D2rToolkit` |
-| CMake | `cmake/FindD2rToolkit.cmake` | `find_package(D2rToolkit REQUIRED)` sets `D2R_TOOLKIT_DIR` |
+| CMake | `cmake/FindD2rToolkit.cmake` | `find_package(D2rToolkit)` sets `D2R_TOOLKIT_DIR` |
 
 ## The rules
 
@@ -24,11 +24,16 @@ projects all land on the same folder.
 
 Nothing found is an error that names the start folder and says to set `D2R_TOOLKIT`.
 
+Relative paths (`--from`, `-From`, a relative `D2R_TOOLKIT`) are relative to the caller's current folder; in
+PowerShell that is the PowerShell location (`Set-Location`), not the process folder. In CMake they are relative to
+the source folder. The Python finder returns the resolved path (junctions and symlinks followed), PowerShell and
+CMake return the path as walked, and CMake uses forward slashes; compare paths after normalising them.
+
 ## `toolkit.version`
 
 A text file in the mod project root saying which toolkit commit the mod was built against. Blank lines and lines
 starting with `#` are ignored; the first other line is the commit SHA (7 to 40 hex characters; a prefix is fine,
-case does not matter). Anything after it is ignored.
+case does not matter) with nothing else on it.
 
 ```
 # toolkit commit this mod expects
@@ -36,28 +41,36 @@ case does not matter). Anything after it is ignored.
 ```
 
 The finders use the nearest `toolkit.version` walking up from the start folder, and compare it with
-`git rev-parse HEAD` of the found toolkit (the prefix must match). No `toolkit.version`: no check.
+`git rev-parse HEAD` of the found toolkit (the prefix must match). No `toolkit.version`: no check. The search is
+bounded: it is skipped when the start folder is inside the toolkit (a pin belongs to a mod), and it stops at the
+first folder that has a `.git` entry (file or folder, so a mod worktree still sees its own committed pin), so a
+stray file above the project never applies. A folder named `toolkit.version` is ignored.
 
-A problem is a pin mismatch, a first line that is not a SHA, or a toolkit whose HEAD cannot be read (not a git
-checkout, no `git`). By default it is a **warning** and the path is still returned. To make it an **error** set
-`D2R_TOOLKIT_STRICT=1` (also `true`, `yes`, `on`) or pass the flag below. Use strict in CI and releases.
+A problem is a pin mismatch, a first line that is not a SHA, an unreadable file, or a toolkit whose HEAD cannot be
+read (not a git checkout, no `git`). By default it is a **warning** and the path is still returned. To make it an
+**error** set `D2R_TOOLKIT_STRICT=1` (also `true`, `yes`, `on`) or pass the flag (`--strict`, `-Strict`,
+`-DD2R_TOOLKIT_STRICT=1`); strict is on when either is on. Use strict in CI and releases.
 
-To move the pin, check out the commit in the toolkit and write `git rev-parse HEAD` into the file.
+**Writing the file.** All three finders read UTF-8 (with or without a byte-order mark) and UTF-16 with a byte-order
+mark, so `echo <sha> > toolkit.version` in Windows PowerShell 5.1 (UTF-16) works. Plain ASCII is still the safest:
+
+```
+git -C <toolkit> rev-parse HEAD > toolkit.version                      # Git Bash
+git -C <toolkit> rev-parse HEAD | Set-Content -Encoding ascii toolkit.version   # PowerShell
+```
 
 ## Python
 
 ```python
-import sys
-sys.path.insert(0, "<toolkit>/tools")      # or run the CLI first, see below
-from toolkit_path import find_toolkit      # find_toolkit(start=None, strict=None) -> Path
-toolkit = find_toolkit()                   # raises ToolkitNotFound / PinMismatch
+import os, sys
+sys.path.insert(0, os.environ["D2R_TOOLKIT"] + "/tools")   # the usual pattern: the variable gets you the finder
+from toolkit_path import find_toolkit                      # find_toolkit(start=None, strict=None) -> Path
+toolkit = find_toolkit()                                   # raises ToolkitNotFound / PinMismatch
 ```
 
-The CLI needs no import: `py -3 <toolkit>\tools\toolkit_path.py [--from DIR] [--strict]` prints the path.
-Exit code 1: no toolkit; 2: pin problem under `--strict`. Warnings go to stderr.
-
-A project that has no toolkit path yet can bootstrap with the environment variable (rule 1) and then call the CLI
-through it: `py -3 "$env:D2R_TOOLKIT\tools\toolkit_path.py"`.
+Importing the finder needs the toolkit path, so a project with no `D2R_TOOLKIT` set calls the CLI instead (or
+vendors the script): `py -3 <toolkit>\tools\toolkit_path.py [--from DIR] [--strict]` prints the path. Exit code 1:
+no toolkit; 2: pin problem under `--strict`. Warnings go to stderr.
 
 ## PowerShell
 
@@ -71,21 +84,36 @@ $tk = Find-D2rToolkit                       # -From <dir>, -Strict
 
 ## CMake
 
-`FindD2rToolkit.cmake` has no dependency on the toolkit, so a mod can keep a copy in its own `cmake/` folder, or
-point at the toolkit's through `D2R_TOOLKIT`:
+A module cannot find itself before it is on `CMAKE_MODULE_PATH`, so the mod's `CMakeLists.txt` first locates the
+toolkit's `cmake/` folder (the environment variable, else a walk up), then hands off to the module, which finds the
+toolkit again, checks the pin and sets `D2R_TOOLKIT_DIR`:
 
 ```cmake
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")   # where the copy lives
+if(DEFINED ENV{D2R_TOOLKIT})
+  list(APPEND CMAKE_MODULE_PATH "$ENV{D2R_TOOLKIT}/cmake")
+else()
+  set(_d "${CMAKE_CURRENT_SOURCE_DIR}")
+  while(NOT EXISTS "${_d}/d2rAI-toolkit/cmake/FindD2rToolkit.cmake")
+    get_filename_component(_p "${_d}" DIRECTORY)
+    if(_p STREQUAL _d)
+      message(FATAL_ERROR "d2rAI-toolkit not found: set D2R_TOOLKIT")
+    endif()
+    set(_d "${_p}")
+  endwhile()
+  list(APPEND CMAKE_MODULE_PATH "${_d}/d2rAI-toolkit/cmake")
+endif()
 find_package(D2rToolkit REQUIRED)
-add_subdirectory("${D2R_TOOLKIT_DIR}/plugin-template" plugin-template)   # for example
 ```
 
-Optional inputs: `-DD2R_TOOLKIT_FROM=<dir>` sets the start folder (default `CMAKE_CURRENT_SOURCE_DIR`), and
-`D2R_TOOLKIT_STRICT` works as an environment variable or a cache variable. A pin problem is `message(WARNING)`, or
-`FATAL_ERROR` when strict.
+If a project cannot reach the toolkit before configuring, it can instead keep a copy of `FindD2rToolkit.cmake` in its
+own `cmake/` folder (the module needs nothing from the toolkit), at the cost of the copy drifting from the toolkit's.
+
+Optional input: `-DD2R_TOOLKIT_FROM=<dir>` sets the start folder (default `CMAKE_CURRENT_SOURCE_DIR`). A pin
+problem is `message(WARNING)`, or `FATAL_ERROR` when strict.
 
 ## Tests
 
 `tests/test_toolkit_finder.py` builds synthetic folder layouts (mod, mod worktree, toolkit, toolkit worktree) and
-runs all three finders against each case: lookup order, worktrees, the environment variable, and the pin check. The
-PowerShell and CMake runs are skipped when those tools are not on PATH.
+runs all three finders against each case: lookup order, worktrees, the environment variable, relative paths after
+`Set-Location`, and the pin check (match, mismatch, encodings, bounded walk, strict precedence). The PowerShell and
+CMake runs are skipped when those tools are not on PATH.

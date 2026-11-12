@@ -5,7 +5,8 @@ Rules (identical in ToolkitPath.ps1 and cmake/FindD2rToolkit.cmake; see docs/too
   2. Else walk up from the start folder. At each level, that level is the answer if it is itself a toolkit
      (the caller is inside the toolkit or one of its worktrees); else its `d2rAI-toolkit` child is.
   3. A toolkit folder has `modkit/` and `tools/toolkit_path.py`.
-  4. Pin: the nearest `toolkit.version` walking up from the start folder; its first line that is not blank or
+  4. Pin: the nearest `toolkit.version` walking up from the start folder (not when the start folder is inside
+     the toolkit; the walk stops at the first folder holding a `.git`); its first line that is not blank or
      a `#` comment is a commit SHA (7-40 hex characters, prefix allowed). It must match `git rev-parse HEAD` of
      the toolkit. A problem is a warning on stderr, or an error with --strict / D2R_TOOLKIT_STRICT=1.
      No toolkit.version, no check.
@@ -73,14 +74,25 @@ def _head(toolkit: Path) -> str | None:
 
 def check_pin(start: Path, toolkit: Path) -> str | None:
     """Rule 4: a problem message, or None when the pin matches or there is no pin."""
-    for level in _levels(Path(start).resolve()):
+    start = Path(start).resolve()
+    toolkit = Path(toolkit).resolve()
+    if toolkit in (start, *start.parents):
+        return None  # the caller is inside the toolkit: a pin belongs to a mod
+    for level in _levels(start):
         f = level / PIN_FILE
         if f.is_file():
             break
+        if (level / ".git").exists():
+            return None  # the project root ends the walk
     else:
         return None
-    pin = next((s for s in (ln.strip() for ln in f.read_text(encoding="utf-8").splitlines())
-                if s and not s.startswith("#")), "")
+    try:
+        raw = f.read_bytes()[:8192]
+    except OSError:
+        raw = b""
+    # UTF-16 (PowerShell 5.1 `>`) by BOM, else UTF-8 with or without BOM; bad bytes never raise.
+    text = raw.decode("utf-16" if raw[:2] in (b"\xff\xfe", b"\xfe\xff") else "utf-8-sig", errors="replace")
+    pin = next((s for s in (ln.strip() for ln in text.splitlines()) if s and not s.startswith("#")), "")
     if not _SHA.fullmatch(pin):
         return f"{f}: the first non-comment line must be a commit SHA (7-40 hex characters)"
     head = _head(toolkit)
@@ -101,7 +113,7 @@ def find_toolkit(start: Path | None = None, strict: bool | None = None, env: dic
     toolkit = find_toolkit_dir(start, env)
     problem = check_pin(start, toolkit)
     if problem:
-        if strict_from_env(env) if strict is None else strict:
+        if strict or strict_from_env(env):
             raise PinMismatch(problem)
         print(f"warning: {problem}", file=sys.stderr)
     return toolkit
