@@ -341,7 +341,7 @@ def main(argv: list[str] | None = None) -> int:
         print(__doc__)
         return 0
     try:
-        cfg = tc.load(a.config)
+        cfg = tc.load(a.config, allow_defaults=(a.cmd == "list"))  # listing touches no slot
         load_checks(cfg, a.module, a.path)
         infos = select(a.select)
         if a.cmd == "list":

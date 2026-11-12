@@ -117,7 +117,7 @@ not listed are free for all. No file: nothing is enforced. A file that cannot be
 All names, paths and numbers live in one TOML (or JSON) file. Nothing about your mod is written in the scripts.
 
 Where it is looked for, first match wins: `--config FILE`, the environment variable `MODKIT_TESTING_CONFIG`, then
-`./modkit-testing.toml`. Relative paths are relative to the config file. `~` and environment variables are expanded.
+`./modkit-testing.toml`. With none of the three, every tool that touches a slot refuses (exit 2, "no testing config found"); only `game_checks.py list` runs on the defaults. Relative paths are relative to the config file. `~` and environment variables are expanded.
 Every key has a default except `game.install_dir` and `game.slots_dir`. `testing/testing.example.toml` lists all of
 them with their defaults. The ones you will change:
 
@@ -461,7 +461,7 @@ python -m unittest discover -s tests -p "test_testing_*.py"
 | Symptom | Cause and fix |
 |---|---|
 | `slot 1 is the user's own game ...` | You asked for slot 1. Use a slot from 2 to `game.slot_count`. This is on purpose. |
-| `game.install_dir is not set` | No config was found. Check `--config`, `MODKIT_TESTING_CONFIG`, or that `./modkit-testing.toml` exists in the current folder. |
+| `no testing config found` | No config was found, so the tool refused to touch a slot (it never falls back to the built-in defaults). Check `--config`, `MODKIT_TESTING_CONFIG`, or that `./modkit-testing.toml` exists in the current folder. |
 | `slot 2 held by <owner> pid=...` | Somebody has the slot. Wait (`lock ... --wait`), take another (`lock any`), or look at `status`. |
 | A lock shows `STALE` | Its process died. The next `lock` replaces it. For a `pid=0` lock of a lane that has gone, `unlock N --force`. |
 | `slot 2 is not locked by MODKIT_RUN=...` | `release_install.py` needs the lock *and* the same name in `MODKIT_RUN`. Take it with `lock 2 <lane>`, then run with `MODKIT_RUN=<lane>`. |

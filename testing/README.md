@@ -74,6 +74,7 @@ python testing/release_install.py restore|status --slot N
 ```
 
 Config file: `--config F`, else env `MODKIT_TESTING_CONFIG`, else `./modkit-testing.toml`. A JSON file works too.
+With none found the tools refuse to touch a slot (exit 2, "no testing config found"); they never fall back to the built-in defaults.
 Env vars: `MODKIT_SLOT`, `MODKIT_RUN`, `MODKIT_TESTING_CONFIG`.
 
 ## Check helpers
