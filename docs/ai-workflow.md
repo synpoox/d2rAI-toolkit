@@ -34,7 +34,7 @@ flowchart TD
     Owner([Owner / human])
     Orch[Orchestrator session<br/>routes, merges, releases, never implements]
     Issues[(GitHub issues<br/>the work list)]
-    Plan[(docs/PLAN.md<br/>phases and progress)]
+    Plan[(docs/PLAN.md<br/>roadmap, status on the issues)]
 
     subgraph Lanes [Lanes: one job each, run in parallel]
         L1[Lane 1<br/>branch ticket/1-a<br/>worktree A]
@@ -59,7 +59,7 @@ flowchart TD
     Orch -- squash merges, never the lane --> Main
     Main --> Rel --> Players
     Players -- bug reports --> Owner
-    Owner -- pass on --> Coord
+    Owner -- pass on --> Orch
 ```
 
 The loop in one sentence: **the owner decides, the orchestrator routes and merges, implementers do one job each and
@@ -83,7 +83,7 @@ None of these decisions shows that a particular rule works; each rule still need
 | Role | Does | Never does |
 |---|---|---|
 | **Owner** (human) | Sets goals, answers questions, approves anything public, paid or destructive, plays the game, reports bugs. | Has to read code or run lane commands (the orchestrator gives copy-paste blocks). |
-| **Orchestrator** (one long agent session) | Plans phases, keeps the work list on issues, splits work into lanes, writes lane prompts, starts implementers and reviewers (at most 5 agents at once), squash-merges reviewed PRs, cleans up, releases, writes the handoff. | **Implements.** An orchestrator that codes gets slow and loses the overview; it routes. |
+| **Orchestrator** (one long agent session) | Plans phases, keeps the work list on issues, splits work into lanes, writes lane prompts, starts implementers and reviewers (at most 5 implementer agents at once; reviewers do not count), squash-merges reviewed PRs, cleans up, releases, writes the handoff. | **Implements.** An orchestrator that codes gets slow and loses the overview; it routes. |
 | **Implementer** (short agent session) | Does exactly one bug or feature on its own branch, runs the tests for what it touched, opens a PR, reports. | Merges, touches files outside its job, releases, waits on CI, or messages other agents. |
 | **Reviewer** (short agent session, strongest model) | Reads one PR's diff against its issue and the rules, checks the tests are real, reports findings. | Is the agent that wrote the PR, or merges. |
 
@@ -113,7 +113,7 @@ Rules that keep this safe:
 - A lane branch is named `ticket/<n>-<slug>` (`research/<topic>`, `refactor/<topic>`; see the `d2r-project-conventions` skill) and starts from the current `origin/main`. Say so in the prompt. A lane
   that starts from some other branch drags that branch's changes into its PR.
 - **Implementers open PRs and never merge.** A separate reviewer reads the diff and checks the tests; the
-  orchestrator squash-merges once the reviewer approves and resolves conflicts. This is the main quality gate.
+  orchestrator squash-merges once the reviewer reports no blocking findings and resolves conflicts. This is the main quality gate.
   Evidence: a project with a separate Opus-class reviewer and a fix-cycle cap caught what the writing agent missed
   without stalling.
 - **At most 2 fix cycles per PR.** A cycle is: reviewer findings, implementer fix, re-review. After the second, merge
@@ -136,9 +136,9 @@ Rules that keep this safe:
 
 1. Read the open issues and the plan. Pick the next jobs. Close duplicates (`duplicate of #N`) before any work.
 2. Write one prompt per job (from the template). Start the implementers, each on a fresh branch from `main`, never
-   more than 5 agents at once.
+   more than 5 implementer agents at once (reviewers do not count).
 3. While they run, answer the owner (one line per vital update or blocker) and start a reviewer for each arriving PR.
-4. Reviewer findings go back to the implementer (fix cycle 1, then 2 at most). When the reviewer approves,
+4. Reviewer findings go back to the implementer (fix cycle 1, then 2 at most). When the reviewer reports no blocking findings,
    squash-merge in a separate worktree and run the targeted checks for the merged code.
 5. Clean up: delete the branch, remove the worktree, clear stale slot locks.
 6. When a batch of fixes is merged: release ([section 6](#6-releasing)).
@@ -196,10 +196,10 @@ Agents that run the real game need somewhere to run it. Sharing the player's own
 - Make a few **slots**: frozen copies of the game install in their own folders, each with its own save folder.
   Keep your own real game out of the pool and mark it "never touch".
 - **Slots are queued, not added.** Do not make a new slot for every lane. A lane does all its offline work first,
-  then takes a lock on a slot, runs, restores the slot, and releases the lock. If every slot is locked, it waits in
-  a bounded polling loop (a few minutes at a time, up to about half an hour). If none is free by then it stops and files
-  a `ready-for-agent` issue for the run instead of polling longer. It does not end its turn while waiting in the loop.
-  Evidence: a long project settled on this because long polls tie up an agent slot for nothing.
+  then makes one lock attempt on a slot that does not wait (`lock any <lane> --wait 0`), runs, restores the slot, and
+  releases the lock. If no slot is free it stops, files (or asks the orchestrator to file) a `ready-for-agent` issue
+  that holds the run's steps, and reports. It never polls or waits for a slot.
+  Evidence: a long project settled on this because waits tie up an agent slot for nothing.
 - **A lane only installs into or stops a game on a slot it holds the lock for, checked at that moment.** Never kill
   processes by a broad filter; kill only the process ids the lane started.
 - Put the slot number on *every* command that touches saves or a game folder (an environment variable or a flag).

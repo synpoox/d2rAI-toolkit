@@ -40,8 +40,9 @@ cp testing/testing.example.toml modkit-testing.toml
 python testing/game_slots.py setup
 python testing/game_slots.py status
 
-# 3. Take a slot for yourself. "any" = the first free slot; wait up to 30 minutes in the queue.
-python testing/game_slots.py lock any my-lane --wait 1800        # prints which slot you got
+# 3. Take a slot for yourself. "any" = the first free slot. One attempt, no waiting (--wait 0 is the default):
+#    if none is free, stop, file a `ready-for-agent` issue for the run and report.
+python testing/game_slots.py lock any my-lane --wait 0           # prints which slot you got
 
 # 4. Put your mod into that slot (the slot copy skips the mods folder by default). Keeps the slot's own savepath.
 MODKIT_RUN=my-lane python testing/slot_install.py --slot 2 my-project
@@ -198,7 +199,8 @@ the age and owner; a manual `owner-*` lock is released by its owner with `MODKIT
 ### The pattern for several agents
 
 1. Do all offline work first: edit, build, run unit tests. No slot needed.
-2. `python testing/game_slots.py lock any <lane> --wait 1800`. Note the slot number it prints.
+2. `python testing/game_slots.py lock any <lane> --wait 0` (one attempt, no waiting). Note the slot number it prints.
+   No slot free: stop, file a `ready-for-agent` issue holding the run's steps, and report.
 3. Install, run, look. Put the slot and the run id on **every** command:
    `MODKIT_RUN=<lane> python testing/game_checks.py run --slot 2`.
 4. `MODKIT_RUN=<lane> python testing/game_slots.py unlock 2 <lane>` (PowerShell: `$env:MODKIT_RUN='<lane>'` first), also when something failed. Do not end your turn while holding a
@@ -606,7 +608,7 @@ What went wrong in real test runs.
 |---|---|
 | `slot 1 is the user's own game ...` | You asked for slot 1. Use a slot from 2 to `game.slot_count`. This is on purpose. |
 | `no testing config found` | No config was found, so the tool refused to touch a slot (it never falls back to the built-in defaults). Check `--config`, `MODKIT_TESTING_CONFIG`, or that `./modkit-testing.toml` exists in the current folder. |
-| `slot 2 held by <owner> pid=...` | Somebody has the slot. Wait (`lock ... --wait`), take another (`lock any`), or look at `status`. |
+| `slot 2 held by <owner> pid=...` | Somebody has the slot. Take another (`lock any`) or look at `status`; if none is free, stop and file a `ready-for-agent` issue. |
 | A lock shows `STALE` | Its process died. The next `lock` replaces it. For a `pid=0` lock of a lane that has gone, `unlock N --force`. |
 | `slot 2 is not locked by MODKIT_RUN=...` | `release_install.py` needs the lock *and* the same name in `MODKIT_RUN`. Take it with `lock 2 <lane>`, then run with `MODKIT_RUN=<lane>`. |
 | `the game of slot 2 is not running` | Run `game_ctl.py --slot 2 start`, or use `ctx.ensure_running()` in the check. |

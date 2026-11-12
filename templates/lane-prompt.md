@@ -60,7 +60,7 @@ Do not change anything else. If you find another problem, list it in your report
 - Do not bump the release version. <Or: "Bump to the next free version after main's.">
 
 ## Game slot
-<"No game needed." or "Needs a game: lock a slot as the rules say; wait in a bounded loop if all are taken.">
+<"No game needed." or "Needs a game: lock a slot as the rules say (one attempt, no waiting); if none is free, stop and file a `ready-for-agent` issue.">
 Checks to run: `<list>`.
 
 ## Report

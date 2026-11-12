@@ -30,7 +30,7 @@ workflow doc once at the start of a project.
   crash address or table, close the newer one as `duplicate of #N` first, then make one lane.
 - Each lane: branch `ticket/<n>-<slug>` (see the d2r-project-conventions skill) from `origin/main`, its own worktree, a prompt built from
   `${CLAUDE_PLUGIN_ROOT}/templates/lane-prompt.md`, a PR at the end. **Implementers never merge.**
-- **At most 5 agents run at once** (implementers and reviewers together). Start the next only when one reports back.
+- **At most 5 implementer agents run at once** (reviewers do not count). Start the next only when one reports back.
 - Start agents as child tasks of your session so their reports come back to you, each with a unique request id.
   Not as separate top-level conversations.
 - Give every prompt: goal, files to read, scope (files it may touch), what is known/ruled out, how "done" is
@@ -53,8 +53,8 @@ The implementer and the reviewer of one PR are different agents.
 
 ## Game slots
 - A lane does offline work first, locks a slot (`${CLAUDE_PLUGIN_ROOT}/testing/game_slots.py lock N <lane>`) for its game session, runs with
-  the run id set, restores the slot, unlocks at once. All slots taken: a bounded wait (up to about 30 minutes), then
-  the lane stops and files a `ready-for-agent` issue for the run.
+  the run id set, restores the slot, unlocks at once. One lock attempt, no waiting. No slot free: the lane
+  stops, files (or asks the orchestrator to file) a `ready-for-agent` issue for the run, and reports.
 - Slot number on **every** command that touches saves or a game folder. Never kill processes by filter. Never touch
   slot 1.
 - Tests: targeted (map changed files to checks). Full suite only at milestones, one game at a time.
@@ -66,7 +66,7 @@ The implementer and the reviewer of one PR are different agents.
    player-visible change, `${CLAUDE_PLUGIN_ROOT}/tools/check_public.py --root <mod repo>` passes.
 2. Findings go back to the implementer as a fix cycle. **At most 2 fix cycles.** Still not right after the second:
    merge what is good if it stands alone, and file a follow-up issue for the rest. Do not run a third.
-3. Merge when the reviewer approves: **squash merge**, then delete the branch. A docs-only PR skips CI unless it
+3. Merge when the reviewer reports no blocking findings: **squash merge**, then delete the branch. A docs-only PR skips CI unless it
    touches the gate inputs (conventions skill). Otherwise merge only with green checks on the final head. Merge in a
    **separate worktree** if a release is using the checkout.
 4. Run the targeted checks for what you merged.
@@ -78,7 +78,8 @@ The implementer and the reviewer of one PR are different agents.
 ## Clean up
 After each merge: delete the remote and local branch, and remove the lane worktree with
 `${CLAUDE_PLUGIN_ROOT}/tools/worktree_remove.ps1` (never a plain delete; see the conventions skill). Branches `research/*`, `issue-assets`,
-`handoff/*` and `backup/*` are never deleted. Clear stale slot locks of finished lanes.
+`handoff/*` and `backup/*` are never deleted. Clear stale slot locks of finished lanes. Before deleting a branch, retarget any PR based on it
+(`gh pr list --base <branch>`, then `gh pr edit <n> --base main`).
 
 ## Handoff
 Your context fills up. Before it does, or when the owner stops the session, write the handoff from

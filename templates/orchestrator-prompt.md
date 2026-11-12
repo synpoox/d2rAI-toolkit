@@ -88,7 +88,7 @@ Implementer tiers:
 
 Spread lanes over providers; never run all heavy lanes on one account.
 
-**Limits:** at most **5 agents** at once, implementers and reviewers together. At most **2 fix cycles** per PR (reviewer
+**Limits:** at most **5 implementer agents** at once (reviewers do not count). At most **2 fix cycles** per PR (reviewer
 findings, implementer fix, re-review is one cycle). After the second, merge what stands alone and file a follow-up
 issue for the rest.
 
@@ -108,8 +108,8 @@ Create `AGENTS.md` and `docs/agents/` in the repo from `templates/agents/` and a
 4. No real input in tests (no synthetic keyboard or mouse, no focus stealing).
 5. Never touch the owner's real game install, or saves of characters the lane did not create.
 6. Game slots are shared and queued, not added. Lock for the session, put the slot on every command, `MODKIT_RUN`,
-   check the lock is still yours before installing. When all are taken, wait in a bounded loop, then stop and file a
-   `ready-for-agent` issue rather than polling long.
+   check the lock is still yours before installing. One lock attempt that does not wait; if no slot
+   is free, stop, file (or ask the orchestrator to file) a `ready-for-agent` issue and report.
 7. Targeted tests only; full suite only at milestones.
 8. Test what players get (release-like install).
 9. Implementers open PRs and never merge. Ask the orchestrator before anything public, paid or destructive.
@@ -121,7 +121,7 @@ into the deviations ledger (docs/deviations.md) with a reason".>
 
 ## 4. Phases
 
-Keep `docs/PLAN.md` current (a phase outline as guidance, not tick boxes). Phases, in order:
+Keep `docs/PLAN.md` current (a roadmap; status lives on the issues, not in the file). Phases, in order:
 
 0. **Setup.** Repo, tooling, slots, source inventory, owner decisions.
 1. **Tools.** Extractors, converters, ID mapping, string conversion, validation.
@@ -169,7 +169,7 @@ For a port, also keep the deviations ledger, `docs/deviations.md`.
 1. A PR arrives: start a **reviewer** (separate agent, strongest model) with the PR number, the issue and the rules.
 2. Reviewer findings go to the implementer: fix cycle 1, then cycle 2 at most. Then merge what stands alone and file a
    follow-up issue for the rest.
-3. **Squash merge** once the reviewer approves. Docs-only PRs skip CI unless they touch the gate inputs; otherwise
+3. **Squash merge** once the reviewer reports no blocking findings. Docs-only PRs skip CI unless they touch the gate inputs; otherwise
    green checks on the final head and `MERGEABLE`. Runners offline: a local run with the report pasted.
 4. Clean up: delete the branch, remove the worktree with `tools/worktree_remove.ps1`, clear stale slot locks. Never
    delete `research/*`, `issue-assets`, `handoff/*`, `backup/*`.

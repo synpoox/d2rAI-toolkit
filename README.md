@@ -347,11 +347,11 @@ A small mod is one person and one agent. A big one runs like a small studio:
 
 ```mermaid
 flowchart LR
-    Owner([You, the owner]) -- goals, approvals --> Coord[Orchestrator agent]
-    Coord -- one prompt per job --> Lanes[Lanes in parallel<br/>own branch + worktree]
+    Owner([You, the owner]) -- goals, approvals --> Orch[Orchestrator agent]
+    Orch -- one prompt per job --> Lanes[Lanes in parallel<br/>own branch + worktree]
     Lanes -- need the game --> Slots{{Game slots<br/>queued}}
-    Lanes -- pull request --> Coord
-    Coord -- reviews, merges --> Main[(main)]
+    Lanes -- pull request --> Rev[Separate reviewer] -- no blocking findings --> Orch
+    Orch -- squash-merges --> Main[(main)]
     Main --> Release[Release] --> Players([Players])
     Players -- bug reports --> Owner
 ```

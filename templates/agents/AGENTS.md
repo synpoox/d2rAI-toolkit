@@ -42,8 +42,8 @@ Game slots and tests
 - Game slots (`[testing].game_slots`) are queued, never added. Lock one for your whole game session, put its number on
   every command that can touch it, run with `MODKIT_RUN=<lane>` so runs do not release your lock, and unlock straight
   away. Check slot status before and after.
-- If every slot is taken, wait in a bounded loop (up to about 30 minutes), then stop and file a `ready-for-agent`
-  issue for the run instead of polling longer. Never wait on CI and never touch runners: push, open the PR, report.
+- Make one lock attempt that does not wait. If no slot is free, stop, file (or ask the orchestrator to file) a
+  `ready-for-agent` issue for the run, and report. Do not poll. Never wait on CI and never touch runners: push, open the PR, report.
 - Install only through a script that stops when the lock fails, and check the lock is still yours right before
   installing. Kill only processes you started, by PID.
 - Run only the checks your changed files map to, plus the build validator and unit tests. For player-facing changes,

@@ -102,5 +102,5 @@ hang) with D2RCore trampolines meant per-unit state corruption; bisect with the 
 
 - Install only with the game closed; restart D2R fully after each install.
 - Keep a `testing.md` table (what changed, how to test, expected result) and let testers run batches; move rows to
-  "confirmed" or into a bug list.
+  "confirmed" or into the issue.
 - Back up saves before any change that touches items, grids or stats.

@@ -33,7 +33,8 @@ CMake return the path as walked, and CMake uses forward slashes; compare paths a
 
 A text file in the mod project root saying which toolkit commit the mod was built against. Blank lines and lines
 starting with `#` are ignored; the first other line is the commit SHA (7 to 40 hex characters; a prefix is fine,
-case does not matter) with nothing else on it.
+case does not matter) with nothing else on it. Bump it on purpose, in one commit named `chore: pin d2rAI-toolkit to <sha>` (see the
+`d2r-toolkit` skill).
 
 ```
 # toolkit commit this mod expects
