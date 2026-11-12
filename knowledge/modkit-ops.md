@@ -54,6 +54,32 @@ New class skills: each class has exactly 30, and saves keep one byte per class s
 `"extendedSaves": true` in mod.json (D2RLoader's extended save format) the op refuses to add a 31st, so
 rework an existing skill with `replace` instead.
 
+## Validation errors and their causes
+
+`modkit build` validates the merged tables and prints only the first errors on the console; keep the full list (the
+build's validation report) and sort it by cause, because a fresh port of a large classic mod reports well over a hundred
+and most share a few causes. The causes seen, with what to do:
+
+| Error kind | Cause | Fix |
+|---|---|---|
+| Code with the wrong case (`Deep-Wounds` where the table has `deep-wounds`) | The classic engine (1.13c) looks property and other codes up in any case; the check reports it | Normalise the case in the mod's row. Evidence is the classic reading, not a D2R run |
+| A name that no row defines (a missile, skill, overlay, property or stat) | The source mod names a row its own tables lack too, or a typo (`fireexplode` for `fire_explode`, `dblue` for `dblu`) | If the source also lacked the row, the classic engine probably found none (unchecked unless you read the classic engine's lookup for that column) and the effect was silently absent: keep that (drop the value) or add the row on purpose. A typo is a bug of the source that shows in the source's game too: fix it only deliberately |
+| A property code in a stat column (`dmg-min` in `stat1`) | A property code is not a stat; no itemstatcost row matches | The stat was dropped in the source: drop it, or use the real stat |
+| A text field read as a raw code (`bonechips` in a 4-byte `alternategfx`) | The column holds a 4-byte code, not a name | Use the 4-byte code the source's engine really read |
+| Value outside the column's list (`ItemTgtDo` 10, `ItemTarget` 5) | D2R allows only the listed values; the classic engine read a plain number | Use a listed value that gives the old result |
+| Formula too long | D2R's formula limit is 255 bytes | Shorten, or move the sum into a second column or a plugin |
+| Formula names a skill or parameter that does not exist | `skill('Name'.blvl)` with an unknown name, or a parameter number a skill does not have | What the classic engine computed is unchecked: fix the name, then test the numbers in game |
+| A note in a numeric column | The source left text where a number is expected | Replace with a number |
+| A treasure class used before it is defined | D2R needs a treasure class defined above the rows that use it | Reorder the table |
+| String key missing from every string table | A name column points to a key no table has; the game shows the fallback string ("An evil force") | Add the key to the strings |
+| Sound or other row from a table the port does not merge yet | A gap of the port, not of the source | Merge that table |
+
+**Rule: a change that fixes a validation error is not merged until an in-game test shows it works and breaks nothing
+else** (the hardest difficulty with a high-level character, not just a start-up). Unit tests, a diff against the
+previous build and CI do not show what D2R does with the data; a fix that is only "the error is gone" can change
+behaviour the source relied on. Record each fix with its cause class (keeps the source's behaviour, a source bug fixed
+on purpose, or unchecked).
+
 ## Not ops (do these elsewhere)
 
 - Engine behaviour that no table column can express (a new skill function, a new cube condition, new calc codes,

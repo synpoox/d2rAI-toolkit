@@ -10,7 +10,7 @@ rules) is covered in [porting-classic-mods.md](porting-classic-mods.md).
 | [engine-limits.md](engine-limits.md) | Every hard-coded limit a mod hits: rule, symptom when broken, fix (data or plugin) |
 | [new-game-systems.md](new-game-systems.md) | Planning a new game system (for example a mapping system): data vs plugin, finding the hooks, where state lives, multiplayer, UI, lanes |
 | [tables.md](tables.md) | How D2R reads its `.txt` tables: banks, indexed vs keyed, IDs, adding rows safely, per-table cheat sheet |
-| [hd-graphics.md](hd-graphics.md) | HD assets: `.sprite` format, item/skill/panel art, HD json maps, overlays, player state machines, monsters |
+| [hd-graphics.md](hd-graphics.md) | HD assets: `.sprite` format, item/skill/panel art, HD json maps, overlays, player state machines, monsters, presets for new DS1 levels (generated, override ops) |
 | [ui-layouts.md](ui-layouts.md) | `data/global/ui/layouts/*hd.json`: widget tree, grids, panels, tabs, stash/inventory/cube/skill tree |
 | [strings.md](strings.md) | String JSON files, complete-file replacement, safe new IDs, printf placeholder hazard |
 | [saves.md](saves.md) | `.d2s` v105 essentials, checksum, D2RLoader `.d2rl` sidecar, safe and unsafe hand edits |
@@ -26,7 +26,7 @@ rules) is covered in [porting-classic-mods.md](porting-classic-mods.md).
 | [classic-109d-engine.md](classic-109d-engine.md) | 1.09d skill and missile code charts against D2R's function tables, class row ranges, loader-thunked slots, the monster AI table and the moved `AIParam` slots |
 | [classic-109d-vs-d2r.md](classic-109d-vs-d2r.md) | Rules the engine code changed since 1.09d, with addresses: leech, damage reduction cap, gambling, item generation, breakpoints, crushing blow, open wounds |
 | [classic-reference-installs.md](classic-reference-installs.md) | Which 1.09d files are stock: hashes, the version tool's store, the NoCD `Game.exe` trap, how to recognise a code-cave patch |
-| [modkit-ops.md](modkit-ops.md) | The modkit's patch operations (JSON ops applied by `modkit build`) |
+| [modkit-ops.md](modkit-ops.md) | The modkit's patch operations (JSON ops applied by `modkit build`) and the validation errors with their causes |
 | [cheat-commands.md](cheat-commands.md) | Setting up an in-game test from D2RLoader's console: every cheat command, item spawn lines, what they did in game |
 
 ## Rules that apply to every file
