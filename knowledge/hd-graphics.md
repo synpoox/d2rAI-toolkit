@@ -204,7 +204,7 @@ floor). Keep the generator rule-only and fix the one map in data after generatio
 fix is a reviewed diff. The ops that mod used:
 
 - **Selectors** (all given must match; every op but `add` and `entity` needs one): `at [x, y]` (a DS1 tile, = position
-  // 10 HD units), `area [x0, y0, x1, y1]` (tiles, inclusive), `model` and `name` (case-insensitive globs),
+  // 10 HD units), `area [x0, y0, x1, y1]` (tiles, inclusive), `model` (case-insensitive glob) and `name` (glob),
   `pos [x, z]` (one entity by its generated position, tolerance 0.01), `expect` (how many it must match). Never select
   by entity `id` or array index: a re-serialised preset renumbers them. The terrain entity is never selected.
 - **Ops:** `remove`; `ground` (set y to the ground plane under the entity: the floating fix); `move` (`by` in HD units,

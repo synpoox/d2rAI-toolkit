@@ -16,9 +16,28 @@ on plain D2R: D2R.exe -mod <Name> -txt.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
+
+
+
+NAMESPACE_RESERVED = ("d2r", "d2rloader")
+
+
+def namespace(mod: dict) -> str | None:
+    """The D2RLoader string namespace `mod.json` asks for, or None. Same rule as the PluginSDK (LOCALIZATION.md): 1-256
+    ASCII letters, digits, `-`, `_` or `.`; `d2r` and `d2rloader` are reserved. Raises ValueError, so a bad value stops
+    the install or the release instead of becoming a loader error at game launch. Shared with release/stage.py."""
+    if "namespace" not in mod or mod["namespace"] is None:
+        return None
+    ns = mod["namespace"]
+    if not isinstance(ns, str) or not re.fullmatch(r"[A-Za-z0-9._-]{1,256}", ns):
+        raise ValueError(f"mod.json namespace {ns!r} is invalid: use 1-256 ASCII letters, digits, '-', '_' or '.'")
+    if ns in NAMESPACE_RESERVED:
+        raise ValueError(f"mod.json namespace {ns!r} is reserved by D2RLoader: choose another")
+    return ns
 
 
 def game_running() -> bool:
@@ -94,8 +113,9 @@ def install(project: Path, game: Path, savepath: str | None = None, check_runnin
             "metadata": {"name": mod.get("title", name), "modVersion": mod.get("version", "0.1.0"),
                          "author": mod.get("author", ""), "description": mod.get("description", ""),
                          "website": mod.get("website", "")}}
-    if mod.get("namespace"):  # opts in to D2RLoader string namespaces (knowledge/strings.md): top level, by schemaVersion
-        meta["namespace"] = mod["namespace"]
+    ns = namespace(mod)  # opts in to D2RLoader string namespaces (knowledge/strings.md): top level, by schemaVersion
+    if ns:
+        meta["namespace"] = ns
     (d2rl / "metadata.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     plugins = []
     for p in mod.get("plugins", []):

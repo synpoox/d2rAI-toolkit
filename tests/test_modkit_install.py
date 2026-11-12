@@ -99,6 +99,17 @@ class NamespaceTests(unittest.TestCase):
     def test_no_namespace_key_without_one_in_mod_json(self):
         self.assertNotIn("namespace", self.metadata({"name": "M"}))
 
+    def test_invalid_or_reserved_namespace_is_refused(self):
+        for ns in ("my mod", "d2r", "d2rloader", "", 5, "x" * 257, "a:b"):
+            with self.subTest(ns=ns):
+                with self.assertRaises(ValueError):
+                    mi.namespace({"namespace": ns})
+
+    def test_valid_namespaces_pass(self):
+        for ns in ("a", "My-Mod_1.x", "x" * 256, "d2rl-sample"):
+            self.assertEqual(mi.namespace({"namespace": ns}), ns)
+        self.assertIsNone(mi.namespace({}))
+
 
 if __name__ == "__main__":
     unittest.main()

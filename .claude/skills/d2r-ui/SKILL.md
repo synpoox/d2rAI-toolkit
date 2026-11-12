@@ -41,8 +41,9 @@ skillstreepanelhd.json: tabs, icon positions per row/column (skilldesc SkillPage
 background sprites `data/hd/global/ui/spells/skill_trees/<xx>skilltree.sprite`. More than 3 tabs is layout work,
 not engine work: 8 TabWidgets (`ActivateTab:0` .. `ActivateTab:7`) with their own `TextBoxWidget` labels were
 confirmed in HD (${CLAUDE_PLUGIN_ROOT}/knowledge/ui-layouts.md, "Skill tree tabs"). What stops at 3 is the stock tab titles (`textTab0-2`),
-so draw titles in art or add labels of your own. Beyond 8 tabs is untested; point skilldesc `SkillPage` at the new
-tabs and check each in game.
+so draw titles in art or add labels of your own. Also move the stock per-tab `Background` frames off screen (they
+assume 3 tabs) and keep the stock `TextTab0-2` widgets, off screen, in case the code looks them up. Beyond 8 tabs is
+untested. Pointing skilldesc `SkillPage` above 3 at the new tabs is untested too: check each tab in game.
 
 ## Build and test
 Build, install with the game closed. Ask for a screenshot of each changed screen: check grid lines against the art,
