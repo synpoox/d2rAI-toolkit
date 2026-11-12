@@ -119,7 +119,7 @@ class StageTests(unittest.TestCase):
         (comp / "d2rloader/config/filter.json").write_text("{}")
         (root / "companions").mkdir()
         (root / "companions/manifest.json").write_text(json.dumps({"companions": [{
-            "name": "X", "asset": "x.zip", "sha256": "0" * 64, "files": {"a": "d2rloader/plugins/x.dll"},
+            "name": "X", "repo": "o/r", "tag": "t", "asset": "x.zip", "sha256": "0" * 64, "files": {"a": "d2rloader/plugins/x.dll"},
             "filter_tables": ["armor", "skills"], "loader_settings": {"d2rcore.items": {"item_stat_ranges": True}}}]}))
         build = root / "plugin/build/Release"
         build.mkdir(parents=True)
