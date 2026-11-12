@@ -24,6 +24,7 @@ endif()
 add_library(plugin_common STATIC
 	src/d2r.cpp
 	src/env_guard.cpp
+	src/level_palette.cpp
 	src/log.cpp
 	src/off_switch.cpp
 )
@@ -44,4 +45,11 @@ if(PROJECT_IS_TOP_LEVEL)
 		set_property(TARGET plugin_common_tests PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
 	endif()
 	add_test(NAME plugin_common_tests COMMAND plugin_common_tests)
+	add_executable(plugin_common_level_palette_test tests/level_palette_test.cpp)
+	target_link_libraries(plugin_common_level_palette_test PRIVATE plugin_common)
+	if(MSVC)
+		target_compile_options(plugin_common_level_palette_test PRIVATE /W4 /permissive- /EHsc /utf-8)
+		set_property(TARGET plugin_common_level_palette_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
+	endif()
+	add_test(NAME plugin_common_level_palette_test COMMAND plugin_common_level_palette_test)
 endif()
