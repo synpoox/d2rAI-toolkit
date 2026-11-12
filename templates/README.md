@@ -5,7 +5,7 @@ real mod. How the files fit together is in [`docs/ai-workflow.md`](../docs/ai-wo
 
 | File | What it is for |
 |---|---|
-| `coordinator-prompt.md`, `lane-rules.txt`, `lane-prompt.md`, `owner-update.md`, `bugs.md` | Running lanes and reporting to the owner |
+| `coordinator-prompt.md`, `agents/AGENTS.md` (the lane rules), `lane-prompt.md`, `owner-update.md`, `bugs.md` | Running lanes and reporting to the owner |
 | `PLAN.md` | The roadmap: lettered work items, one session each, status on issues, a Blocked-by column |
 | `ADR.md` | One decision record, kept at `docs/adr/NNNN-<slug>.md` |
 | `deviations.md` | The deviations ledger: how a port differs from its source, one row each, feeding the table-diff gate |
@@ -23,7 +23,7 @@ When a mod's build has passes (steps that rewrite tables, strings or files in se
 Two lanes adding a pass then edit the same lines and conflict, and the order lives nowhere you can read.
 
 Make each pass or hook its own module, and give the module an integer `ORDER`. The runner discovers the modules,
-sorts them by `ORDER` (ties broken by module name, so the result is stable), and runs them. Leave gaps (`ORDER = 100`,
+sorts them by `ORDER`, and runs them. Every `ORDER` is unique, so the order never depends on a tie-break. Leave gaps (`ORDER = 100`,
 `200`, ...) so a later pass can slot in between without renumbering.
 
 ```python

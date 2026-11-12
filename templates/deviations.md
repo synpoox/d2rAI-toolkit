@@ -1,5 +1,7 @@
 # Deviation list
 
+Save as `docs/deviations.md`.
+
 Every deviation from the source (`<the baseline this mod is held to, e.g. a classic version or another mod>`), and
 why. See [GLOSSARY.md](../GLOSSARY.md) for the words. Content D2R has and the source lacks is not a deviation; if the
 project keeps a separate approval list for it, say where. A deviation is a difference the project chose or could not
@@ -39,19 +41,21 @@ Rules in the plugin that the source implemented in its own engine: same columns 
 
 ## Data rows
 
-Individual table rows (an item, a skill, a monster) that differ. Keep one row per id, not one per column.
+Individual table rows (an item, a skill, a monster) that differ. One row per id, not one per column. Name the table and
+the row id inside the Deviation text (`<items: id 123>`); it is a Deviation row like the ones above.
 
-| Table | Row (id) | Status | Why | ADR / issue |
+| Deviation | Status | Why | ADR / issue | Work item |
 |---|---|---|---|---|
 | | | | | |
 
 ## Gate patterns
 
-The table-diff gate compares the mod's tables with the source's and fails on any difference that no row above
-accounts for. Each machine-readable pattern below feeds the gate (`<tools/diff.py>` or the project's `diff.gate`
-config) and cites the row it covers, so the list and the gate cannot drift: a test fails when a pattern has no row, or a
-`cut` or `approximated` row has no pattern where the difference is in a table.
+The table-diff gate (`diff.gate` in `shared/classic_import/diff.py`; its module docstring has the format) compares the
+mod's tables with the source's and fails on any difference that no row above accounts for. Each pattern is
+`table.row.column` in backticks (fnmatch, lower case), and its row in this table names the Deviation it covers
+**exactly as written above**, so the list and the gate cannot drift. A `cut` or `approximated` row whose difference is in
+a table needs a pattern.
 
-```
-# <table> <column or row selector> <expected difference>   # row: <Deviation line above>
-```
+| Deviation | Gate |
+|---|---|
+| `<what differs, in one line>` | `<table.row.column>` |

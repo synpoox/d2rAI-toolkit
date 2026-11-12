@@ -3,7 +3,7 @@
 `<One or two sentences, in a player's words: what the mod is and what it changes. Say if it is offline single-player
 only.>`
 
-**Status: `<alpha 0.1.0>`** ([roadmap](docs/roadmap.md), [changelog](CHANGELOG.md), `<[how it differs from the source](docs/deviations.md)>`).
+**Status: `<alpha 0.1.0>`** ([roadmap](docs/PLAN.md), [changelog](CHANGELOG.md), `<[how it differs from the source](docs/deviations.md)>`).
 
 This is the outline of the README that players read first. Keep it about playing; developer material goes at the end.
 The placeholders below are examples to replace or delete.
