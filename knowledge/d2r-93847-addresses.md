@@ -452,7 +452,7 @@ pairs and `scha`/`pelt`. The plugin template's `item_type_check.cpp` checks them
 Table slots are written with `PatchWriteU64(table + 8*slot, expected, 8, function)`: expected 0 for an empty slot,
 the current pointer when wrapping a D2R function. srvdofunc `0x238ea00` (free 172-190), cltdofunc `0x235f7d0` (free
 110-129), server missile hit `0x2391030` (free 61-70), client missile hit `0x2358710` (6, 7 empty), server missile
-do `0x2390e80` (46-54 empty), client missile do `0x2358430` (14 unused). Item spell flag:
+do `0x2390e80` (46-53 empty), client missile do `0x2358430` (14 unused). Item spell flag:
 `PatchWriteU32(0x236fe30 + 12*slot + 8, 0 -> 1)`.
 
 ## Inventory grid widget (build 93847)
