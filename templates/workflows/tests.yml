@@ -1,0 +1,45 @@
+name: tests
+
+# Template: copy to .github/workflows/tests.yml in a mod repository.
+# Unit tests of the mod's own tools on synthetic fixtures only. CI never has the game's files and never builds the mod
+# (game files stay on the owner's machine; see README.md in this folder).
+# Repository variables (Settings > Secrets and variables > Actions > Variables), all optional:
+#   TEST_RUNS_ON     JSON array of runner labels, default ["ubuntu-latest"]
+#   PYTHON_VERSION   default 3.13
+#   TEST_DIR         folder `unittest discover` starts in, default tests (the toolkit's own layout)
+#   TEST_REQUIREMENTS  extra pip packages, space separated, default none
+# The steps are written for bash (set as the default shell below; Git Bash exists on Windows hosted runners).
+on:
+  push:
+    branches: [main]
+  pull_request:
+    # Skip runs that touch only docs (`on.paths` cannot come from a variable, so edit it here):
+    # paths-ignore: ['**.md']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  unit:
+    runs-on: ${{ fromJSON(vars.TEST_RUNS_ON || '["ubuntu-latest"]') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ vars.PYTHON_VERSION || '3.13' }}
+      - name: Extra packages
+        if: ${{ vars.TEST_REQUIREMENTS != '' }}
+        env:
+          TEST_REQUIREMENTS: ${{ vars.TEST_REQUIREMENTS }}
+        run: python -m pip install --quiet --disable-pip-version-check $TEST_REQUIREMENTS
+      - env:
+          TEST_DIR: ${{ vars.TEST_DIR || 'tests' }}
+        run: python -m unittest discover -s "$TEST_DIR" -v
