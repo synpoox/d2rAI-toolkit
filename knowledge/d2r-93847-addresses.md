@@ -249,7 +249,7 @@ empty). Functions holding one inline its destruction (see `0x5630e0`'s epilogue)
 | `0x2390e80` | **server do table** (record +0x2c), bound 54 (slots 0-53), dispatcher `0x466ce0`; **46-53 empty** |
 | `0x2391030` | **server hit table** (record +0x2e), bound 71 at `0x2391404`, dispatcher `0x464ac0` (game, missile, target or null); **61-70 empty** |
 | `0x2358430` | **client do table** (record +0x28), called (missile, float part-frame) from `0x1ba040`; 92 slots (0-91), **78-91 empty**, slot 14 unused |
-| `0x2358710` | **client hit table** (record +0x2a), bound 81 at `0x2358a64` (slots 0-80); **66-80 empty**, slots 6, 7 empty |
+| `0x2358710` | **client hit table** (record +0x2a), bound 81 at `0x2358a64` (slots 0-80); **66-80 empty**, slots 6, 7 empty (a mod's reading also lists 8, 11, 15, 17, 20-23, 27, 35, 45, 49, 58, 59 as empty; not checked here) |
 | `0x4550e0` / `0x1b5380` | server / client do 1 (plain move) |
 | `0x459380` / `0x1a8880` | server do 15 / client do 19 (Frozen Orb style spawner) |
 | `0x45bc40` | server hit 1 (explosion: missile damage to units within sHitPar1 / calc1) |
@@ -452,7 +452,7 @@ pairs and `scha`/`pelt`. The plugin template's `item_type_check.cpp` checks them
 
 Table slots are written with `PatchWriteU64(table + 8*slot, expected, 8, function)`: expected 0 for an empty slot,
 the current pointer when wrapping a D2R function. srvdofunc `0x238ea00` (free 172-190), cltdofunc `0x235f7d0` (free
-110-129), server missile hit `0x2391030` (free 61-70), client missile hit `0x2358710` (66-80 empty, 6, 7 empty), server missile
+110-129), server missile hit `0x2391030` (free 61-70), client missile hit `0x2358710` (66-80 empty, 6, 7 empty; more listed at the table row), server missile
 do `0x2390e80` (46-53 empty), client missile do `0x2358430` (78-91 empty, 14 unused). Item spell flag:
 `PatchWriteU32(0x236fe30 + 12*slot + 8, 0 -> 1)`.
 
@@ -485,127 +485,131 @@ column. Signatures are Windows x64 and come from the header comment; "-" means t
 
 Evidence: **H** hook or patch with D2R's original entry bytes in the header (checked before a hook or patch);
 **C** a plugin calls it with this signature; **T** a dispatch table or slot, read from the image and bounded by the slot
-count; **R** read from the dumped image and its Ghidra decompile, not yet run by a plugin; **P** a patch address inside a
+count; **R** read from the dumped image and its Ghidra decompile, not called by the toolkit's own code; **P** a patch address inside a
 function (bytes in the header, checked before the patch); **D** data: a variable, mask or constant array in the image.
 
 | RVA | Header name | Signature | Meaning | Ev |
 |---|---|---|---|---|
-| `0x8b2d0` | LocalPlayerSlot | () -> slot of the local player | () -> slot of the local player | T |
-| `0x976e0` | MonStatsRecord | (dataFlag, classId) -> monstats record or null | (dataFlag, classId) -> monstats record or null | R |
-| `0x9a480` | ClientPlayer | (slot) -> the client's player unit in that slot | (slot) -> the client's player unit in that slot | R |
-| `0x9a5d0` | ClientFindUnit | (id, type) -> the client's unit or null | (id, type) -> the client's unit or null | R |
-| `0xcd6d0` | SetActPalette | (act byte) -> void | sets ActPalette. The client's unit placement 0x9bf00 sets it from the level record's Pal, the act load 0x86bc0 from the act. The global it writes: 0x2a2adc0. | D |
+| `0x8b2d0` | LocalPlayerSlot | () -> slot of the local player | Returns slot of the local player | R |
+| `0x976e0` | MonStatsRecord | (dataFlag, classId) -> monstats record or null | Returns monstats record or null | R |
+| `0x97790` | GetSkillRecord | (dataFlag, skillId) -> record or null | The skills.txt record of a skill; bound as d2r::api.getSkillRecord | C |
+| `0x9a480` | ClientPlayer | (slot) -> the client's player unit in that slot | Returns the client's player unit in that slot | R |
+| `0x9a5d0` | ClientFindUnit | (id, type) -> the client's unit or null | Returns the client's unit or null | R |
+| `0xcd6d0` | SetActPalette | (act byte) -> void | sets ActPalette. The client's unit placement 0x9bf00 sets it from the level record's Pal, the act load 0x86bc0 from the act. The global it writes: 0x2a2adc0. | R |
 | `0x112620` | NpcMenuHire | - | Hire's handler: opens HireMenuPanel, for any NPC | R |
 | `0x116480` | NpcMenuOpen | (record, resurrect) -> 1 | inserts or removes Resurrect before Hire, then the menu opens. push rbp / push rbx / push rdi / lea rbp,[rsp-0x47] / sub rsp,0x90 | H |
 | `0x193a80` | SetMissileOffset | - | The client's 3D offset and motion of a missile's graphic, as D2R's Meteor (cltdo 9, 0x1b6480) sets them (1.13c's D2Client 0xc7e30 and its writes to gfx +0x30 +0x10..0x18): (missile, x, y, z) << 11; (missile, x, y, z, shift), shift 0 stores the values as given (1.13c's raw writes), else << 11. | R |
 | `0x193ad0` | SetMissileMotion | - | Client: sets a missile graphic's motion, next to SetMissileOffset | R |
-| `0x213f50` | ClientThrowSkillMissile | (unit, missile, skill, level, UnitStateKey(unit) | ) | R |
-| `0x2142d0` | ClientAreaUnits | - | Client: (center unit, x, y, radius, unit mask, callback, arg, 0): callback(&ClientAreaContext, unit) for each unit in range; x/y 0 = the center unit's position, radius 0 does nothing (Fist of the Heavens' clthit 26 0x1adcb0) | R |
-| `0x22f9a0` | CltDoLeap | - | D2R cltdo 43 (unit, skillId): Leap's client half | R |
+| `0x213f50` | ClientThrowSkillMissile | (unit, missile, skill, level, UnitStateKey(unit)) | Client half of ThrowSkillMissile | R |
+| `0x2142d0` | ClientAreaUnits | (center unit, x, y, radius, unit mask, callback, arg, 0) | Client: callback(&ClientAreaContext, unit) for each unit in range; x/y 0 = the center unit's position, radius 0 does nothing (Fist of the Heavens' clthit 26 0x1adcb0) | R |
+| `0x22f9a0` | CltDoLeap | (unit, skillId) | D2R cltdo 43: Leap's client half | R |
 | `0x2aed4a` | CltDoStrikeLocalOnly | - | Power Strike's client do function (cltdo 22, 1.13c D2Client 0x15660) draws the strike only for the local player: 'je' at this address skips its early return. | P |
-| `0x2ef4d0` | RoomUnitRemoved | - | How operate 15 removes a used town portal: (room, unit type, unit id) tells the room's clients, (game, unit) frees the unit | R |
-| `0x2ef8b0` | ActSpawnSpot | - | D2Common's DUNGEON_FindActSpawnLocationEx (1.13c's ordinal 10816), as WarpToLevel calls it: (dataFlag, act, level, spot, int32* x, int32* y, unit size) -> the room holding the free spot near the level's spot, its coordinates in x/y, or null. With the levels record's +0x90 set, spot picks a special tile of the level's presets (0x3dac20; 13 the level's entry); without it, spot is unused. It builds the level if needed. | R |
+| `0x2ef4d0` | RoomUnitRemoved | (room, unit type, unit id); (game, unit) | How operate 15 removes a used town portal: the first call tells the room's clients, the second frees the unit | R |
+| `0x2ef8b0` | ActSpawnSpot | (dataFlag, act, level, spot, int32* x, int32* y, unit size) -> room or null | D2Common's DUNGEON_FindActSpawnLocationEx (1.13c's ordinal 10816), as WarpToLevel calls it: the room holding the free spot near the level's spot, its coordinates in x/y. With the levels record's +0x90 set, spot picks a special tile of the level's presets (0x3dac20; 13 the level's entry); without it, spot is unused. It builds the level if needed | R |
 | `0x2efd90` | RoomFirstUnit | (room) | First unit of a room | R |
-| `0x2efde0` | NearRooms | - | A room preset's subtile offsets from the room's RoomX/RoomY, as PresetSpawn reads them The room walk of 0x593630 (finds an object by class near a unit): (room, &rooms, &count) the room and its neighbours, (room) its first unit, (unit) the next unit in its room | R |
+| `0x2efde0` | NearRooms | (room, &rooms, &count) | The room walk of 0x593630 (finds an object by class near a unit): the room and its neighbours. RoomFirstUnit gives a room's first unit, NextUnitInRoom the next one | R |
 | `0x2f0530` | RoomPortalMark | (room, 0) | sets bit 0x400000 of the room's level-gen room (+0x18, flags +0x50; 0x328860), (room, 1) clears it. The portal maker sets it on each portal's room, operate 15 clears it on removal: an unmarked room is freed with its units once no player is near. | R |
 | `0x2f0630` | RoomReleasable | - | The room-release pass 0x4088c0 asks (act, room) -> nonzero for each room 10+ ticks without a player; a yes frees the room and its units (0x504260 each, then 0x2f0110). Its only caller. 0 when the room is marked (RoomPortalMark). push rbx / sub rsp,0x20 / cmp dword [rcx+0x80],0 / mov rbx,rdx | H |
 | `0x2f2cb0` | AttachStatList | (unit, list, 1) | It does not set the list's state bit: UnitHasState read 0 after it in game, and D2R's 0x339d70 calls SetStateBit after it. Its body is D2RCore's (jmp [0x3e2a270], filled at runtime). | R |
 | `0x2f4190` | UnitAlignment | (unit) -> alignment | stat 172 for players and monsters (0 hostile, 1 neutral, 2 ally; pets 2), 2 for other types. 1.13c's D2Common #10830. D2RLoader hooks its entry: call it, never hook it. | R |
-| `0x2f4d20` | UnitMaxLife | (unit) -> max life, 1/256 | (unit) -> max life, 1/256 | R |
-| `0x2f56a0` | ListSkill | (list) -> its skill id | (list) -> its skill id | R |
-| `0x2f56e0` | ListLevel | (list) -> its skill level | (list) -> its skill level | R |
-| `0x2f5a00` | UnitListByFlags | (unit, state, flags) -> its stat list with those flags, or null | (unit, state, flags) -> its stat list with those flags, or null | R |
-| `0x2f5df0` | ListStatValue | (dataFlag, list, stat, layer) -> value | (dataFlag, list, stat, layer) -> value | R |
+| `0x2f4d20` | UnitMaxLife | (unit) -> max life, 1/256 | Returns max life, 1/256 | R |
+| `0x2f56a0` | ListSkill | (list) -> its skill id | Returns its skill id | R |
+| `0x2f56e0` | ListLevel | (list) -> its skill level | Returns its skill level | R |
+| `0x2f5a00` | UnitListByFlags | (unit, state, flags) -> its stat list with those flags, or null | Returns its stat list with those flags, or null | R |
+| `0x2f5df0` | ListStatValue | (dataFlag, list, stat, layer) -> value | Returns value | R |
+| `0x2f65d0` | StatCallbackInit | (unit, flags, callback, arg) | Sets up the unit's stat list with its callback (unit creation 0x4252c0, 0x543120). Entry: mov [rsp+0x10],rbx / mov [rsp+0x18],rsi / mov [rsp+0x20],rdi / push rbp | R |
 | `0x2f72f0` | SetListState | (list, state) | list +0x20 = state (0x49bef0, 0x339d70 use it) | R |
-| `0x2f7300` | NewStatList | (flags, expire frame, unit type, unit id) -> list or null | (flags, expire frame, unit type, unit id) -> list or null | R |
+| `0x2f7300` | NewStatList | (flags, expire frame, unit type, unit id) -> list or null | Returns list or null | R |
 | `0x2f7c20` | SetListStatOf | (dataFlag, list, stat, value, layer, unit) | (a D2RCore jump) | R |
 | `0x2f81a0` | StatListLink | (parent, unit, 1) | its stat list under the parent's | R |
 | `0x2f8290` | StatListUnlink | (unused, unit) | its stat list off its parent's | R |
 | `0x2f84b0` | UnitStatEntries | - | How a charge use (0x4368a0) and the repair (0x46f3be) move an item_charged_skill (204) value, charges / max << 8 at layer skill << TablesSkillLayerShift / level: (unit, stat, out, max) -> count: the unit's full-stat entries of the stat, 8 bytes each {u16 layer, u16 stat, i32} | R |
-| `0x300830` | DifficultyRecord | - | Conversion D2R's melee start (srvst 32, 0x567070) sets from a skill with an EType: type and percent (calc4), 1.13c's 0x65 / 0x68 (dataFlag, difficulty) -> difficultylevels.txt record (0x84 bytes); StaticFieldMin at +0x68. Static Field (srvdo 20 0x5546b0, per unit 0x5556a0) builds its hit from it. | R |
-| `0x313ef0` | ItemRowByCode | (dataFlag, u32 code, 'wss ' = 0x20737377) -> items row, < 0 if none | (dataFlag, u32 code, 'wss ' = 0x20737377) -> items row, < 0 if none | R |
-| `0x324fc0` | UnitDistance | (a, b) -> distance in subtiles | (a, b) -> distance in subtiles | R |
-| `0x325c50` | QuestFlag | (questRecord, quest, bit) -> non-zero when set (D2Common QuestRecord | cpp); a player's record for a difficulty is at player data + 0x40 + difficulty * 8 (the item-use quest checks in 0x4734f0). Bit 0: the quest is done. | R |
+| `0x300830` | DifficultyRecord | (dataFlag, difficulty) -> record | difficultylevels.txt record (0x84 bytes); StaticFieldMin at +0x68. Static Field (srvdo 20 0x5546b0, per unit 0x5556a0) builds its hit from it | R |
+| `0x313ef0` | ItemRowByCode | (dataFlag, u32 code, 'wss ' = 0x20737377) -> items row, < 0 if none | Returns items row, < 0 if none | R |
+| `0x324fc0` | UnitDistance | (a, b) -> distance in subtiles | Returns distance in subtiles | R |
+| `0x325c50` | QuestFlag | (questRecord, quest, bit) -> non-zero when set | D2Common QuestRecord.cpp. A player's record for a difficulty is at player data + 0x40 + difficulty * 8 (the item-use quest checks in 0x4734f0). Bit 0: the quest is done | R |
 | `0x3267c0` | LevelGet | - | The steps ActSpawnSpot's 0x3da650 takes from a level id to a room (D2Common Drlg): (dataFlag, act +ActDrlg, level id) -> the act's level (made if missing); (dataFlag, level) builds its rooms when level +0x10 (the first room ex) is null; (level, tile x, tile y) -> the room ex holding the tile; (dataFlag, room ex) -> its room, made if needed. A level's origin is in tiles at +0x24/+0x28. | R |
 | `0x3271c0` | LevelBuild | - | Builds a level of the act's dungeon (D2Common Drlg) | R |
 | `0x3275b0` | LevelRoomExAt | - | The room at a point of a built level (D2Common Drlg) | R |
-| `0x335a40` | StateIsCurse | (dataFlag, state) -> non-zero for a states | txt curse | R |
-| `0x337da0` | ElementalLength | (dataFlag, unit, skillId, level, 1) -> ELen with ELevLen, the length ElementalDamage gives cold and poison | (dataFlag, unit, skillId, level, 1) -> ELen with ELevLen, the length ElementalDamage gives cold and poison | R |
+| `0x3289a0` | RoomExRoom | - | Level-gen room ex step after the level-entry finder 0x3da650: reads [rdx+0x50] of the room it is given (null when the entry-room table is empty) | R |
+| `0x335a40` | StateIsCurse | (dataFlag, state) -> non-zero for a curse | True when the states.txt row is a curse | R |
+| `0x337da0` | ElementalLength | (dataFlag, unit, skillId, level, 1) -> ELen with ELevLen, the length ElementalDamage gives cold and poison | Returns ELen with ELevLen, the length ElementalDamage gives cold and poison | R |
 | `0x338160` | SkillPhysMax | (dataFlag, unit, skillId, level, 0) | The skill's own physical max in 1/256, the partner of SkillPhysMin | R |
-| `0x3385b0` | SkillPhysMin | (dataFlag, unit, skillId, level, 0) -> the skill's own physical min / max in 1/256 (MinDam/MaxDam with MinLevDam | ..; a kick's from strength and dexterity), the pair MeleeFill reads; 1.13c's D2Game 0x9f1a0 adds min + rand(max - min) to the hit's physical damage | R |
-| `0x339040` | SkillToHit | (unit, skillId, level) -> attack rating for the roll | (unit, skillId, level) -> attack rating for the roll | R |
+| `0x3385b0` | SkillPhysMin | (dataFlag, unit, skillId, level, 0) -> min in 1/256 | The skill's own physical min / max (MinDam/MaxDam with MinLevDam...; a kick's from strength and dexterity), the pair MeleeFill reads; 1.13c's D2Game 0x9f1a0 adds min + rand(max - min) to the hit's physical damage. SkillPhysMax is the max | R |
+| `0x339040` | SkillToHit | (unit, skillId, level) -> attack rating for the roll | Returns attack rating for the roll | R |
 | `0x33d1e0` | UnitSkillLevel | (unit, unitSkill, bonus) -> level | bonus 0 = hard points | R |
 | `0x33d4f0` | MasteryBonus | (unit, weapon, 0, kind) -> the weapon mastery's bonus | kind 2 is the crit chance (D2RCore jumps it at its entry) | R |
-| `0x33dd40` | GetUnitSkill | (unit, skillId, 0) -> the unit's skill (flags +0x14) or null | (unit, skillId, 0) -> the unit's skill (flags +0x14) or null | R |
-| `0x33e080` | UnitSkillId | (unitSkill, file, line) -> skills | txt id | R |
+| `0x33dd40` | GetUnitSkill | (unit, skillId, 0) -> the unit's skill (flags +0x14) or null | Returns the unit's skill (flags +0x14) or null | R |
+| `0x33e080` | UnitSkillId | (unitSkill, file, line) -> skill id | The skills.txt id of a unit skill | R |
 | `0x33e380` | LeapStart | (unit, unitSkill) -> non-zero | leap path to the skill's point, type 9 | R |
 | `0x340e70` | PathSteer | (path, unit, 0, 1) | re-aim the path at its target unit | R |
-| `0x342740` | PathSetCollisionMask | (path, mask) | path +0x64, what the path collides with (1.13c D2Common #11164, +0x50); missile create 0x5371a0 sets it from CollideType's row of the mask table 0x2391378 (CollideType 3: 0x184) | D |
+| `0x342740` | PathSetCollisionMask | (path, mask) | path +0x64, what the path collides with (1.13c D2Common #11164, +0x50); missile create 0x5371a0 sets it from CollideType's row of the mask table 0x2391378 (CollideType 3: 0x184) | R |
 | `0x342920` | PathSetTargetUnit | (path, unit) | path +0x70 target unit | R |
 | `0x342a50` | PathSetTargetXY | (path, x, y) | path +0x10/+0x12 target point; clears +0x70 | R |
 | `0x342ae0` | PathSetVelocity | (path, velocity) | ignored while the skill has flag 0x1000 | R |
-| `0x348650` | UnitInReach | (unit, target, reach, 0) -> non-zero when in reach | (unit, target, reach, 0) -> non-zero when in reach | R |
+| `0x348650` | UnitInReach | (unit, target, reach, 0) -> non-zero when in reach | Returns non-zero when in reach | R |
 | `0x349020` | SetOverlay | (unit, overlay, layer) | overlay.txt row as stat 0xb2 on the given layer; 1.13c's D2Common #10689 has no layer (0). Asserts on a row past the table, so check DataTables + TablesOverlayCount first, as Leap Attack (0x56b170) does. | R |
-| `0x349560` | UnitFrame | (unit) -> animation frame (+0x5c >> 8) | (unit) -> animation frame (+0x5c >> 8) | R |
-| `0x3495d0` | UnitHitClass | (unit) -> the value Leap Attack puts at DmgHitClass | (unit) -> the value Leap Attack puts at DmgHitClass | R |
-| `0x34aa90` | UnitReach | (unit) -> 1 for a player, 3 for a monster | (unit) -> 1 for a player, 3 for a monster | R |
-| `0x34b000` | ClientUnitWeapon | (unit) -> the client's weapon item, or null | (unit) -> the client's weapon item, or null | R |
+| `0x349560` | UnitFrame | (unit) -> animation frame (+0x5c >> 8) | Returns animation frame (+0x5c >> 8) | R |
+| `0x3495d0` | UnitHitClass | (unit) -> the value Leap Attack puts at DmgHitClass | Returns the value Leap Attack puts at DmgHitClass | R |
+| `0x34aa90` | UnitReach | (unit) -> 1 for a player, 3 for a monster | Returns 1 for a player, 3 for a monster | R |
+| `0x34b000` | ClientUnitWeapon | (unit) -> the client's weapon item, or null | Returns the client's weapon item, or null | R |
 | `0x34b240` | UnitPlayerData | (player) -> player data | its pet table at +0x98 | R |
 | `0x34b4a0` | NextUnitInRoom | (unit) | Next unit in a room's list | R |
 | `0x34b580` | UnitSize | (unit) -> collision size | a missile's row Size, 2 for a player | R |
-| `0x34b6c0` | UnitStateKey | (unit) -> value Frozen Armor passes to 0x435920 | (unit) -> value Frozen Armor passes to 0x435920 | R |
-| `0x34ba40` | CurrentSkill | - | The current unit skill of a unit: (unit) -> the unit skill it is using, or null. D2R's Inferno (srvdo 19 0x554460 -> 0x551730, cltdo 24 0x2203f0) and Nest (srvst 49) keep their channel and spawn data on it. | R |
-| `0x34c2c0` | UnitDead | (unit) -> non-zero when dying or dead | (unit) -> non-zero when dying or dead | R |
+| `0x34b6c0` | UnitStateKey | (unit) -> value Frozen Armor passes to 0x435920 | Returns value Frozen Armor passes to 0x435920 | R |
+| `0x34ba40` | CurrentSkill | (unit) -> unit skill or null | The unit skill the unit is using. D2R's Inferno (srvdo 19 0x554460 -> 0x551730, cltdo 24 0x2203f0) and Nest (srvst 49) keep their channel and spawn data on it | R |
+| `0x34c2c0` | UnitDead | (unit) -> non-zero when dying or dead | Returns non-zero when dying or dead | R |
 | `0x34d8c0` | SetUnitAnimSpeed | (unit, n) | +0x64 = n << 8 | R |
 | `0x34d990` | SetUnitFrames | (unit, n) | +0x4c = n << 8, keeping its low byte | R |
 | `0x34da20` | SetUnitFrame | (unit, frame) | +0x5c and +0x60 = frame << 8 | R |
 | `0x34da60` | SetMissileAnimRange | (missile, MsAnimSpeed << 8 / range) | cltdo 24 calls it on each flame it draws | R |
-| `0x34e140` | SetUnitFlag | (unit, flag, on) | (unit, flag, on) | R |
+| `0x34e140` | SetUnitFlag | (unit, flag, on) | Sets or clears a bit of the unit's flags | R |
 | `0x34e190` | SetUnitFlags | (unit, flags, on) | unit flags +0x124 (bit 0x10000 is dead, see UnitDead); 0x20000 is 1.13c's no-treasure-class bit | R |
-| `0x34e5f0` | SetObjectMode | (object, mode) | (object, mode) | R |
+| `0x34e5f0` | SetObjectMode | (object, mode) | Puts an object into a mode | R |
 | `0x3525c0` | ActLightSet | - | An act's eclipse, the way the Tainted Sun quest (a2q3.cpp 0x5a7370) darkens act II. ActEclipseOn: (dataFlag, act) eclipse on (1.13c D2Common #10337). ActLightSet: (dataFlag, act, room or null, period, time, eclipse) sets the act's light, as the client's packet 0x53 handler (0x12cb50) does; period 2, time 0, eclipse 0 is 1.13c #10895's eclipse off, which also puts back the speed (EnvSpeedNormal) and clears the pause. The act's light at act +8: period +0, speed +0x2c, pause +0x30, eclipse +0x34 (0x351df0 reads it). A unit's act at unit +0x20 (0x34a1a0). | R |
 | `0x3526f0` | ActEclipseOn | - | An act's eclipse, the way the Tainted Sun quest (a2q3.cpp 0x5a7370) darkens act II. ActEclipseOn: (dataFlag, act) eclipse on (1.13c D2Common #10337). ActLightSet: (dataFlag, act, room or null, period, time, eclipse) sets the act's light, as the client's packet 0x53 handler (0x12cb50) does; period 2, time 0, eclipse 0 is 1.13c #10895's eclipse off, which also puts back the speed (EnvSpeedNormal) and clears the pause. The act's light at act +8: period +0, speed +0x2c, pause +0x30, eclipse +0x34 (0x351df0 reads it). A unit's act at unit +0x20 (0x34a1a0). | R |
 | `0x3636d0` | ClearSpawnSpot | (room, x, y, 1, 0x100) | Nest calls it before spawning | R |
-| `0x366250` | CollisionAt | (room, x, y, mask) -> the mask's bits set at subtile x/y (0x27 with no room there), 1 | 13c's single-point test | R |
+| `0x366250` | CollisionAt | (room, x, y, mask) -> bits set | The mask's bits set at subtile x/y (0x27 with no room there); 1.13c's single-point test | R |
 | `0x36b410` | ItemSocketable | (item) -> non-zero | can take sockets (1.13c D2Common #10360) | R |
 | `0x36c750` | ItemHasSockets | (item) -> non-zero when socketed | cube input flags 4 / 8 test it | R |
-| `0x36cc80` | ItemSeed | (item) -> &its item seed {lo, hi}, which item rolls draw from (not the unit seed, UnitSeed) | (item) -> &its item seed {lo, hi}, which item rolls draw from (not the unit seed, UnitSeed) | R |
-| `0x36ccf0` | ItemLevel | (item) -> item level (the matcher's out, 0x529d50) | (item) -> item level (the matcher's out, 0x529d50) | R |
+| `0x36cc80` | ItemSeed | (item) -> &its item seed {lo, hi}, which item rolls draw from (not the unit seed, UnitSeed) | Returns &its item seed {lo, hi}, which item rolls draw from (not the unit seed, UnitSeed) | R |
+| `0x36ccf0` | ItemLevel | (item) -> item level (the matcher's out, 0x529d50) | Returns item level (the matcher's out, 0x529d50) | R |
 | `0x36d730` | SetItemStorePage | (item, page) | item data +0x54 | R |
 | `0x36d8f0` | SetItemFlag | (item, flag, on) | item data +0x18 flags (0x400000 ethereal) | R |
 | `0x36de20` | SetItemPage | (item, page) | item data +0x55 (ItemPage); 0xff socketed | R |
-| `0x36e2d0` | ItemTestFlag | (item, flag, line, file) -> non-zero when item data +0x18 has it | (item, flag, line, file) -> non-zero when item data +0x18 has it | R |
+| `0x36e2d0` | ItemTestFlag | (item, flag, line, file) -> non-zero when item data +0x18 has it | Returns non-zero when item data +0x18 has it | R |
 | `0x36e880` | SetItemSockets | (item, n) | sockets, clamped to the type's max (1.13c #10599) | R |
-| `0x36ef50` | ItemCode | (item) -> items | txt code as a dword ('box ' 0x20786f62) | R |
-| `0x371b60` | ItemMissileType | (item) -> weapons | txt missiletype row | R |
-| `0x371d00` | ItemOwnerId | (item) -> the owner's unit id (item data +0xc), -1 for none | (item) -> the owner's unit id (item data +0xc), -1 for none | R |
-| `0x372b80` | StaffModsClass | (item) -> itemtypes StaffMods class (0-6, 7 Warlock), or >7 | (item) -> itemtypes StaffMods class (0-6, 7 Warlock), or >7 | R |
-| `0x3730d0` | ItemVersion | (item) -> 0 classic, 100 or more expansion (1 | 13c #10718) | R |
+| `0x36ef50` | ItemCode | (item) -> code dword | The items.txt code as a dword ('box ' = 0x20786f62) | R |
+| `0x371b60` | ItemMissileType | (item) -> row | The weapons.txt missiletype row | R |
+| `0x371d00` | ItemOwnerId | (item) -> the owner's unit id (item data +0xc), -1 for none | Returns the owner's unit id (item data +0xc), -1 for none | R |
+| `0x372b80` | StaffModsClass | (item) -> itemtypes StaffMods class (0-6, 7 Warlock), or >7 | Returns itemtypes StaffMods class (0-6, 7 Warlock), or >7 | R |
+| `0x3730d0` | ItemVersion | (item) -> version | 0 classic, 100 or more expansion (1.13c ordinal 10718) | R |
 | `0x3740a0` | ItemIsEthereal | (item) -> non-zero when ethereal | cube input flags 0x10 / 0x20 | R |
+| `0x37a451` / `0x37a47c` / `0x37a4a7` / `0x37a4d2` / `0x37a4fe` / `0x37a52a` | DecodeEtherealDamage[] | - | Item decoder (0x378860): the first of six sites that times a weapon's base damage by 3/2 when ethereal, stats 21-24, 159, 160; the others are `0x37a47c`, `0x37a4a7`, `0x37a4d2`, `0x37a4fe`, `0x37a52a` | P |
 | `0x3856e0` | PlaceInSocket | (parent's inventory, item, 1) -> non-zero | in a socket | R |
 | `0x3861c0` | CreateInventory | (item) | gives the item an empty inventory | R |
 | `0x38ba30` | InventoryRemove | (item) -> non-zero | out of whatever inventory holds it | R |
 | `0x38ebf0` | QueueUnitUpdate | (unit) | flags it (+0x124 bit 0x2000) for its room's update list; D2R's srvst 63 calls it on the corpse it takes | R |
-| `0x38fd00` | ObjectRecord | (dataFlag, objects row) -> objects record (0x168 bytes) or null | (dataFlag, objects row) -> objects record (0x168 bytes) or null | R |
-| `0x397290` | TcRecord | (dataFlag, u16 index, 0) -> compiled TreasureClassEx or null | (dataFlag, u16 index, 0) -> compiled TreasureClassEx or null | R |
+| `0x38fd00` | ObjectRecord | (dataFlag, objects row) -> objects record (0x168 bytes) or null | Returns objects record (0x168 bytes) or null | R |
+| `0x397290` | TcRecord | (dataFlag, u16 index, 0) -> compiled TreasureClassEx or null | Returns compiled TreasureClassEx or null | R |
 | `0x3ba820` | MissileCritRoll | (unit, weapon) -> bool | a missile's crit or deadly strike, rolled by the missile fill 0x3bf9b0 (D2Common Missile.cpp) and the server's 0x432f90 / 0x4333f0; a hit doubles the physical part of a missile that carries it. mov [rsp+8],rbx / mov [rsp+0x10],rsi / push rdi / sub rsp,0x20 | H |
-| `0x3bae80` | MissileActivateFrame | (missile) -> 1 | 13c's data +0x08 (D2R +0x0a) | R |
-| `0x3bc0a0` | MissileBounces | (missile) -> chain count left (Chain Lightning's) | (missile) -> chain count left (Chain Lightning's) | R |
-| `0x3bc190` | MissileTargetType | (missile) -> target unit type, 6 for none | (missile) -> target unit type, 6 for none | R |
-| `0x3bc280` | MissileTargetId | (missile) -> target unit id | (missile) -> target unit id | R |
+| `0x3bae80` | MissileActivateFrame | (missile) -> frame | 1.13c's data +0x08 (D2R +0x0a) | R |
+| `0x3bc0a0` | MissileBounces | (missile) -> chain count left (Chain Lightning's) | Returns chain count left (Chain Lightning's) | R |
+| `0x3bc190` | MissileTargetType | (missile) -> target unit type, 6 for none | Returns target unit type, 6 for none | R |
+| `0x3bc280` | MissileTargetId | (missile) -> target unit id | Returns target unit id | R |
 | `0x3bda20` | SetMissileTargetDx | (missile, tx - ux) | , set by srvdo 139 (0x585440) | R |
 | `0x3d3420` | ApplyCubeMod | (item, &property {prop, param, min, max}) | a cube output mod on the item's magic list (mod type 7, 1.13c #10914) | R |
 | `0x3d3510` | ItemApplyEthereal | (item) | sets the ethereal flag, then base stats times 3/2 (1.13c's D2Common #10890). Callers: the drop 0x442d60, the ethereal property 0x3ccc60, the cube output 0x5269c0. mov [rsp+0x10],rbx / push rdi / sub rsp,0x20 / mov rbx,rcx / test rcx,rcx | H |
 | `0x3d4220` | AffixAllowed | (item, affix record) -> non-zero when the magicprefix/suffix record may roll on the item (item types, level 100+ rules) | both affix pickers (0x58c940, 0x58ce80) call it for each candidate, after the picker's own 'rare' test (record +0x64, a flag in D2R: 0 bars quality 6, 8 and 9). mov [rsp+8],rbx / mov [rsp+0x10],rbp / mov [rsp+0x18],rsi / mov [rsp+0x20],rdi | H |
 | `0x3d4950` | ChargedSkillList | (item, skill, level, &charges, &list) -> non-zero | the item's list that holds the charged skill (a D2RCore jump) | R |
-| `0x3d5860` | ItemRandom | (item, min, max) -> min | .max from the item's seed | R |
+| `0x3d5860` | ItemRandom | (item, min, max) -> value | A value from min to max, drawn from the item's seed | R |
 | `0x3d5940` | PropertySetStat | (dataFlag, a1, a2, item, Property*, set, stat, layer, value, a8, a9, a10) | put one stat on the item's list, as every D2R property function does (value shifted by the stat's ValShift) | R |
-| `0x3e3f20` | CubeRecipeCount | (dataFlag) -> cubemain row count | (dataFlag) -> cubemain row count | R |
-| `0x4061e0` | GameKey | (u16 id) -> key, 0 for an empty slot | (u16 id) -> key, 0 for an empty slot | R |
-| `0x4062f0` | GameById | (key) -> game or null | (key) -> game or null | R |
+| `0x3e3f20` | CubeRecipeCount | (dataFlag) -> cubemain row count | Returns cubemain row count | R |
+| `0x4061e0` | GameKey | (u16 id) -> key, 0 for an empty slot | Returns key, 0 for an empty slot | R |
+| `0x4062f0` | GameById | (key) -> game or null | Returns game or null | R |
 | `0x40fc39` | SpawnCheatKey | - | The 'cheat spawn' handler 0x40f670 builds its item-code key the same way (0x40fc39-0x40fc6e: the first 3 characters, spaces after a short code, a space in byte 3), then compares it with each item record's code (+0x80), so a 4-character code spawns nothing. On entry r8 holds the lowered code and cl its first character; 0x40fc6e is the compare loop. D2R's bytes are SpawnCheatKeyD2R. | P |
-| `0x4242b0` | UnitWeapon | (unit) -> weapon item the server attacks with, or null | (unit) -> weapon item the server attacks with, or null | R |
-| `0x4251e0` | PlayerCount | (game) -> players, at least the /players setting | (game) -> players, at least the /players setting | R |
+| `0x4242b0` | UnitWeapon | (unit) -> weapon item the server attacks with, or null | Returns weapon item the server attacks with, or null | R |
+| `0x4251e0` | PlayerCount | (game) -> players, at least the /players setting | Returns players, at least the /players setting | R |
 | `0x42d700` | HitRecoveryGate | - | Mode-change gate for a player in get-hit, block or knockback (modes 4, 9, 0x13), called by 0x42bfb0 (game, unit, requested mode, flag byte) -> 0 allow, 1 refuse, 4 buffer | H |
 | `0x42d7d2` | HitRecoveryWindowBuffer | - | The immediates of its two "mode end - game frame > 1" tests (cmp eax,1): walk / run -> buffer, the rest -> refuse | P |
 | `0x42d808` | HitRecoveryWindowRefuse | - | Patch address: the refuse-window immediate of the hit recovery gate | P |
@@ -613,27 +617,30 @@ function (bytes in the header, checked before the patch); **D** data: a variable
 | `0x42e600` | PlayerRegenEvent | (game, player, a, b) | the player's life regen event (unit event 3, D2Game\src\Player\PlrModes.cpp). It adds itself again for the next frame first, so it runs every frame for every player, dead or alive. mov [rsp+0x20],rbx / push rbp / sub rsp,0x40 / mov eax,r9d / mov dword [rsp+0x30],0 | H |
 | `0x42eea0` | AuraEvent32D2R | - | D2R's own function in aura event slot 32 | R |
 | `0x42fa90` | RegisterSkillEvents | - | srvstfunc 66: (game, unit, skill, level) -> 1, registers the skill's auraevent1-4 / auraeventfunc1-4 on the unit for good (no stat list, no source), through 0x588670 and 0x438230 per event | R |
-| `0x4331d0` | NearestTarget | (game, owner, x, y, range, flags, skip unit id, 0) -> nearest target to x/y other than the skipped unit, or null | (game, owner, x, y, range, flags, skip unit id, 0) -> nearest target to x/y other than the skipped unit, or null | R |
-| `0x4333f0` | ThrowSkillMissile | (game, missile, unit, skill, level, UnitStateKey(unit) | , 0, 0, 0, 0, 1) -> missile thrown at the skill's target | R |
-| `0x435920` | StateListKey | (dataFlag, list, key) -> stat 202 value | (dataFlag, list, key) -> stat 202 value | R |
-| `0x436e90` | AreaApply | (game, attacker, victim, &damage) | (game, attacker, victim, &damage) | R |
+| `0x4331d0` | NearestTarget | (game, owner, x, y, range, flags, skip unit id, 0) -> nearest target to x/y other than the skipped unit, or null | Returns nearest target to x/y other than the skipped unit, or null | R |
+| `0x4333f0` | ThrowSkillMissile | (game, missile, unit, skill, level, UnitStateKey(unit), 0, 0, 0, 0, 1) -> missile | Throws a missile at the skill's target | R |
+| `0x435920` | StateListKey | (dataFlag, list, key) -> stat 202 value | Returns stat 202 value | R |
+| `0x436e90` | AreaApply | (game, attacker, victim, &damage) | Applies an area hit's damage block to one victim | R |
+| `0x4370b0` | RemoveSkillState | (unit, state, self) -> 1 if any removed | Removes every state of the unit in the same states.txt group as `state` (the state itself too with self 1). A state with no group (0) removes nothing | R |
 | `0x437230` | ItemAuraTick | - | Unit event 9's handler, (game, unit, key, skill, stateKey): an item aura's tick. Casts the skill at item_aura's level for it (stat 151, layer skill) through SrvSkillDispatch (unit flag 0x20000000 and UnitStateKey = stateKey around the cast), then re-adds the event perdelay (calc +0x180, at least 5) frames on, on the frame grid; with no item_aura level (or a dead unit, or no aurastate) it removes the event. The item_aura case (0x581970) starts it. mov [rsp+0x20],rbx / push rbp / push rsi / push rdi / push r12 / push r14 / sub rsp,0x40 | H |
 | `0x437820` | AreaKnockback | (game, unit, 0, 0, radius, &LeapKnockback, 0, &scratch) | Leap's landing knockback (srvdo 77), callback 0x43a740 | R |
 | `0x437980` | AddElementDamage | (unit, &damage, etype, amount, length, &resist stat or null, &etype or null) | adds amount to the etype's field (2 lightning: +0x2c, hit class +0x144 = 0x40; resist stat 41) | R |
+| `0x4398b0` | AreaUnits | (game, unit, &AreaCenter, radius, unit mask, callback, arg, 0) | callback(&AreaContext, victim) for each unit in range | R |
 | `0x43cd50` | ItemSpawn | (game, drop, 0) -> item or null | makes an item from a drop request (1.13c's same function). The TC drop 0x444680 (game, unit, item row, quality, index, flags) fills the request and calls it at 0x444866. push rbp / push rbx / push rsi / push r12 / push r15 / lea rbp,[rsp-0x37] / sub rsp,0x90 | H |
 | `0x43ea10` | ScheduleReplenish | - | Replenish (D2Game\src\Items\ItemMode.cpp). Item event 3 replenishes: (game, item) schedules it 2500 / stat + 1 frames on for item_replenish_durability (252), unless one is pending; the equip 0x46eb00 and the durability loss 0x441b10 call it, each beside its replenish_quantity (253) twin 0x43eaa0. The handler (game, item, ...) adds one durability or quantity (0x46f4f0) and schedules the next, at least 125 frames on. mov [rsp+8],rbx / mov [rsp+0x10],rsi / push rdi / sub rsp,0x40 | H |
 | `0x4404f0` | TcDrop | (game, dropper, killer, TC record, quality, item level, 0, items* or 0, count* or 0, max) | rolls the TC and drops its picks by the dropper; with no items array it drops all picks (max under 1 means 6). The item level feeds the quality roll 0x4421b0. 1.13c's same function takes (..., tc, 0, ilvl, 0, 0, 0, 1). | R |
+| `0x441b83` / `0x441ba6` | WeaponDurabilityChance[] | - | Weapon durability loss per hit (0x441b10): `mov ebx,4`, the chance (percent) for most weapons; `0x441ba6` is the same with `mov ebx,0xa` for the item types that take 10 | P |
 | `0x444680` | DropItemAt | (game, unit, items row, quality, set/unique row + 1, flags) | drops the item by the unit at its item level, as the TC roller 0x4404f0 does | R |
 | `0x44486b` | TcDropReturn | - | the TC drop's return address from ItemSpawn | P |
-| `0x4471e0` | ModeCmdInit | - | The mode command AiIdle sends: (unit, mode, &cmd), cmd +0x10 the unit, then (game, &cmd, 1) | H |
-| `0x4475c0` | ModeCmdRun | - | The mode command AiIdle sends: (unit, mode, &cmd), cmd +0x10 the unit, then (game, &cmd, 1) | R |
+| `0x4471e0` | ModeCmdInit | (unit, mode, &cmd) | Fills the mode command AiIdle sends (cmd +0x10 the unit); ModeCmdRun runs it | H |
+| `0x4475c0` | ModeCmdRun | (game, &cmd, 1) | Runs the mode command ModeCmdInit filled, as AiIdle does | R |
 | `0x447b80` | MonsterTcDrop | (game, monster, flag, death*) -> the monster's own TC drop | its monstats TC for the difficulty and kind (champion, unique, quest), dropped by 0x441300. death +0x08 is the monster, +0x10 the killer (the quest-drop test and the quality roll's player). 1.13c's 0x6fc95680; D2R's death path 0x4479a0 passes flag 0. | R |
 | `0x44b600` | QueueHit | (game, attacker, target, hit) | Queues a melee hit on the attacker's unit +0x108 list | H |
 | `0x44b720` | MeleeRoll | (game, unit, target, toHit, flag, 0) -> result flags (bit 0 hit) | flag = skill byte SkRollFlags & the byte at MeleeRollFlagMask | R |
-| `0x44b930` | AvoidRoll | (game, attacker, victim, 1, 0) -> 1 avoided, 2/4/0x10 block kinds | (game, attacker, victim, 1, 0) -> 1 avoided, 2/4/0x10 block kinds | R |
+| `0x44b930` | AvoidRoll | (game, attacker, victim, 1, 0) -> 1 avoided, 2/4/0x10 block kinds | Returns 1 avoided, 2/4/0x10 block kinds | R |
 | `0x44c2b4` | WeaponCritBlock | - | WeaponDamage's (0x44c030) roll: from 0x44c2b4, right after the physical roll is stored at damage +0x18, to 0x44c3d9 it rolls the weapon mastery's crit (when a5 is 0), passive_critical_strike, then deadly strike, and doubles the physical part with result flag 0x2000. Attacker in RSI, damage block in RDI, a5 in R14D; 0x44c3d9 needs R15D 0. The 28 bytes of the block: test r14d,r14d / jnz / mov rcx,rsi / call UnitWeapon / test / jz / lea r9d,[r14+2] / xor r8d,r8d / mov rdx,rax (nothing outside jumps into them). | P |
 | `0x44c3d9` | WeaponCritBlockEnd | - | End of the WeaponCritBlock, where the roll rejoins | P |
-| `0x44d660` | QueuedHit | (attacker, defender) -> the damage block of the attacker's queued hit on defender (unit +0x108 list), or null | (attacker, defender) -> the damage block of the attacker's queued hit on defender (unit +0x108 list), or null | R |
+| `0x44d660` | QueuedHit | (attacker, defender) -> the damage block of the attacker's queued hit on defender (unit +0x108 list), or null | Returns the damage block of the attacker's queued hit on defender (unit +0x108 list), or null | R |
 | `0x44df10` | DamageEffects | (game, attacker, victim, &damage) | 0x44ce80 runs it for area hits | R |
 | `0x451820` | AddLife | (unit, amount) -> life added | life + amount up to the max, unless the unit is dead or has state 92. Callers: the life leech 0x450c90 (attacker) and the hit's absorb heal in 0x44ce80 (victim). mov [rsp+0x18],rbx / push rsi / sub rsp,0x20 / mov esi,edx / mov rbx,rcx | H |
 | `0x4518c0` | PoisonApply | - | type: +0 the int32* damage field; +0x28 int32 non-zero on the 9 types 1.13c flags (physical, fire, lightning, cold, magic, poison and the three leeches; not the cold, freeze and poison lengths) (attacker, victim, rate, length, a5, a6, a7): poison, stat 74 (hpregen) at -rate for length frames. Its entry tests the length (test r9d,r9d / jle, relative); a hook sits past it, at PoisonApplyHook, with the arguments still in place: mov rax,rsp / push rbp / push rsi / push r14 / push r15 / sub rsp,0x68 / mov r14d,r9d | R |
@@ -643,50 +650,54 @@ function (bytes in the header, checked before the patch); **D** data: a variable
 | `0x463100` | MissileSrvDoDefault | - | srvdo 1 (game, missile): move, collide, count down range | R |
 | `0x4639a0` | MissileSrvEnd | (game, missile, hit, 1) | what srvdo 1 does when range runs out | R |
 | `0x465d60` | MissileDamageFill | - | Fills a missile hit's damage block | R |
+| `0x46e8c0` | IdentifyItem | (game, player, item, 1) | Identifies the item and tells the client | R |
 | `0x46fdd0` | StatCallback | - | The server's stat callback, (game, unit, item, stat << 32 / layer (a 64-bit r9), old, new), for stats with fCallback: a switch on stats 7-209 only ('lea eax,[r12-7]; cmp eax,0xca' at 0x46ff4a), item_aura (151) at 0x470470. Its entry is 'jmp [rip+x]': D2RCore hooks it, so wrap the pointer handed to StatCallbackInit instead. | R |
 | `0x476060` | ReplenishEvent | - | mov [rsp+8],rbx / mov [rsp+0x10],rbp / mov [rsp+0x18],rsi | H |
 | `0x477420` | SendPacket10 | (client, packet) | sends a 10-byte packet, a2q3's 0x53 {0x53, int period, int time, byte eclipse} (0x5a4290). The game's light tick 0x406550 sends the same packet to an act's clients when its light changes. Client +4: 4 in game. | R |
-| `0x477a30` | SendChat | (*(game + GameClients) | , packet): sends a chat packet 0x26 (type at +1, unit type +3, unit id +4, colour +8, name at +10 up to 60 bytes, text at +0x47 up to 255) to the game's clients; it breaks on longer text. D2R's own GameChat (0x4016c0, the debug commands' "Warping to level") sends type 1 with unit type 2, which the client drops; type 4 or unit type 0 shows. | R |
+| `0x477a30` | SendChat | (*(game + GameClients), packet) | Sends a chat packet 0x26 (type at +1, unit type +3, unit id +4, colour +8, name at +10 up to 60 bytes, text at +0x47 up to 255) to the game's clients; it breaks on longer text. D2R's own GameChat (0x4016c0, the debug commands' "Warping to level") sends type 1 with unit type 2, which the client drops; type 4 or unit type 0 shows | R |
 | `0x47a190` | SendUnitStat | (client, unit, 1, stat, value, layer) | sends the unit's stat to the client, as the charge use does | R |
-| `0x484c90` | ClientUnit | - | The game's clients: a list at game +0x138, the next client at +0x628 (0x484d90 walks it); (client, 0) -> its player | R |
+| `0x484c90` | ClientUnit | (client, 0) -> its player | The game's clients are a list at game +0x138, the next client at +0x628 (0x484d90 walks it); this gives a client's player | R |
 | `0x488180` | WarpToLevel | (game, player, level, 0) | moves the player into the level (D2Game\src\Game\Clients.cpp). In the same act it finds the level's arrival spot (ActSpawnSpot) and teleports there (TeleportUnit); else it changes act. The debug "Warping to level" handler 0x402820 calls it. | R |
 | `0x489b70` | InTerrorZone | (game, level id) -> bool | the level is in the active Terror Zone | R |
-| `0x48b230` | UnitEventFrame | (game, unit, event type, 0) -> earliest frame of the unit's timer events of that type (1 = mode end), 0 for none | (game, unit, event type, 0) -> earliest frame of the unit's timer events of that type (1 = mode end), 0 for none | R |
+| `0x48b230` | UnitEventFrame | (game, unit, event type, 0) -> earliest frame of the unit's timer events of that type (1 = mode end), 0 for none | Returns earliest frame of the unit's timer events of that type (1 = mode end), 0 for none | R |
 | `0x48b720` | AddUnitEvent | (game, unit, event, frame, key, skill, stateKey) | zeros for most; item aura ticks (0x437419) pass them | R |
 | `0x48b890` | RemoveUnitEvent | (game, unit, event, key) | 0 for most; an item aura passes its key | R |
 | `0x48e820` | NestHold | (unit, 0) | Nest calls it before spawning; sets state 54 to the value | R |
 | `0x48faa0` | RemoveUnit | (game, unit) | Removes a unit from the game | R |
-| `0x48fde0` | PlayerClient | - | How the chest operate plays its unlock sound: rva::ClientMessage(player, 0xb, player), then (player) -> its client (player data +0xf0, null for a non-player) and (player, client) sends the sound packet 0x2c | R |
-| `0x48fe80` | FindUnit | (game, unit type, id) -> unit or null | (game, unit type, id) -> unit or null | R |
-| `0x4926b0` | PresetSpawn | - | A room's subtile rect, as 0x2f0680 (does the room hold x/y) reads it: int32 x, y, width, height (game, room, preset): spawns one room preset unit (1.13c D2Game 0x6fd013b0) through 0x48dc50 (1.13c 0x6fd012d0; type 1 goes to 0x50a050). The room's preset loop 0x48f190 (1.13c 0x6fd01430) is its only caller. Preset: +4 int32 id (a monstats id for a monster), +0x20 int32 unit type. push rbx / push rsi / push rdi / sub rsp,0x80 | H |
+| `0x48fde0` | PlayerClient | (player) -> its client; (player, client) | Player data +0xf0 holds the client (null for a non-player). How the chest operate plays its unlock sound: rva::ClientMessage(player, 0xb, player), then it sends the sound packet 0x2c to the client | R |
+| `0x48fe80` | FindUnit | (game, unit type, id) -> unit or null | Returns unit or null | R |
+| `0x4926b0` | PresetSpawn | (game, room, preset) | Spawns one room preset unit (1.13c D2Game 0x6fd013b0) through 0x48dc50 (1.13c 0x6fd012d0; type 1 goes to 0x50a050). The room's preset loop 0x48f190 (1.13c 0x6fd01430) is its only caller. Preset: +4 int32 id (a monstats id for a monster), +0x20 int32 unit type. A room's subtile rect, as 0x2f0680 (does the room hold x/y) reads it: int32 x, y, width, height. Entry: push rbx / push rsi / push rdi / sub rsp,0x80 | H |
 | `0x494a60` | MonsterSpawned | (spawn params, monster) | D2R's per-class setup of a monster that its spawn core 0x493cc0 (D2Game\src\Monster\MonsterSpawn.cpp) just made; 0x493cc0 is its only caller, and 0x492cf0 and the other spawners all go through 0x493cc0. The monster's stats and its monstats Align alignment (0x48e600) are set by then. mov [rsp+0x18],rbx / mov [rsp+0x20],rbp / push rsi / push rdi / push r15 | H |
 | `0x4a6d10` | AiIdle | (game, unit, frames) | mode neutral, think again after frames | R |
 | `0x4a6e50` | AiSetDelay | (game, unit, frames) | think again after frames, mode kept | R |
 | `0x4a78e0` | AiAttack | (game, unit, mode, target) | melee in mode 4 (A1) or 5 (A2) | R |
-| `0x4a7bc0` | AiUseSkill | - | difficulty (as D2R's Overseer think 0x5c2290 reads them) The tick's AI control (tick +0): its three int params at +0x44 (1.13c +0x14, +0x18, +0x1c), as the Regurgitator think reads its state at +0x44 and corpse at +0x48 The think's tick block: the target at +0x10 (1.13c +0x08), its distance at +0x20 (1.13c +0x14), as the Mephisto think reads them (game, unit, mode, skill, target, x, y, 0) -> non-zero once cast; on failure it idles 10 (0x4a7bc0) | R |
+| `0x4a7bc0` | AiUseSkill | (game, unit, mode, skill, target, x, y, 0) -> non-zero once cast | Casts a skill from a think; on failure it idles 10 | R |
 | `0x4a8740` | AiApproach | (game, unit, target, 0) | walk at the target | R |
-| `0x4ff1a0` | FirstPet | (game, owner, pet type, 1) -> the type's first pet, or null | (game, owner, pet type, 1) -> the type's first pet, or null | R |
+| `0x4ff1a0` | FirstPet | (game, owner, pet type, 1) -> the type's first pet, or null | Returns the type's first pet, or null | R |
 | `0x4ffd30` | RemovePet | (game, owner, pet id, 1) | takes the pet off the list and kills it, as the pet add's loop over a group does | R |
-| `0x5013f0` | PetEntry | (dataFlag, pet table, pet type) -> the type's entry (stride 0x20) | (dataFlag, pet table, pet type) -> the type's entry (stride 0x20) | R |
-| `0x508f80` | AreaMonsterLevelFn | - | GameMonRegions: 0x5098b0 builds every level's region once per game (0x508750), from its levels row. Fields at 1.13c's offsets. (game, level id) -> the level's monster level: levels MonLvl / MonLvlEx of the difficulty (0x32c700), plus a terror zone's bump (MonsterRegionAdjustMonsterLevel). Monster spawns, uniques and item levels call it; D2R never reads the region's own monster level fields (+0x2dc, +0x2e0). mov [rsp+0x10],rbx / mov [rsp+0x18],rsi / push rdi / sub rsp,0x30 | R |
+| `0x5013f0` | PetEntry | (dataFlag, pet table, pet type) -> the type's entry (stride 0x20) | Returns the type's entry (stride 0x20) | R |
+| `0x508f80` | AreaMonsterLevelFn | (game, level id) -> monster level | The level's monster level: levels MonLvl / MonLvlEx of the difficulty (0x32c700), plus a terror zone's bump (MonsterRegionAdjustMonsterLevel). Monster spawns, uniques and item levels call it; D2R never reads the region's own monster level fields (+0x2dc, +0x2e0). GameMonRegions: 0x5098b0 builds every level's region once per game (0x508750), from its levels row. Entry: mov [rsp+0x10],rbx / mov [rsp+0x18],rsi / push rdi | R |
 | `0x50a050` | SpawnMonsterAt | (game, room, monstats id, x, y, mode, 0) -> monster or null | srvhit 6's spawn at the missile | R |
 | `0x50acf0` | RoomPopulate | (game, room) | spawns a room's monsters as it activates (1.13c D2Game 0x6fc67a20). Its first call (1.13c 0x6fc66cd0) counts the room in its level's monster region at +0x04. mov r11,rsp / push rbx / push rsi / sub rsp,0xb8 | H |
 | `0x52922a` | CubeNumInputsJump | - | The numinputs filter of the cube search: a 6-byte jne on the item count (original bytes: CubeNumInputsJumpOrig in items.h); a 6-byte nop over it lifts the filter | P |
 | `0x5396d0` | SendChargePacket | (unit, target, skill, level, seed, 0, charges) | the release packet an assassin charge-up skill sends after each hit | R |
 | `0x5397f0` | SoundPacket | - | Sends a sound packet to a client | R |
+| `0x5551f0` | SkillStateExpired | - | Frozen Armor's expiry callback: removes the state | R |
 | `0x55a7e0` | ApplyCurse | - | D2Game\src\Skills\SkillNec.cpp: puts one curse on one unit, (target, &CurseParams) -> 1 applied. Every curse skill's srvdo reaches it once per target. It calls NewStateList (whose own entry D2RCore hooks), which removes the unit's first list flagged ListFlagCurse unless it is this state's, then sets aurastat2-6 on the list. mov [rsp+8],rbx / mov [rsp+0x18],rbp / mov [rsp+0x20],rsi / push rdi | H |
 | `0x55bfb0` | CurseStatValue | (game, target, stat, value) -> value | what ApplyCurse sets for each aurastat (a fifth of a resist cut on an immune) | R |
+| `0x55e7e0` | SrvDoReviveD2R | (game, unit, skillId, level) | D2R's own srvdo 58 (Revive); the expected value when SrvDoRevive's slot is wrapped | R |
 | `0x564930` | SrvDoSmiteD2R | - | srvdofunc 150, Smite (also the monster Smites): builds the hit on its stack, QueueHit, then ApplyMeleeHit | R |
 | `0x56b170` | SkillMeleeHit | (game, unit, skillId, level) | Leap Attack's hit on the skill target | R |
-| `0x56b5e0` | LeapLanded | (game, unit, unitSkill) -> non-zero once the unit has landed | (game, unit, unitSkill) -> non-zero once the unit has landed | R |
+| `0x56b5e0` | LeapLanded | (game, unit, unitSkill) -> non-zero once the unit has landed | Returns non-zero once the unit has landed | R |
 | `0x56c3e0` | SrvPrgDispatch | - | Release dispatcher (srvdo 1, 42, 46, 50, 52 call it with the queued hit): for each progressive state, n = min(max(charges, 1), 3) at max(list level, skill level); with prgstack it calls srvprgfunc1..n-1 first, setting the charge stat to i, then srvprgfunc n, all as (game, unit, skill, level), and sends SendChargePacket. | R |
 | `0x56dae0` | AddCharge | (game, unit, skill, level, aurastate, aurastat1) -> 1 | one charge on the aurastate list (made with stats 350/351 if none), capped at 3, timer reset to auralencalc; aurastat2 grows by aurastatcalc2. srvdo 34 calls it on a hit. | R |
+| `0x571700` | PickSkillMissile | (unit, skillId) -> missile row | The srvmissile a/b/c row by the skill's charges (1, 2, 3+), srvmissilea for a skill with no charges, -1 on error (vanilla's charge-missile helper; D2R's srvdo 37 uses it) | C |
 | `0x573af0` | MeleeFill | (game, &block, unit, target, skill, level) | the hit's damage for a kick, into a damage block with DmgPercent set; D2R's srvdo 52 (0x56fc80) fills its kick with this after the roll (MeleeRoll) | R |
 | `0x574480` | AddAuraStats | (unit, list, skillRecord, skillId, level) | aurastat1-6 (attackrate also sets stat 69) | R |
-| `0x574600` | AddAuraStatsB | - | same arguments, Frozen Armor calls both | R |
+| `0x574600` | AddAuraStatsB | (unit, list, skillRecord, skillId, level) | AddAuraStats' partner with the same arguments; Frozen Armor calls both | R |
 | `0x581bd0` | CrushingBlowApply | (game, unit, target, &CrushingBlowArgs) -> the event's result | called by D2R's event 16 after its roll | R |
 | `0x583150` | AuraEvent16D2R | - | Slot 16 is D2R's crushing blow (item_crushingblow): chance = the stat at (skill >> 16, layer skill & 0xffff), roll % 100 on the unit's seed, then CrushingBlowApply (damage.h). | R |
-| `0x5889e0` | DamageStep | (attacker, victim, &damage) | (attacker, victim, &damage) | R |
+| `0x5889e0` | DamageStep | (attacker, victim, &damage) | One step of DamageEffects' damage-type pass | R |
 | `0x5896e0` | CastEventSkill | (unit, skill, level, target, 0) -> non-zero cast | a skill cast from unit at target as an event, sent to clients (aura event 33 0x42f300 casts this way); refuses while the unit has state 54 | R |
 | `0x58a050` | ItemStaffMods | - | The staffmods roll on a new item (0x58a050, D2Game\src\Items\ItemsMagic.cpp; 1.13c D2Game +0x13de0): (item, drop params). It reads the itemtypes StaffMods class and that class's skill count, then rolls 1.13c's tiers in 0x58af50 (DropFlags 0x20 adds the item level as bonus) or, on a version-0 item, 0x58b7c0. Entry: mov [rsp+0x10],rbx / push rbp / push rdi / push r14 / sub rsp,0x30 / mov rdi,rdx | H |
 | `0x58e2f0` | OperateChestFn | - | D2R's chest operate (OperateFn 4, D2Game\src\Objects\ObjMode.cpp): mode 0 only; it sets mode 1 with event 1 at the open frames (or mode 2), plays sound 0xb for a locked chest, then drops the act's chest TC. | R |
@@ -702,11 +713,12 @@ function (bytes in the header, checked before the patch); **D** data: a variable
 | `0x5cfb20` | AiTrappedSoul | - | row 99's think, read from the table | R |
 | `0x5e5a91` | SealSweepKillReturn | - | The Chaos Sanctuary sweep (0x5e5990, D2Game\src\Quests\a4q2.cpp; 1.13c's D2Game +0xbb3b0): once the fifth seal opens, it kills every monster but Diablo (243) in level 108's rooms, each through ModeCmdInit (unit, 0, &cmd) at 0x5e5a8c, then ModeCmdRun. This is the return address of that kill call. | P |
 | `0x6639f9` | ItemsJsonKey | - | Patch address of the items.json item code key builder | P |
-| `0x9041a0` | LoadActPalette | (act byte) -> void | loads data/global/palette/act<N+1>/pal.pl2 (legacy floor, light and colormap tables) and updates the palette texture. Only the load screen's end calls it with a level's palette (0xc5f80 passes the act palette), so a level entered without one keeps the last act's. SetActPalette sets that palette. | D |
-| `0xa121f0` | TcIndexByName | (name map, name, 0) -> compiled index, > 0 when found | (name map, name, 0) -> compiled index, > 0 when found | R |
-| `0x1215650` | TlsfBlockInsert | (control, block) -> void | (control, block) -> void | R |
-| `0x122ad60` | EntityPoolLock | (lock*) -> void | (lock*) -> void | R |
-| `0x122ad90` | EntityPoolUnlock | (lock*) -> void | (lock*) -> void | R |
+| `0x9041a0` | LoadActPalette | (act byte) -> void | loads data/global/palette/act<N+1>/pal.pl2 (legacy floor, light and colormap tables) and updates the palette texture. Only the load screen's end calls it with a level's palette (0xc5f80 passes the act palette), so a level entered without one keeps the last act's. SetActPalette sets that palette. | R |
+| `0xa121f0` | TcIndexByName | (name map, name, 0) -> compiled index, > 0 when found | Returns compiled index, > 0 when found | R |
+| `0x12063c0` | EngineAllocator | () -> allocator | The engine allocator object; vtable +0x20 frees a block (Leap Attack's cleanup) | C |
+| `0x1215650` | TlsfBlockInsert | (control, block) -> void | Returns void | R |
+| `0x122ad60` | EntityPoolLock | (lock*) -> void | Returns void | R |
+| `0x122ad90` | EntityPoolUnlock | (lock*) -> void | Returns void | R |
 | `0x1d1b650` | DirectionX | - | int32[64] x and y offsets of D2's 64 directions (radius 30), the ones Nova's srvhit 5 (0x45fd20) aims at | D |
 | `0x1d1b750` | DirectionY | - | Data: int32[64] y offsets of D2's 64 directions, next to DirectionX | D |
 | `0x1d996d0` | MeleeRollFlagMask | - | Data: int32 flag mask MeleeRoll reads with the skill byte | D |
@@ -716,6 +728,7 @@ function (bytes in the header, checked before the patch); **D** data: a variable
 | `0x2376848` | EnvSpeedNormal | - | int 128 (1.13c 0x6fdeb238); the eclipse's is 4 (0x237684c) | D |
 | `0x237ea60` | NpcTable | - | The server's NPC table (D2Game\src\Unit\SUnitNpc.cpp, read by 0x3971a0): 43 entries of 0x1c bytes, +0 uint16 NPC class, +7 byte "hires mercenaries" (the hire handler 0x53d350 refuses an NPC without it). Kashya, Greiz, Asheara and Qual-Kehk have 1; Tyrael (entry 30) has 0. | T |
 | `0x2381f30` | MissileCallbackTable | - | MissileParams::callback: run by the create (0x3bac90) from this table as fn(missile, callbackArg). 1 is Firestorm's (0x3b75c0; srvdo 117 / cltdo 67): frames capped at 77, seed from the arg, a type 10 path. | T |
+| `0x2386ab0` | PropertyFuncTable | int32_t fn(dataFlag, a1, a2, item, Property*, set, stat, val, first func result, a8, a9, a10) | properties.txt func1-7 table, called from the property apply 0x3d4620; 37 slots (bound dword 0x2386bd8 = 37), 26-35 null | T |
 | `0x238e5c0` | AuraEventTable | - | Aura event function table (skills.txt auraeventfunc1-4) | T |
 | `0x2391270` | MissileSrvDmgTable | - | void fn(Game*, Unit* missile, Unit* hit, Damage*): 31 slots, 18-30 free. Called by srvhit 1 (0x45bc40) while it builds the hit's damage. | T |
 | `0x2396ea0` | AiTable | - | Monster AI think table, indexed by the monai row | T |
@@ -723,6 +736,7 @@ function (bytes in the header, checked before the patch); **D** data: a variable
 | `0x27d1770` | JsonPool | - | JSON Pool: 0xa0a230 gives it 40 MiB (0x2800000) for parsed JSON; a 46 MB generated preset ran it dry (null write in the memcpy at 0x12d36f3). ObjectPool: 0xa20bb0 gives it 50 MiB (0x3200000). | D |
 | `0x27d7848` | ObjectPool | - | Pool: the object allocator (TlsfAlloctor object) | D |
 | `0x27ff098` | TexturePool | - | Texture Cache TextureData Pool: 0xe8b100 gives it 24 MiB (0x1800000); a TlsfAlloctor like the Entity System Pool. | D |
+| `0x2810ff0` | RendererPool | - | Renderer Pool: 0xf6efe0 gives it 12 MiB (0xc00000); allocations go through 0xf6f060. A full-density map ran it dry: 0xdafe30 (called from 0xeeb4d0) wrote through the null it returned | D |
 | `0x2a48830` | NpcMenus | - | NPC menus (D2Client\src\UI\npcmenu.cpp): a vector of 0x48-byte records, one per NPC with a menu. +0 uint16 NPC class, +4 int32 entry count (the last entry is Cancel), +8 uint16 string id[5], +0x18 handler[5]. The client fills them from npc.txt and per-NPC setters (Kashya and Qual-Kehk get Hire, Tyrael Travel To Harrogath), then opens one with NpcMenuOpen. | D |
 | `0x2a48838` | NpcMenuCount | - | NPC menus (D2Client\src\UI\npcmenu.cpp): a vector of 0x48-byte records, one per NPC with a menu. +0 uint16 NPC class, +4 int32 entry count (the last entry is Cancel), +8 uint16 string id[5], +0x18 handler[5]. The client fills them from npc.txt and per-NPC setters (Kashya and Qual-Kehk get Hire, Tyrael Travel To Harrogath), then opens one with NpcMenuOpen. | D |
 | `0x34c3ce8` | JobsPool | - | Jobs: the job system (getter 0x9e8e70, static 0x34c3b40) holds a 10 MiB (0xa00000) TlsfAllocator at +0x1a8 (vtable 0x1d95618, set up by 0x9e91e0). Same +0x20 control, but +0x28 is a spinlock: 0x9e8c30 swaps in the lock's own address, spins while it is not 0 and stores 0 to release. A full-density map ran it dry: 0xd9e740 wrote through the null 0x9e8ca0 returned. | D |
@@ -730,8 +744,6 @@ function (bytes in the header, checked before the patch); **D** data: a variable
 | `0x3e2a448` | CrushingBlowApplySlot | - | CrushingBlowApply's entry is jmp [rip+0x38a8872]: the qword it jumps through, which a plugin can swap | T |
 | `0x3e2aab0` | DamageTypeStepSlot | - | DamageEffects (0x44df10) runs its 12 damage types (1.13c's table, 0x40 bytes each here) through (&ctx, &type, flag), called as jmp [this slot]: D2RCore's resist step (1.13c's 0x6fcfbd00). | T |
 | `0x3e2b652` | SetUnitStateKey | (unit, key) | UnitStateKey's setter (a jmp stub) | R |
-| `0x37a451` | DecodeEtherealDamage[] | - | Item decoder (0x378860): the first of six sites that times a weapon's base damage by 3/2 when ethereal, stats 21-24, 159, 160; the others are `0x37a47c`, `0x37a4a7`, `0x37a4d2`, `0x37a4fe`, `0x37a52a` | P |
-| `0x441b83` | WeaponDurabilityChance[] | - | Weapon durability loss per hit (0x441b10): `mov ebx,4`, the chance (percent) for most weapons; `0x441ba6` is the same with `mov ebx,0xa` for the item types that take 10 | P |
 
 ## Rules the engine hard-codes: damage reduction cap, leech rounding, level packets (build 93847)
 

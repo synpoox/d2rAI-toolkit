@@ -198,8 +198,7 @@ inline constexpr uint8_t PrimesDropOrig[] = {0x48, 0x89, 0x5c, 0x24, 0x20};  // 
 // HD pictures of 4-character item codes. The items.json loader 0x6635a0 keys each entry by its code's first 3
 // characters plus a space (0x663a14 writes 0x20 to byte 3), while the picture lookup 0x662fb0 (case 4) searches by the
 // item record's whole code dword (+0x80). So a 4-character code never finds its entry and overwrites the entry of the
-// 3-character code it starts with. D2R's bytes at ItemsJsonKey are ItemsJsonKeyD2R; a fix keeps byte 3 (the code's
-// 4th character | 0x20) and sends the 2-character path to D2R's own double-space store at 0x663a07.
+// 3-character code it starts with. D2R's bytes at ItemsJsonKey are ItemsJsonKeyD2R.
 inline constexpr uint64_t ItemsJsonKey = 0x6639f9;
 // jmp 0x663a14 / mov [rsp+25],al / movzx eax,byte [rsi+2] / test al,al / jne 0x663a10 / mov word [rsp+26],0x2020 /
 // jmp 0x663a19 / mov [rsp+26],al / mov byte [rsp+27],0x20
