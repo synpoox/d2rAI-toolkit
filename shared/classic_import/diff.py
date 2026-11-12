@@ -10,9 +10,11 @@ project's `statuses`, which the project always names); a table with a Gate colum
 """
 from __future__ import annotations
 
+import argparse
 import fnmatch
 import re
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
@@ -202,6 +204,39 @@ def gate(src_excel: Path, mod_excel: Path, d2r_excel: Path, deviation_list: Path
                                 "row")
         results.append(triage(res, patterns))
     return Report(results, entries)
+
+
+def fix_of(finish: ids.Finish | None) -> Fix | None:
+    """A merge's `finish` hook (ids.finishes, ids.props_finish, ...) as the `fix` compare() takes, so the gate spells a
+    source row exactly as the merge fixed it. The D2R row a finish may read is not known here (None), as for a row
+    the merge appended."""
+    if finish is None:
+        return None
+    return lambda table, header, want, src_header, src_row: finish(header, want, dict(zip(src_header, src_row)), None)
+
+
+def scope_of(scopes: dict[str, Callable[[str], bool]], name: str) -> Callable[[str], bool]:
+    """The `select` of a named scope; an unknown scope is a GateError."""
+    if name not in scopes:
+        raise GateError(f"scope {name!r} is not one of {', '.join(scopes)}")
+    return scopes[name]
+
+
+def cli(prog: str, scopes: dict[str, Callable[[str], bool]], run_gate: Callable[[Callable[[str], bool]], Report],
+        argv: list[str] | None = None, root: Path | None = None, source: str = "Source", description: str = "") -> int:
+    """A project's gate command line: `--scope NAME` picks a table selection of `scopes`, `run_gate(select)` returns the
+    Report (the project calls gate() with its paths, id lists and compare_args). Prints the markdown report; exit 0 when
+    nothing is open, 1 when something is, 2 when the deviation list, an id list or the scope is broken."""
+    ap = argparse.ArgumentParser(prog=prog, description=description)
+    ap.add_argument("--scope", required=True, choices=list(scopes))
+    a = ap.parse_args(argv)
+    try:
+        rep = run_gate(scope_of(scopes, a.scope))
+    except (GateError, ids.IdError) as e:
+        print(f"{prog}: {e}", file=sys.stderr)
+        return 2
+    print(report(rep, a.scope, commit_of(root) if root else "", source))
+    return 0 if rep.ok else 1
 
 
 def escape_pipes(v: str) -> str:
