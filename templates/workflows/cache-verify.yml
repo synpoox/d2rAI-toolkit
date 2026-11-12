@@ -1,0 +1,93 @@
+name: cache-verify
+
+# Template: copy to .github/workflows/cache-verify.yml in a mod repository.
+# A gate that replays cached build results is only as correct as the cache key. Nightly (and by hand), build main's head
+# fresh and again replaying the shared cache, and fail naming every generated file whose SHA-256 differs. Self-hosted
+# like the gate: it needs the game's files, which never go to GitHub (README.md in this folder).
+# Repository variables: RUNNER_LABELS, D2R_TOOLKIT, D2R_GAME, MODKIT_CACHE_DIR, DATA_LINK, RULE_CACHE_DIR.
+# The schedule cannot come from a variable: edit the cron line below.
+on:
+  schedule:
+    - cron: '17 4 * * *'  # EDIT: daily, 04:17 UTC, a quiet hour off the :00 mark
+  workflow_dispatch:
+
+# Least privilege: the job only reads code.
+permissions:
+  contents: read
+
+# One check at a time.
+concurrency:
+  group: cache-verify
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["self-hosted","windows"]') }}
+    timeout-minutes: 90
+    env:
+      D2R_TOOLKIT: ${{ vars.D2R_TOOLKIT }}
+      PYTHONPATH: ${{ vars.D2R_TOOLKIT }}
+      MODKIT_CACHE: ${{ vars.MODKIT_CACHE_DIR || format('{0}\d2r-data', vars.D2R_TOOLKIT) }}
+      MODKIT_GAME: ${{ vars.D2R_GAME }}
+      DATA_LINK: ${{ vars.DATA_LINK || 'd2r-data' }}
+      RULE_CACHE_VAR: ${{ vars.RULE_CACHE_DIR }}  # empty: <runner temp>\rule-cache
+      GENERATED: generated  # EDIT: the folder the build writes and the comparison covers
+    steps:
+      - name: Drop cache junction
+        # a junction left in the workspace by an earlier run would be walked by checkout's clean step
+        run: if (Test-Path $env:DATA_LINK) { cmd /c rmdir $env:DATA_LINK }
+        continue-on-error: true
+      - uses: actions/checkout@v4
+        with:
+          ref: main  # the cache is main's: check main's head, whichever branch a manual run starts from
+      - name: Update the toolkit checkout
+        run: git -C "$env:D2R_TOOLKIT" pull -q --ff-only
+        continue-on-error: true
+      - name: Extracted data
+        run: |
+          New-Item -ItemType Directory -Force $env:MODKIT_CACHE | Out-Null
+          New-Item -ItemType Junction -Path $env:DATA_LINK -Target $env:MODKIT_CACHE | Out-Null
+          $rules = if ($env:RULE_CACHE_VAR) { $env:RULE_CACHE_VAR } else { Join-Path $env:RUNNER_TEMP "rule-cache" }
+          "RULE_CACHE=$rules" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          # EDIT: the mod's extraction commands, each followed by an exit-code check, for example
+          #   py -3 -m modkit fetch --prefix data/global/; if ($LASTEXITCODE) { throw "modkit fetch failed" }
+      - name: Fresh build
+        # No cache scope set: every rule runs and nothing is read from or kept in the cache.
+        run: |
+          Remove-Item Env:CI_SCOPE -ErrorAction SilentlyContinue
+          # EDIT: the mod's build command
+          py -3 tools/build.py; if ($LASTEXITCODE) { throw "fresh build failed" }
+          Move-Item $env:GENERATED "$env:GENERATED-fresh"
+      - name: Cached build
+        # Scope pr-0 replays only the entries main kept and keeps its misses in a scratch folder that is emptied before
+        # and after, so this run never writes into the shared cache and never replays leftovers.
+        run: |
+          $scratch = Join-Path $env:RULE_CACHE "pr\pr-0"   # EDIT: where the mod's cache keeps a PR scope's misses
+          if (Test-Path $scratch) { Remove-Item -Recurse -Force $scratch }
+          $env:CI_SCOPE = "pr-0"
+          # EDIT: the same build command; its output must report how many rules were replayed
+          $out = py -3 tools/build.py; $code = $LASTEXITCODE
+          $out
+          if (Test-Path $scratch) { Remove-Item -Recurse -Force $scratch }
+          if ($code) { throw "cached build failed" }
+          # EDIT: the pattern of the build's "N of M rules replayed" line
+          $line = $out | Select-String -Pattern 'rule cache: (\d+) of (\d+) rules replayed' | Select-Object -First 1
+          if ($line) { $line.Line | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY }
+          # Self-heal hides a cache fault: a build that rebuilt without the cache proves nothing about it.
+          if ($out | Select-String -SimpleMatch 'rebuilding without the rule cache') {
+            "::warning::the cached build logged 'rebuilding without the rule cache': the cache was not what was compared"
+            "Warning: the build rebuilt without the rule cache." | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
+          }
+          # 0 replayed: nothing cached was compared (an empty cache, or a key that never hits), so the check is vacuous.
+          if (-not $line -or $line.Matches[0].Groups[1].Value -eq "0") {
+            "::error::NOT VERIFIED: the cached build replayed no rules, so there is nothing to compare"
+            "NOT VERIFIED: no rules replayed." | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
+            throw "cached build replayed 0 rules"
+          }
+      - name: Compare generated files
+        # EDIT: a tool that prints every file whose SHA-256 differs between the two folders and exits non-zero on any
+        run: py -3 tools/cache_verify.py "$env:GENERATED-fresh" $env:GENERATED
+      - name: Remove the fresh copy
+        if: always()
+        run: if (Test-Path "$env:GENERATED-fresh") { Remove-Item -Recurse -Force "$env:GENERATED-fresh" }
+        continue-on-error: true
