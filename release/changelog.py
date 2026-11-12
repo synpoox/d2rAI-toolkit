@@ -6,6 +6,7 @@ Python 3.12+, standard library only. Used by release/stage.py; importable on its
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 
 FRAGMENTS_DIR = "changelog.d"
@@ -84,23 +85,35 @@ def notes_section(changelog: str, version: str) -> str:
 def main(argv: list[str] | None = None) -> int:
     """`py -3 release/changelog.py fold --root . --version 1.2.3`: fold the fragments into the changelog and delete them."""
     import argparse
-    import sys
     ap = argparse.ArgumentParser(description=main.__doc__)
     ap.add_argument("command", choices=["fold"])
     ap.add_argument("--root", type=Path, default=Path.cwd(), help="the mod project folder (default: the current folder)")
     ap.add_argument("--version", required=True, help="release version (the section the fragments fold into)")
-    ap.add_argument("--changelog", default=CHANGELOG)
-    ap.add_argument("--fragments", default=FRAGMENTS_DIR)
+    ap.add_argument("--changelog", help=f"default: repos.changelog of release.toml, else {CHANGELOG}")
+    ap.add_argument("--fragments", help=f"default: repos.fragments of release.toml, else {FRAGMENTS_DIR}")
+    ap.add_argument("--config", type=Path, help="release.toml (default: <root>/release.toml when it exists)")
     a = ap.parse_args(argv)
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import release_config
+    config = a.config or Path(a.root) / release_config.DEFAULT_CONFIG_NAME
     try:
-        n = fold_fragments(a.root, a.version.lstrip("v"), a.changelog, a.fragments)
+        if a.config or config.is_file():
+            repos = release_config.load(config, required=True)["repos"]
+        else:
+            repos = {"changelog": CHANGELOG, "fragments": FRAGMENTS_DIR}
+        changelog = repos["changelog"] if a.changelog is None else a.changelog
+        fragments = repos["fragments"] if a.fragments is None else a.fragments
+        release_config.check_fragments(fragments, changelog, "--fragments")
+        n = fold_fragments(a.root, a.version.lstrip("v"), changelog, fragments)
+    except release_config.ConfigError as e:
+        print(f"changelog: {e}", file=sys.stderr)
+        return 1
     except ChangelogError as e:
         print(f"changelog: {e}", file=sys.stderr)
         return 1
-    print(f"changelog: folded {n} fragments from {a.fragments}/")
+    print(f"changelog: folded {n} fragments from {fragments}/")
     return 0
 
 
 if __name__ == "__main__":
-    import sys
     sys.exit(main())

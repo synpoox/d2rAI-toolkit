@@ -6,7 +6,7 @@ Run it after the project's whole build (data merged, `modkit build`, plugins bui
   1. folds changelog.d/*.md into the changelog in memory and checks the `### <version> (<date>)` section exists,
   2. checks the game image (D2R.exe's PE timestamp against game.image_timestamp, when the config sets one) and the
      item type ids of out/data (plugin-template/tools/item_type_ids.py, unless stage.item_type_check = false),
-  3. lays the mod folder out in <out>/mod/<name>/ as `modkit install` does: out/data, modinfo, loader metadata and
+  3. lays the mod folder out in <out>/.stage-mod/<name>/ (a folder this tool creates and removes, nothing else) as `modkit install` does: out/data, modinfo, loader metadata and
      config, the companions (release/companions.py overlay, the vanilla tables they read from DIR) and the built plugins,
   4. runs release/package_release.py with the config, and replaces its notes with the changelog section alone.
 The fragments are deleted only when the whole run succeeded; any failure leaves the changelog and fragments as they were.
@@ -34,6 +34,9 @@ sys.path.insert(0, str(HERE))
 import changelog as cl  # noqa: E402
 import companions as comp  # noqa: E402
 import release_config  # noqa: E402
+
+
+STAGE_DIR = ".stage-mod"  # under --out; never a name a project or a user uses for their own files
 
 
 class ReleaseError(Exception):
@@ -174,13 +177,10 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     out = (a.out or root / cfg["package"]["dist"]).resolve()
     try:
-        try:
-            return run(a, root, out, config_path, cfg)
-        except (cl.ChangelogError, ReleaseError, comp.CompanionError) as e:
-            print(f"release: {e}", file=sys.stderr)
-            return 1
-    finally:
-        shutil.rmtree(out / "mod", ignore_errors=True)  # the staged copy; the release assets stay
+        return run(a, root, out, config_path, cfg)
+    except (cl.ChangelogError, ReleaseError, comp.CompanionError) as e:
+        print(f"release: {e}", file=sys.stderr)
+        return 1
 
 
 def run(a, root: Path, out: Path, config_path: Path, cfg: dict) -> int:
@@ -193,7 +193,6 @@ def run(a, root: Path, out: Path, config_path: Path, cfg: dict) -> int:
     frag = cfg["repos"]["fragments"]
     exe = a.game / "D2R.exe"
     text, fragments = cl.pending(root, version, cfg["repos"]["changelog"], frag)
-    before = log.read_text("utf-8")
     section = cl.notes_section(text, version)  # checked before anything is written or deleted
     if exe.is_file():
         check_game_image(cfg, exe)
@@ -209,8 +208,22 @@ def run(a, root: Path, out: Path, config_path: Path, cfg: dict) -> int:
             from modkit.base import Base  # this toolkit
             base.append(Base(a.game))
         return base[0].bytes(rel)
+    work = out / STAGE_DIR  # the tool's own folder: created fresh here, the only thing removed afterwards
+    if work.exists():  # left by an interrupted run of this tool
+        shutil.rmtree(work)
+    work.mkdir(parents=True)
     try:
-        mod = stage(root, out / "mod", cfg, read)
+        return package(a, root, out, config_path, cfg, work, version, section, text, fragments, exe, read)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)  # the release assets stay; nothing else under `out` is touched
+
+
+def package(a, root, out, config_path, cfg, work, version, section, text, fragments, exe, read) -> int:
+    log = root / cfg["repos"]["changelog"]
+    frag = cfg["repos"]["fragments"]
+    before = log.read_text("utf-8")
+    try:
+        mod = stage(root, work, cfg, read)
     except OSError as e:  # no game storage, no cache, a locked file
         raise ReleaseError(f"cannot stage the mod folder: {e}")
     folded = bool(fragments)

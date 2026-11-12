@@ -249,7 +249,8 @@ class GuardTests(unittest.TestCase):
 
 
 class MainTests(unittest.TestCase):
-    def run_main(self, run, with_fragment=True, version_section=True, args=(), cwd=None, mod_name="M", changelog=True):
+    def run_main(self, run, with_fragment=True, version_section=True, args=(), cwd=None, mod_name="M", changelog=True,
+                 prepare=None, out_dir="dist"):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         root = Path(tmp.name) / "p"
@@ -264,6 +265,8 @@ class MainTests(unittest.TestCase):
         (root / "release.toml").write_text('[mod]\nfolder = "M"\n[stage]\nitem_type_check = false\n', "utf-8")
         if with_fragment:
             (root / "changelog.d" / "1-a.md").write_text("#### Items\n- X.\n", "utf-8")
+        if prepare:
+            prepare(root)
         game = Path(tmp.name) / "game"
         game.mkdir()
         if cwd:
@@ -273,7 +276,7 @@ class MainTests(unittest.TestCase):
         with mock.patch.object(stage, "stage", return_value=root / "mod") as staged, \
                 mock.patch.dict(sys.modules, {"modkit": mock.MagicMock(), "modkit.base": mock.MagicMock()}), \
                 mock.patch.object(stage.subprocess, "run", side_effect=run):
-            code = stage.main(["--game", str(game), "--root", str(root), "--out", str(root / "dist"), *args])
+            code = stage.main(["--game", str(game), "--root", str(root), "--out", str(root / out_dir), *args])
         self.staged = staged
         return root, code, log
 
@@ -348,13 +351,43 @@ class MainTests(unittest.TestCase):
     def test_the_staged_copy_is_removed_after_success(self):
         def run(cmd, **k):
             out = Path(cmd[cmd.index("--out") + 1])
-            (out / "mod").mkdir(parents=True, exist_ok=True)
+            (out / stage.STAGE_DIR / "M").mkdir(parents=True, exist_ok=True)
             (out / "RELEASE_NOTES-0.2.0.md").write_text(SKELETON)
             (out / "SHA256SUMS").write_text(f"{'0' * 64}  RELEASE_NOTES-0.2.0.md\n")
             return mock.Mock(returncode=0)
         root, code, log = self.run_main(run)
         self.assertEqual(code, 0)
-        self.assertFalse((root / "dist" / "mod").exists())
+        self.assertFalse((root / "dist" / stage.STAGE_DIR).exists())
+
+    def test_a_failed_run_keeps_a_users_dist_mod_folder(self):
+        def prepare(root):
+            (root / "dist" / "mod").mkdir(parents=True)
+            (root / "dist" / "mod" / "user.txt").write_text("mine")
+        for run, version_section in ((lambda *a, **k: mock.Mock(returncode=3), True),
+                                     (lambda *a, **k: mock.Mock(returncode=0), False)):  # fails late / before staging
+            root, code, log = self.run_main(run, version_section=version_section, prepare=prepare)
+            self.assertNotEqual(code, 0)
+            self.assertEqual((root / "dist" / "mod" / "user.txt").read_text(), "mine")
+            self.assertFalse((root / "dist" / stage.STAGE_DIR).exists())
+
+    def test_out_set_to_the_project_never_touches_its_mod_folder(self):
+        def prepare(root):
+            (root / "mod").mkdir()
+            (root / "mod" / "keep.txt").write_text("project")
+        for run, version_section in ((lambda *a, **k: mock.Mock(returncode=3), True),
+                                     (lambda *a, **k: mock.Mock(returncode=0), False)):
+            root, code, log = self.run_main(run, version_section=version_section, prepare=prepare, out_dir=".")
+            self.assertNotEqual(code, 0)
+            self.assertEqual((root / "mod" / "keep.txt").read_text(), "project")
+            self.assertFalse((root / stage.STAGE_DIR).exists())
+
+    def test_a_stale_stage_folder_is_replaced_and_the_staging_goes_there(self):
+        def prepare(root):
+            (root / "dist" / stage.STAGE_DIR).mkdir(parents=True)
+            (root / "dist" / stage.STAGE_DIR / "old.txt").write_text("stale")
+        root, code, log = self.run_main(lambda *a, **k: mock.Mock(returncode=3), prepare=prepare)
+        self.assertEqual(self.staged.call_args[0][1], root / "dist" / stage.STAGE_DIR)
+        self.assertFalse((root / "dist" / stage.STAGE_DIR).exists())
 
     def test_success_folds_then_deletes_the_fragments_and_writes_the_notes(self):
         def run(cmd, **k):
@@ -368,6 +401,41 @@ class MainTests(unittest.TestCase):
         self.assertIn("- X.", (root / "CHANGELOG.md").read_text("utf-8"))
         self.assertEqual(list((root / "changelog.d").iterdir()), [])
         self.assertIn("- X.", (root / "dist" / "RELEASE_NOTES-0.2.0.md").read_text())
+
+
+class FoldCliConfigTests(unittest.TestCase):
+    def project(self, tmp, toml=None):
+        root = Path(tmp)
+        (root / "CHANGELOG.md").write_text(RELEASE_LOG, "utf-8")
+        if toml is not None:
+            (root / "release.toml").write_text(toml, "utf-8")
+        return root
+
+    def test_defaults_come_from_release_toml(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.project(tmp, '[repos]\nfragments = "notes.d"\nchangelog = "docs/LOG.md"\n')
+            (root / "docs").mkdir()
+            (root / "docs" / "LOG.md").write_text(RELEASE_LOG, "utf-8")
+            (root / "notes.d").mkdir()
+            (root / "notes.d" / "1.md").write_text("- Z.\n", "utf-8")
+            self.assertEqual(cl.main(["fold", "--root", str(root), "--version", "0.2.0"]), 0)
+            self.assertIn("- Z.", (root / "docs" / "LOG.md").read_text("utf-8"))
+            self.assertFalse((root / "notes.d" / "1.md").exists())
+
+    def test_fragments_option_must_be_a_folder_below_the_project(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.project(tmp, "")
+            (root.parent / "outside").mkdir(exist_ok=True)
+            (root.parent / "outside" / "1.md").write_text("- Z.\n", "utf-8")
+            for bad in ("..", "../outside", "/abs", "C:x", ".", ""):
+                with self.subTest(bad=bad):
+                    self.assertEqual(cl.main(["fold", "--root", str(root), "--version", "0.2.0", "--fragments", bad]), 1)
+            self.assertTrue((root.parent / "outside" / "1.md").exists())
+
+    def test_a_broken_release_toml_is_a_clean_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.project(tmp, "[repos\n")
+            self.assertEqual(cl.main(["fold", "--root", str(root), "--version", "0.2.0"]), 1)
 
 
 class ConfigTests(unittest.TestCase):
