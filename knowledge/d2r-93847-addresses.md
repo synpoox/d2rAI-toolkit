@@ -255,8 +255,8 @@ empty). Functions holding one inline its destruction (see `0x5630e0`'s epilogue)
 | `0x3bb1e0` | (missile) -> frames left |
 | `0x3bdbc0` / `0x3bd450` / `0x3bd8a0` | total frames / set frames left / set step counter |
 | `0x2390e80` | **server do table** (record +0x2c), bound 54 (slots 0-53), dispatcher `0x466ce0`; **46-53 empty** |
-| `0x2391030` | **server hit table** (record +0x2e), bound 71 at `0x2391404`, dispatcher `0x464ac0` (game, missile, target or null); **61-70 empty** |
-| `0x2358430` | **client do table** (record +0x28), called (missile, float part-frame) from `0x1ba040`; 92 slots (0-91), **78-91 empty**, slot 14 unused |
+| `0x2391030` | **server hit table** (record +0x2e), bound 71 at `0x2391404`, dispatcher `0x464ac0` (game, missile, target or null); **61-70 empty**. Return value: build 93847, unverified. A review read srvhit 4 (`0x45ddb0`) as returning 3 (bit 0x2 = deal the missile's damage) but this was not checked against the caller at `0x464ac0`, so the toolkit types the function as `void` and never reads a result |
+| `0x2358430` | **client do table** (record +0x28), called (missile, float part-frame) from `0x1ba040` (the second argument is a float, in xmm1 on x64, not an int); 92 slots (0-91), **78-91 empty**, slot 14 unused |
 | `0x2358710` | **client hit table** (record +0x2a), bound 81 at `0x2358a64` (slots 0-80); **66-80 empty**, slots 6, 7 empty (a mod's reading also lists 8, 11, 15, 17, 20-23, 27, 35, 45, 49, 58, 59 as empty; not checked here) |
 | `0x4550e0` / `0x1b5380` | server / client do 1 (plain move) |
 | `0x459380` / `0x1a8880` | server do 15 / client do 19 (Frozen Orb style spawner) |

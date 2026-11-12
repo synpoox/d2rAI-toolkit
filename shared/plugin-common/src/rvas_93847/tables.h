@@ -67,11 +67,12 @@ inline constexpr uint64_t MissileSrvDoTable = 0x2390e80;
 inline constexpr int MissileSrvDoSlots = 54;
 inline constexpr int MissileSrvDoFirstFree = 46;
 // void fn(Game*, Unit* missile, Unit* hit or null): 71 slots (bound 0x2391404), 61-70 free (dispatcher 0x464ac0,
-// record +0x2e)
+// record +0x2e). Return value: not confirmed (build 93847, unverified); a function written to this type returns nothing
+// and nothing in the toolkit reads one.
 inline constexpr uint64_t MissileSrvHitTable = 0x2391030;
 inline constexpr int MissileSrvHitSlots = 71;
 inline constexpr int MissileSrvHitFirstFree = 61;
-// void fn(Unit* missile, int32_t a2): 92 slots, 78-91 free (called from 0x1ba040, record +0x28)
+// void fn(Unit* missile, float partFrame): 92 slots, 78-91 free (called from 0x1ba040, record +0x28)
 inline constexpr uint64_t MissileCltDoTable = 0x2358430;
 inline constexpr int MissileCltDoSlots = 92;
 inline constexpr int MissileCltDoFirstFree = 78;
