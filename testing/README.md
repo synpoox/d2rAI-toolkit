@@ -15,6 +15,7 @@ Windows is needed to run the game; everything else (locks, config, checks, relea
 | `menu_layout.py` | Menu click positions (fractions of the window) for `lod_checks`; measured for D2R 3.3 at 1920x1080, re-measure for another version. |
 | `game_checks.py` | Small checks framework: `@check` registry, runner, results JSON, summary, screenshots. |
 | `example_checks.py` | Example checks to copy (`config-sane`, `game-starts`, `main-menu-visible`, `console-echo`, `no-new-crash-files`). |
+| `slot_registry.py` | The slot-to-owner table (`~/.d2r-modkit/slots.toml`, machine config): which project may lock which slot. |
 | `warps.py` | `cheat goto` lines (and a markdown doc for a list of levels) for a DS1 map's centre, waypoints and boss presets. |
 | `slot_install.py` | Installs a built mod project into a slot (`modkit install`), keeping the slot's own savepath. |
 | `force_ds1.py` | Test-only: pins a level to one DS1 variant in a slot's installed `lvlprest.txt`, so a warp lands on the preset under test. |
@@ -48,6 +49,17 @@ MODKIT_RUN=my-lane python testing/game_slots.py unlock 2 my-lane
   free slot from 2 up. `unlock N <owner>`, or `unlock N --force` to clear a stale lock of a finished lane.
   `status` shows each lock's age ("held 6 min"). `unlock` refuses a lock younger than 30 min or whose owner pid still
   runs, and names the age and owner, unless `<owner>` equals your own `MODKIT_RUN` (freeing your own lock) or `--force`.
+- **Slot owners.** If `~/.d2r-modkit/slots.toml` exists (or `--slots-file F` / `MODKIT_SLOTS_FILE`), `lock` refuses a slot
+  another project owns. Say who you are with `--project NAME` or `MODKIT_PROJECT`; `lock any` takes only your own slots,
+  then unowned ones. No file, no enforcement; an unreadable file refuses everything. The table is machine config and never
+  goes into a repo. Format:
+
+  ```toml
+  [owners]
+  "2"   = "toolkit"     # a slot number or a range is the key, a project name the value
+  "3"   = "mod-a"
+  "4-6" = "mod-b"
+  ```
 - Nothing here sends real mouse or keyboard input or takes focus. The window is found by PID, never by title.
 
 ## Command lines
