@@ -15,6 +15,7 @@ Windows is needed to run the game; everything else (locks, config, checks, relea
 | `menu_layout.py` | Menu click positions (fractions of the window) for `lod_checks`; measured for D2R 3.3 at 1920x1080, re-measure for another version. |
 | `game_checks.py` | Small checks framework: `@check` registry, runner, results JSON, summary, screenshots. |
 | `example_checks.py` | Example checks to copy (`config-sane`, `game-starts`, `main-menu-visible`, `console-echo`, `no-new-crash-files`). |
+| `warps.py` | `cheat goto` lines (and a markdown doc for a list of levels) for a DS1 map's centre, waypoints and boss presets. |
 | `slot_install.py` | Installs a built mod project into a slot (`modkit install`), keeping the slot's own savepath. |
 | `force_ds1.py` | Test-only: pins a level to one DS1 variant in a slot's installed `lvlprest.txt`, so a warp lands on the preset under test. |
 | `release_install.py` | Installs the PUBLISHED release into a slot, as a player would get it. |
@@ -59,6 +60,7 @@ python testing/game_slots.py unlock N [OWNER] [--force]
 python testing/game_ctl.py   --slot N status|start|stop|shot NAME|key KEY..|click FX FY [right]|console CMD|harness on|off|pair NAME LEVEL,X,Y [--light N] [--settle S]|moved click FX FY|key KEY..
 python testing/game_checks.py list [names or tags]
 python testing/game_checks.py run [names or tags] --slot N [--run-id ID] [--keep] [--stop-on-fail] [--module M] [--path DIR]
+python testing/warps.py --data DIR --level N [--level M ...] [--ds1 NAME] [--boss-word W ...] [--out FILE]   # no slot needed
 python testing/slot_install.py --slot N PROJECT
 python testing/force_ds1.py --slot N [--project DIR] "<Name or LevelId>=<ds1>" | <ds1> | --reset
 python testing/release_install.py check [--channel C] [--site S]
