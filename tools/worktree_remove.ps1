@@ -47,21 +47,40 @@ foreach ($line in $probe.Out) {
     elseif ($line -eq 'locked' -or $line -like 'locked *') { $cur.Locked = $true; $cur.LockReason = $line.Substring(6).Trim() }
 }
 $repo = $trees[0].Path   # the main checkout: branch and fetch commands run here
-$target = Norm $Path
+$target = Norm $here
 $wt = $trees | Where-Object { (Norm $_.Path) -eq $target } | Select-Object -First 1
 if (-not $wt) { throw "Refusing: $Path is not a worktree of this repo" }
 if ((Norm $trees[0].Path) -eq $target) { throw "Refusing: $Path is the main checkout" }
 if ($wt.Locked) { throw "Refusing: $Path is locked ($($wt.LockReason)); a live agent may own it. Not unlocking." }
-if ((Inside $PWD.Path $Path) -or (Inside $PSScriptRoot $Path)) {
+if ((Inside $PWD.Path $here) -or (Inside $PSScriptRoot $here)) {
     throw "Refusing: the current directory or this script is inside $Path"
 }
-$nested = $trees | Where-Object { (Norm $_.Path) -ne $target -and (Inside $_.Path $Path) }
+$nested = $trees | Where-Object { (Norm $_.Path) -ne $target -and (Inside $_.Path $here) }
 if ($nested) { throw "Refusing: $Path contains another worktree: $(($nested | ForEach-Object { $_.Path }) -join ', ')" }
 $root = $wt.Path
 $branch = $wt.Branch
 
+# Find every reparse point without descending into any of them.
+function FindLinks {
+    $found = @(); $stack = New-Object System.Collections.Stack; $stack.Push($root)
+    while ($stack.Count) {
+        $d = $stack.Pop()
+        foreach ($e in (Get-ChildItem -LiteralPath $d -Force)) {
+            if ($e.Attributes -band [IO.FileAttributes]::ReparsePoint) { $found += $e }
+            elseif ($e.PSIsContainer) { $stack.Push($e.FullName) }
+        }
+    }
+    $found
+}
 if (-not $Force) {
-    $dirty = @((Native 'git' @('-C', $root, 'status', '--porcelain')).Out)
+    # The cache junctions are removed safely below, so they are not "changes". -uall lists each untracked path.
+    $linkRel = @(FindLinks | ForEach-Object { $_.FullName.Substring($root.TrimEnd('\', '/').Length).TrimStart('\', '/').Replace('/', '\').ToLowerInvariant() })
+    $dirty = @((Native 'git' @('-C', $root, 'status', '--porcelain', '--untracked-files=all')).Out | Where-Object {
+        $rel = ($_.Substring(3).Trim('"') -replace '/', '\').TrimEnd('\').ToLowerInvariant()
+        $isLink = $false
+        foreach ($l in $linkRel) { if ($rel -eq $l -or $rel.StartsWith($l + '\')) { $isLink = $true; break } }
+        -not ($_.StartsWith('?? ') -and $isLink)
+    })
     if ($dirty.Count -gt 0) {
         $dirty | ForEach-Object { Write-Host "  $_" }
         throw "Refusing: $root has uncommitted or untracked changes (listed above); commit them or pass -Force"
@@ -81,7 +100,8 @@ if ($DeleteBranch) {
             # The remote name comes from the real upstream, which may differ from the local name.
             $up = ((Native 'git' @('-C', $repo, 'for-each-ref', '--format=%(upstream:short)', "refs/heads/$branch")).Out -join '').Trim()
             $head = if ($up -match '^[^/]+/(.+)$') { $Matches[1] } else { $branch }
-            $g = Native 'gh' @('pr', 'list', '--head', $head, '--state', 'merged', '--json', 'headRefOid', '--jq', '.[].headRefOid')
+            Push-Location $repo   # gh asks the repo this worktree belongs to, not the caller's directory
+            try { $g = Native 'gh' @('pr', 'list', '--head', $head, '--state', 'merged', '--json', 'headRefOid', '--jq', '.[].headRefOid') } finally { Pop-Location }
             if ($g.Code -eq 0 -and ($g.Out -contains $tip)) {
                 $branchDelete = $true; $branchVerdict = "deleted local branch $branch (a merged PR's head is its tip $($tip.Substring(0, 9)))"
             } else {
@@ -91,18 +111,6 @@ if ($DeleteBranch) {
     }
 }
 
-# Find every reparse point without descending into any of them.
-function FindLinks {
-    $found = @(); $stack = New-Object System.Collections.Stack; $stack.Push($root)
-    while ($stack.Count) {
-        $d = $stack.Pop()
-        foreach ($e in (Get-ChildItem -LiteralPath $d -Force)) {
-            if ($e.Attributes -band [IO.FileAttributes]::ReparsePoint) { $found += $e }
-            elseif ($e.PSIsContainer) { $stack.Push($e.FullName) }
-        }
-    }
-    $found
-}
 # File count and a sample file for a folder, followed through the link's target.
 function Snapshot([string]$dir) {
     $n = 0; $sample = $null

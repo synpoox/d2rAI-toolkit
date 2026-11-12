@@ -47,7 +47,7 @@ try {
     New-Item -ItemType Junction -Path (Join-Path $wt 'cache-data') -Target $target | Out-Null
     New-Item -ItemType Directory (Join-Path $wt 'sub\deep') -Force | Out-Null
     New-Item -ItemType Junction -Path (Join-Path $wt 'sub\deep\nested') -Target $target2 | Out-Null
-    $r = Run @('-Path', $wt, '-DeleteBranch', '-Force')  # -Force: the nested junction shows as untracked
+    $r = Run @('-Path', $wt, '-DeleteBranch')  # no -Force: junctions alone do not make a worktree dirty
     Write-Host $r.Out
     Check 'removal succeeds' ($r.Code -eq 0)
     Check 'worktree is gone' (-not (Test-Path $wt))
@@ -56,6 +56,40 @@ try {
     Check 'nested junction reported' ($r.Out -match 'unlinked .*nested')
     Check 'worktree no longer listed' (-not ((& git -C $repo worktree list) -match 'links'))
     Check 'unmerged branch kept' ($r.Out -match 'kept branch' -and (& git -C $repo branch --list 'scratch/links'))
+
+    # Junction plus a real untracked file: still refused, nothing unlinked.
+    $wt = NewWt 'linkdirty'
+    New-Item -ItemType Junction -Path (Join-Path $wt 'cache-data') -Target $target | Out-Null
+    Set-Content (Join-Path $wt 'real-work.txt') 'x'
+    $r = Run @('-Path', $wt)
+    Check 'junction plus untracked file is refused and lists only the file' ($r.Code -ne 0 -and $r.Out -match 'real-work.txt' -and $r.Out -notmatch '\?\? cache-data' -and (Test-Path (Join-Path $wt 'cache-data\keep.txt')))
+    cmd /c rmdir (Join-Path $wt 'cache-data')
+    & git -C $repo worktree remove --force $wt
+
+    # Submodule with a junction inside it, removed from a relative path.
+    $subOrigin = Join-Path $scratch 'sub.git'; $subSrc = Join-Path $scratch 'subsrc'
+    G init -q --bare -b main $subOrigin
+    G clone -q $subOrigin $subSrc
+    G -C $subSrc commit -q --allow-empty -m subbase
+    G -C $subSrc branch -M main
+    G -C $subSrc push -q -u origin main
+    G -C $repo -c protocol.file.allow=always submodule add -q $subOrigin libsub
+    G -C $repo commit -q -m 'add submodule'
+    G -C $repo push -q origin main
+    $wt = NewWt 'withsub'
+    G -C $wt -c protocol.file.allow=always submodule update --init -q
+    New-Item -ItemType Junction -Path (Join-Path $wt 'libsub\cache-data') -Target $target | Out-Null
+    $r = Run @('-Path', $wt, '-Force')
+    Write-Host $r.Out
+    Check 'worktree with an initialized submodule is removed' ($r.Code -eq 0 -and -not (Test-Path $wt))
+    Check 'junction inside the submodule leaves its target intact' (Test-Path (Join-Path $target 'keep.txt'))
+
+    # Relative -Path resolves against the caller's directory.
+    $wt = NewWt 'relative'
+    $oldCwd = [Environment]::CurrentDirectory
+    Push-Location $scratch; [Environment]::CurrentDirectory = $scratch
+    try { $r = Run @('-Path', '.\relative') } finally { Pop-Location; [Environment]::CurrentDirectory = $oldCwd }
+    Check 'relative path is resolved against the current directory' ($r.Code -eq 0 -and -not (Test-Path $wt))
 
     # Locked: refused before anything is touched, and not unlocked.
     $wt = NewWt 'locked'
