@@ -23,6 +23,7 @@ endif()
 
 add_library(plugin_common STATIC
 	src/ai_registry.cpp
+	src/calib.cpp
 	src/d2r.cpp
 	src/env_guard.cpp
 	src/level_palette.cpp
@@ -42,7 +43,7 @@ endif()
 if(PROJECT_IS_TOP_LEVEL)
 	enable_testing()
 	# One executable per test file: tests/<name>.cpp builds plugin_common_<name> (add the name here).
-	foreach(test guard_test ai_registry_test level_palette_test parts_test sig_test sig_dump_test)
+	foreach(test guard_test ai_registry_test calib_test level_palette_test parts_test sig_test sig_dump_test)
 		add_executable(plugin_common_${test} tests/${test}.cpp)
 		target_link_libraries(plugin_common_${test} PRIVATE plugin_common)
 		if(MSVC)

@@ -103,6 +103,7 @@ parts::Part g_parts[] = {
 **Record offsets** (`rva::UnitType`, `rva::SkCalc1` and the other `int` offsets) have no signature: they are
 known for build 93847 only. A part that reads any lists `&d2r::sig::RecordOffsets` in `uses`: a cache-only entry
 that resolves only on builds whose cache lists it, so the part stays off on a build whose offsets nobody checked.
+A txt record field can instead be found at table load: "Record offsets by calibration" below.
 
 **A plugin's own addresses** stay in the plugin (only engine facts more than one project needs go in here) and use
 the same machinery: declare `sigscan::Entry` objects (pattern, kind, at, next), a `sigscan::CacheRow` table per
@@ -124,6 +125,57 @@ A scan finds code by its bytes, so a pattern over a function entry another plugi
 matches on an unknown build: that part stays off rather than patching through someone else's hook. On a known build
 the cache is used and nothing changes.
 
+## Record offsets by calibration
+
+`calib.h` finds a txt record field's byte offset at table load, so a part that reads it does not need a fixed value
+per build. On a new build where a column moved, the part reads the new place. When the table can't single out one
+place, the part stays off. It never reads the wrong field. Resurrected 09's `offsets` part uses it
+(resurrected-09 `docs/offset-calibration.md`, its #323).
+
+- **Where.** After D2RLoader's `DataTablesLoaded` event, take the compiled rows from the data table service
+  (`getTable`: rows, rowCount, rowSize). Read the mod's own txt for that table set
+  (`<mod>.mpq/data/global/excel/base/` for Lod and Classic, `excel/` for Reign of the Warlock) with `calib::LoadTxt`.
+  Row *i* of the txt is record *i*. `Expansion` rows are skipped, as D2R skips them.
+- **A field** (`calib::Field`) is a group of cells: a column and its byte offset from the field start (all
+  difficulties, all numbered columns), with a kind (signed, unsigned, a bit of a flag word) and a width. A name column
+  has a lookup key: the record holds the row number of that name in another txt (`Skill1` holds a `skills.txt` row).
+- **The rule** (`calib::Sample`):
+  - Every row is sampled. An empty cell, an unknown name, or text in a number column is no sample.
+  - Every value must fit the width (`does not fit`, off).
+  - A candidate offset is a multiple of the width and must hold every sample of every cell.
+  - **Exactly one** offset may match. None or several is off, also on a build with a cache row.
+  - The field needs at least `MinInformative` (16) rows where a cell differs from its column's most common value, or
+    it is not sampled. An all-zero or nearly constant column matches any zero bytes.
+- **The build cache** (`calib::Decide`). Each field lists its verified offset per PE stamp (`CacheRow`). A found
+  offset that differs from the build's row is off. A field that could not be sampled (no txt, a missing column, too
+  few informative rows, another row count) takes the build's row, or is off on a build without one.
+- **Not sampled from a txt:**
+  - A record size is the table view's `rowSize`.
+  - A DataTables slot holding a table (`TablesLevels`, ...) is the one slot that holds the view's `rows` pointer, with
+    its count after it.
+  - Structure offsets (unit, game, path, unit skill, damage block) have no table to sample. They stay fixed, valid
+    on the builds whose cache lists `RecordOffsets`, as before.
+- **Don't sample a column a plugin writes** at run time (09 sets monstats `noRatio` on every record). Pick columns
+  that vary in the mod's data. The informative-row count in the log says how much they do.
+
+Inventory of `rvas_93847/offsets.h`, by whether a table can be sampled:
+
+| Group | Offsets | Calibrate by |
+| --- | --- | --- |
+| skills.txt record | `SkSrvDoFunc`, `SkSrvPrgFunc1`, `SkSrvMissile*`, `SkAuraStat1`, `SkAuraState`, `SkSummon`, `SkPetType`, `SkCltMissileA`, `SkParam1-6`, `SkReqLevel`, `SkEType`, `SkSrcDam`, `SkResultFlags`, `SkHitFlags`, `SkHitClass`, `SkAuraFilter` | sampling skills.txt; name columns by lookup (missiles, monstats, states, pettype) |
+| skills.txt calcs | `SkCalc1-4`, `SkCltCalc1-3`, `SkPrgCalc1`, `SkAura*Calc`, `SkPetMaxCalc`, `SkPerDelayCalc`, `SkLocalDelay` | fixed: the record holds a compiled calc index, not a txt value |
+| missiles.txt record | `MsParam1`, `MsHitPar1-3`, `MsCltHitPar1-3`, `MsDParam1-2`, `MsAnimSpeed`, `MsCollideKill`, `MsSkill`, `Ms*SubMissile1`, `MsHitFlags`, `MsResultFlags` | sampling missiles.txt (`MsCollideKill` is 0/1: check its informative rows) |
+| missiles.txt calcs | `MsHitCalc1`, `MsCltHitCalc1`, `MsDmgCalc1` | fixed (calc index) |
+| monstats.txt record | `MonFlags` (bits), `MonSpawn`, `MonPartyMin/Max`, `MonMinGrp/MaxGrp`, `MonRun`, `MonDrain`, `MonAlign`, `MonAiDel`, `MonAiParams`, `MonAiDist`, `MonSkills` | sampling monstats.txt (resurrected-09 does `MonFlags`, `MonDrain`, `MonAiParams`, `MonSkills`) |
+| monstats modes | `MonSkillModes` | fixed: the column holds monseq names whose compiled number is not known |
+| other records | `LvlPal`, `LvlMon1`, `LvlNMon1`, `CsChargeVelocity`, `ItCode`, `ItNormCode`, `ItType`, `It2Handed`, `ItemPSpell`, `AffixRare`, `ObjOperateFn`, `ObjOpenFrames` | sampling the table (codes: a 4-byte code compare) |
+| record sizes | `LevelRecordSize`, `CharStatsSize` | the table view's `rowSize` |
+| DataTables slots | `TablesCharStats(Count)`, `TablesLevels`, `TablesLevelCount`, `TablesProgressive*`, `TablesStateCount`, ... | the slot holding the view's pointer and count |
+| structures | `Game*`, `Unit*`, `Path*`, `USkill*`, `Md*`, `MonDataTypeFlags`, the damage block | fixed, `RecordOffsets` per build |
+
+The shared fields themselves are not calibrated yet: the table lists how. A part that reads a shared txt field moves
+from `RecordOffsets` to a calibrated field the first time a plugin needs one on a build with no cache row.
+
 ## Record the toolkit commit
 
 The library changes with the toolkit, so each project pins the toolkit commit it was built and tested with:
@@ -136,7 +188,7 @@ Update the pin on purpose, rebuild, and rerun the project's game checks before y
 
 ## Tests
 
-The image guard has a test (a fake PE header with an unknown stamp must bind nothing); `sig_test` covers the pattern
+The image guard has a test (a fake PE header with an unknown stamp must bind nothing); `calib_test` covers the calibration rule; `sig_test` covers the pattern
 matcher, the resolver and the per-part gate; `sig_dump_test` scans build 93847's dump (`D2R_DUMP_93847`, else
 `C:/ghidra-work/D2RLoader_6ab3782c_dump.exe`; skipped without one). Windows with Visual Studio:
 
