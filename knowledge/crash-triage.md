@@ -113,6 +113,7 @@ Typical register stories:
 | Read of `null + small offset` right after a record getter | An id outside the table (`-1` from an unresolved name, a row number past the end): check the table the getter reads |
 | Write to address 0 right after an allocator call | The allocator returned null: a pool ran out (section 5) |
 | `BC_ASSERT` in d2rloader.log just before the crash | The assert names the file and line; the crash is its consequence |
+| A table getter reads null + offset, and `0x300a90`'s shadow slot (the getter's RSP + 8) holds 0 | dataFlag 0, an empty bank: the caller passed a flag from a null unit or a plugin global never set on that side (build 93847: [d2r-93847-addresses.md](d2r-93847-addresses.md) `0x300a90`). The getter's return address names the caller; for a DLL only the low 16 bits are fixed across runs, so match `0x?XXXX` RVAs |
 | A non-pointer like `0x8000003F0` | Stale or freed memory: an engine race, or memory your plugin moved |
 | RIP inside your plugin | Your code: build with symbols and map the offset |
 | RIP inside D2RCore | A D2RLoader hook trampoline or service: check what your plugin patched that D2RLoader also reads |
