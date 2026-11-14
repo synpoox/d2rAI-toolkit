@@ -284,9 +284,10 @@ inline auto RandomBelow(uint32_t* seed, uint32_t n) noexcept -> uint32_t {
 
 // Leap Attack's (0x56b170) cleanup of its damage block: the tagged object at +0x158 (bit 0 set: a heap pointer or
 // none; clear: an object in place), then the list if it outgrew its inline space (capacity without the inline bit).
+// A part that calls it lists &d2r::sig::EngineAllocator in its `uses`.
 inline void ReleaseDamage(LeapKnockback& damage) noexcept {
 	const auto release = [](void* p) {
-		void* allocator = Engine<void* (*)() noexcept>(rva::EngineAllocator)();
+		void* allocator = Engine<void* (*)() noexcept>(sig::EngineAllocator)();
 		(*reinterpret_cast<void (***)(void*, void*) noexcept>(allocator))[4](allocator, p);
 	};
 	const uint64_t tagged = damage.tagged[0];
