@@ -7,8 +7,10 @@
 //  - declares itself Shared (server + client behaviour), ModScopedOnly (loads only from
 //    <game>/mods/<Mod>/d2rloader/plugins/ while that mod runs) and NativeHooks (patches game code);
 //  - log.h: one log line for the plugin (version, D2R version, image stamp, mod, this DLL's path) and one per part;
-//  - build_guard.h: checks the game image (PE TimeDateStamp). Every RVA belongs to one image; on any other image the
-//    engine parts stay off and say so, so a D2R/D2RLoader update cannot make the plugin patch random code;
+//  - d2r::Bind() and build_guard.h: find the engine addresses by signature (a known build's cache, else a scan of the
+//    image). A part gated on its addresses (`uses`) installs where all of them are found exactly once and stays off,
+//    naming the address, where one is not; a part reading fixed RVAs installs only on build 93847's image. So a
+//    D2R/D2RLoader update cannot make the plugin patch random code;
 //  - off_switch.h: reads "<plugin>-off.txt" next to the DLL: words naming parts to leave out (bisecting a crash);
 //  - crash_guard.h: logs a FAULT line (address, why, whether this plugin is on the stack) when the game faults;
 //  - env_guard.h: warns when D2RLoader runs another mod, when this DLL is not in the mod's own folder, or when a second
@@ -17,7 +19,8 @@
 //  - registers the console command "<plugin>" that prints the state of every part.
 //
 // Adding a part: write Install<Part>(context, report, size) in its own file, add a row to g_parts (parts.h in plugin-common) with a one-word
-// name (the word the off-file uses), whether it needs the expected image and, if wanted, a live state line. It shows up in the log and the status command.
+// name (the word the off-file uses), whether it uses game addresses, if wanted a live state line, and the signature
+// entries it reads (`uses`, see skill_functions.cpp and hook_example.cpp). It shows up in the log and the status command.
 #include <D2RLPlugin/api.h>
 
 #include "build_guard.h"
@@ -116,8 +119,8 @@ parts::Part g_parts[] = {
 	{"envguard", false, InstallEnvironment, EnvironmentState},
 	{"soundguard", true, InstallSounds, SoundState},
 	{"typeids", true, InstallTypeIds},
-	{"skills", true, InstallSkills},
-	{"hook", true, InstallHook, HookState},
+	{"skills", true, InstallSkills, nullptr, SkillFunctionUses()},  // any build where its addresses are found
+	{"hook", true, InstallHook, HookState, HookExampleUses()},
 };
 
 // --- Console command ----------------------------------------------------------------------------------------------
@@ -169,9 +172,13 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 	if (off_switch::Words()[0] != '\0') {
 		plog::Info("%s-off.txt leaves out: %s", PluginName, off_switch::Words());
 	}
-	const bool imageOk = d2r::Bind(context->exeBase);  // binds nothing on any other image
+	// Resolves the shared engine addresses (d2r::sig) on any image; true only on build 93847, which parts without
+	// `uses` (fixed d2r::rva:: values) need. Then this plugin's own entries.
+	const bool imageOk = d2r::Bind(context->exeBase);
+	ResolveHookExample(context->exeBase);
 	if (!imageOk) {
-		plog::Warn("not the expected game image: every engine part stays off");
+		plog::Warn("not build 93847's image: parts with fixed addresses stay off, parts gated by signatures run where "
+		           "their addresses are found");
 	}
 	parts::InstallAll(g_parts, std::size(g_parts), context, PluginName, imageOk);
 	return context->RegisterConsoleCommand(PluginName, StatusCommand, "Status of this mod's engine plugin and its guards.");

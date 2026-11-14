@@ -100,9 +100,19 @@ parts::Part g_parts[] = {
 };
 ```
 
-**A plugin's own addresses** use the same machinery: declare `sigscan::Entry` objects (pattern, kind, at, next), a
-`sigscan::CacheRow` table per known build, and call `sigscan::Resolve(entries, n, context->exeBase, caches, m)`
-after `d2r::Bind()`. Make the patterns from a dump with the same rules (or adapt `tools/make_signatures.py`).
+**Record offsets** (`rva::UnitType`, `rva::SkCalc1` and the other `int` offsets) have no signature: they are
+known for build 93847 only. A part that reads any lists `&d2r::sig::RecordOffsets` in `uses`: a cache-only entry
+that resolves only on builds whose cache lists it, so the part stays off on a build whose offsets nobody checked.
+
+**A plugin's own addresses** stay in the plugin (only engine facts more than one project needs go in here) and use
+the same machinery: declare `sigscan::Entry` objects (pattern, kind, at, next), a `sigscan::CacheRow` table per
+known build, and call `sigscan::Resolve(entries, n, context->exeBase, caches, m)` after `d2r::Bind()`.
+`plugin-template/src/hook_example.cpp` is the example. Make the patterns from a dump with the same rules (or adapt
+`tools/make_signatures.py`).
+
+**A fixed RVA valid on one build only** (no pattern yet, or none possible) is an entry with the pattern `""` and a
+row in that build's cache. It resolves there and stays off, `has no signature (known builds only)`, everywhere else:
+the same gate as a fixed `rva::` value, but per entry and per part, for any build a plugin lists.
 
 **Adding or changing a shared address:** add the `rva::` value (and its knowledge row) as before, then run
 `py -3 tools/make_signatures.py` on the build's dump: it keeps every entry that still finds its RVA, makes the

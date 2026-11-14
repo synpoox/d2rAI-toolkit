@@ -4,9 +4,11 @@ A minimal mod-scoped D2RLoader plugin for Diablo II: Resurrected. Copy this fold
 it. It is the part of an overhaul that data files alone cannot do: new skill functions, formula codes, hooks on
 engine functions.
 
-Target: **D2R 3.3.0 build 93847 + D2RLoader 1.3.1, PluginSDK 0.4.0.** Every address in the shared library's
-`rvas_93847.h` (`../shared/plugin-common`) belongs to that one game image. The plugin checks the image's PE timestamp (`0x6ab3782c`). On any other image it loads, logs
-"not the expected game image: every engine part stays off", and changes nothing.
+Target: **D2R 3.3.0 build 93847 + D2RLoader 1.3.1, PluginSDK 0.4.0.** The engine addresses are found by
+signature (see [Engine addresses by signature](#engine-addresses-by-signature)): on build 93847 from its cache, on
+another build by a scan of the image. A part gated on its addresses runs wherever all of them are found exactly once,
+and stays off, naming the address, where one is not. A part that reads fixed `d2r::rva::` values runs only on build
+93847's image (PE timestamp `0x6ab3782c`).
 
 | File | What it is |
 | --- | --- |
@@ -101,13 +103,13 @@ skills hook
 
 The template's parts and their words:
 
-| Word | Part | Needs the expected image |
+| Word | Part | Runs on |
 | --- | --- | --- |
-| `envguard` | Environment guard | no |
-| `soundguard` | Sound-table guard | yes |
-| `typeids` | Item type id self-check | yes |
-| `skills` | Server skill functions | yes |
-| `hook` | Example inline hook | yes |
+| `envguard` | Environment guard | any image (no game address) |
+| `soundguard` | Sound-table guard | build 93847 (fixed RVAs) |
+| `typeids` | Item type id self-check | build 93847 (fixed RVAs) |
+| `skills` | Server skill functions | any build where its entries are found (`SkillFunctionUses`) |
+| `hook` | Example inline hook | any build where its entry is found (`HookExampleUses`) |
 
 When the game crashes or misbehaves, leave out half of the parts, restart, and repeat until you find the cause.
 Delete the file for normal play. Each part you add gets its own word (a row in `g_parts` in `plugin.cpp`). You can
@@ -120,7 +122,7 @@ command. Keep them in every release: they turn "it crashes" into one log line.
 
 | Guard | What it catches | What it does |
 | --- | --- | --- |
-| Build (`build_guard.h`) | Another D2R or D2RLoader image (TimeDateStamp is not `0x6ab3782c`) | Every engine part stays off. Logs the stamp and D2R's version string |
+| Build (`build_guard.h`, `d2r::Bind`) | Another D2R or D2RLoader image (TimeDateStamp is not `0x6ab3782c`), or an engine address its signature does not find exactly once | Parts with fixed RVAs stay off; a part gated on signatures stays off only if one of its entries is not found, and its line names it. Logs the stamp, D2R's version string and how many addresses resolved |
 | Environment (`env_guard.*`) | D2RLoader runs another mod (`default_mod`), this DLL sits outside `mods\<Mod>`, a second copy is loaded, other plugins | Warns at load and again 15 s later. Lists other plugins. It does not try to work with them |
 | Sound table (`sound_guard.*`) | The first start after an install builds D2R's cache and loads only D2R's sounds; the mod's sound ids are past the table | Makes the read return "no sound" instead of crashing; logs once and asks for a restart |
 | Item type ids (`item_type_check.*`) | The mod's itemtypes.txt moved a row D2R.exe tests by number (for example rune 75) | Logs each mismatch. Fix the data |
@@ -139,6 +141,31 @@ python plugin-template/tools/item_type_ids.py <project>\out\data\global\excel\it
 
 It prints `item type ids ok: 10 of 10 as D2R` or one line per wrong code.
 
+## Engine addresses by signature
+
+A D2R patch moves every address. So a part names its addresses as **signature entries** (`sigscan::Entry`, the
+format is in [plugin-common's README](../shared/plugin-common/README.md#engine-addresses-by-signature)): a byte
+pattern that matches only there, with `??` over what changes between builds, and how to get the address from the
+match. At load, `d2r::Bind()` resolves the shared ones (`d2r::sig::<Name>`, every address in the toolkit's
+`rvas_93847/`), and the plugin resolves its own (`ResolveHookExample`). A known build takes the RVAs from its cache
+and scans nothing; another build is scanned.
+
+Each part lists the entries it reads in its `uses` (the fifth field of its `g_parts` row). It installs only when
+all of them resolved; otherwise only that part stays off, and its line says which one:
+`skills off: engine address CreateMissile not found on this game image`.
+
+- **Shared addresses:** read them through the entry: `d2r::sig::SrvDoTable.rva`, `d2r::Engine<Fn>(d2r::sig::X)`.
+  `d2r::api` is bound from the entries of the same names, so list those you call (`skill_functions.cpp`'s `Uses`).
+- **Record offsets** (`rva::SkCalc1`, `rva::UnitType`, ...) are known for build 93847 only. A part that reads any
+  lists `d2r::sig::RecordOffsets`, so it stays off on a build whose offsets nobody has checked.
+- **Your own addresses** stay in your plugin: declare an entry and its RVA on each build you know, as
+  `hook_example.cpp` does, and resolve them after `d2r::Bind()`. Make the pattern from the dump: the function's
+  first instructions, longer until it is unique, `??` over rip-relative displacements and call / jump targets
+  (`tools/make_signatures.py` shows the rules). An address only valid on one build, with no pattern, is an entry
+  with the pattern `""` and a row in that build's cache: it resolves there and stays off elsewhere.
+- **A part that reads fixed `rva::` values** (yours or the toolkit's) has no `uses` and runs on build 93847 only,
+  as `soundguard` and `typeids` do here. Never list `uses` on a part that still reads one.
+
 ## Adding a server skill function (srvdofunc)
 
 When a skill reaches its cast frame, the server calls `srvdofunc` from a table of 191 pointers (RVA `0x238ea00`).
@@ -156,6 +183,8 @@ D2R 3.3 uses slots up to 171, so **slots 172-190 are free**.
      D2R's own summons do.
    - Use `unitStat` / `unitStatNoParam` for stats, and `api.unitSeed` + `d2r::RandomBelow` for D2's RNG.
    - Call `setUnitSkillFlag(unit, 1)` first, like D2R's own do functions.
+   - Add the entry of every `d2r::api` function you call (`&d2r::sig::SummonPet`, ...) to `Uses` in the same file:
+     the part is gated on them.
 3. Add a row `{slot, Function, "name"}` to `Functions[]`.
 4. In skills.txt, set the skill's **`srvdofunc` to the slot number** (for example `172`). Set `cltdofunc` to a client
    function that fits the animation, or 0. Missiles created on the server are sent to clients by the game.
@@ -187,7 +216,10 @@ another plugin's function.
    auto Hook(void* unit, void* weapon) noexcept -> int32_t { return g_original(unit, weapon); }
    context->InstallInlineHook(Rva, EntryBytes, sizeof(EntryBytes), Hook, &g_original);
    ```
-5. Give the hook a part word and a row in `g_parts` in `plugin.cpp`.
+5. Declare the function's address as a signature entry with its 93847 RVA in a cache, resolve it at load and list
+   it in the part's `uses`, as `hook_example.cpp` does ([Engine addresses by signature](#engine-addresses-by-signature)).
+   The hook reads the resolved `entry.rva`.
+6. Give the hook a part word and a row in `g_parts` in `plugin.cpp`.
 
 ## Building a new game system
 
@@ -209,8 +241,10 @@ Plan it with [knowledge/new-game-systems.md](../knowledge/new-game-systems.md) b
 
 ## Rules
 
-- Every RVA, offset and entry byte sequence is for build 93847 only. After a game or D2RLoader update, dump the
-  image again, re-find each address, and only then write the new build's `rvas_<build>.h` in the shared library.
+- Fixed RVAs, record offsets and entry byte sequences are for build 93847 only; signature entries find the
+  addresses on other builds. After a game or D2RLoader update, dump the image again, check which entries resolve
+  (plugin-common's `sig_dump_test` against the new dump) and what each part's checks say, then add the new build's
+  cache.
 - Inline hooks need whole instructions with REX prefixes included (no fixed minimum length; the sound guard's 8-byte
   signatures run in game). Hook function types must be `noexcept`.
 - Check for an existing D2RLoader hook (`jmp [rip+x]` at the entry) before you patch any engine function.

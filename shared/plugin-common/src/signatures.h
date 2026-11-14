@@ -17,11 +17,18 @@ using sigscan::Kind;
 #include "sig/shared.inc"
 #undef D2R_SIG
 
+// A fixed fact valid only on the builds whose cache lists it (pattern "", no address): the record and structure
+// offsets of rvas_93847/offsets.h and the other int offsets (UnitType, SkCalc1, ...). A part that reads any of them
+// lists RecordOffsets in its `uses`, so it stays off on a build whose offsets nobody has checked. The same form, a
+// cache-only entry with a row in one build's cache, is how a plugin marks any value it knows for one build only.
+inline sigscan::Entry RecordOffsets {"RecordOffsets", "offsets", Kind::Code, 0, 0, ""};
+
 // Every shared entry, in header order
 inline sigscan::Entry* const Shared[] = {
 #define D2R_SIG(name, ...) &name,
 #include "sig/shared.inc"
 #undef D2R_SIG
+	&RecordOffsets,
 };
 
 // Build 93847 (stamp 0x6ab3782c): the cache, and a compile-time check that it equals the fixed rva:: values
@@ -32,6 +39,7 @@ inline const sigscan::CacheRow Cache6ab3782c[] = {
 #define D2R_CACHE(name, compat, value) {&name, value},
 #include "sig/cache_6ab3782c.inc"
 #undef D2R_CACHE
+	{&RecordOffsets, 0},  // the offsets in rvas_93847/ were found on this build
 };
 
 // The known builds (a new build: generate its cache and add it here)

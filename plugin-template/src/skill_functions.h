@@ -3,8 +3,13 @@
 
 #include <D2RLPlugin/api.h>
 
+#include "sig.h"
+
 #include <cstddef>
+#include <span>
 
 // Writes every function of the table into its slot. Returns how many were installed; report gets one entry per slot.
 auto InstallSkillFunctions(const D2RL::PluginContext* context, char* report, size_t reportSize) noexcept -> int;
 auto SkillFunctionCount() noexcept -> int;
+// The engine addresses the skill functions read: the skills part's `uses`.
+auto SkillFunctionUses() noexcept -> std::span<sigscan::Entry* const>;

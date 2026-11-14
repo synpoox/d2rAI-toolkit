@@ -128,6 +128,17 @@ int main() {
 	sigscan::Resolve(all, 7, 0, caches, 2);
 	Check(code.state == sigscan::State::NotFound && code.address == 0, "Resolve: no image resolves nothing");
 
+	// A fixed RVA valid only on one stamp: pattern "" and a row in that build's cache
+	sigscan::Entry fixed {"Fixed", "t", sigscan::Kind::Code, 0, 0, ""};
+	sigscan::Entry* fixedOnly[] = {&fixed};
+	const sigscan::CacheRow fixedRows[] = {{&fixed, 0x1500}};
+	const sigscan::Cache fixedCache[] = {{0x11112222, fixedRows, 1}};
+	sigscan::Resolve(fixedOnly, 1, image.base(), fixedCache, 1);
+	Check(fixed.state == sigscan::State::Ok && fixed.rva == 0x1500, "a fixed entry resolves on its stamp");
+	FakeImage otherBuild(0x33334444);
+	sigscan::Resolve(fixedOnly, 1, otherBuild.base(), fixedCache, 1);
+	Check(fixed.state == sigscan::State::CacheOnly && fixed.address == 0, "a fixed entry stays off on any other stamp");
+
 	// --- Parts gated by their entries ---
 	sigscan::Resolve(all, 7, image.base(), nullptr, 0);
 	sigscan::Entry* const goodUses[] = {&code, &rip};

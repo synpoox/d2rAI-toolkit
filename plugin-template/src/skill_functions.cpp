@@ -1,9 +1,10 @@
-// New server skill "do" functions (skills.txt column srvdofunc), D2R 3.3.0 build 93847.
+// New server skill "do" functions (skills.txt column srvdofunc), D2R 3.3.0 build 93847 and any build where the
+// engine addresses below are found (SkillFunctionUses).
 //
 // How it works
 // ------------
 // When a skill's cast frame is reached, the server looks up skills.txt's `srvdofunc` value in a table of function
-// pointers (d2r::rva::SrvDoTable, RVA 0x238ea00, 191 slots) and calls that slot as
+// pointers (d2r::sig::SrvDoTable, RVA 0x238ea00 on 93847, 191 slots) and calls that slot as
 //     int64_t fn(Game* game, Unit* caster, int32_t skillId, int32_t skillLevel)   -> non-zero = the skill ran.
 // D2R 3.3 uses slots up to 171. Slots 172-190 are empty (null pointers), so a plugin can put its own functions there.
 // In skills.txt, set `srvdofunc` of your skill to the SLOT NUMBER; that is all the data side needs:
@@ -119,6 +120,17 @@ static_assert(sizeof(Functions) / sizeof(Functions[0]) <= skill_router::Slot - d
 
 }  // namespace
 
+// Every engine address the functions above and the install read: the table, the d2r::api functions they call
+// (d2r::sig entries of the same names), and RecordOffsets for the skill record and unit offsets (rva::SkCalc1, ...),
+// which are known for 93847 only. The skills part is gated on these (its `uses`).
+sigscan::Entry* const Uses[] = {&d2r::sig::SrvDoTable, &d2r::sig::GetSkillRecord, &d2r::sig::SetUnitSkillFlag,
+                                &d2r::sig::SkillTargetXY, &d2r::sig::MissileCount, &d2r::sig::EvalSkillCalc,
+                                &d2r::sig::CreateMissile, &d2r::sig::RecordOffsets};
+
+auto SkillFunctionUses() noexcept -> std::span<sigscan::Entry* const> {
+	return Uses;
+}
+
 auto InstallSkillFunctions(const D2RL::PluginContext* context, char* report, size_t reportSize) noexcept -> int {
 	static constexpr uint8_t Empty[8] = {};  // the slot must still be a null pointer
 	// skill_router::Add(MySkillId, SrvDoMySkill);  // routed skills share slot 190; add them here, before the router below
@@ -130,7 +142,7 @@ auto InstallSkillFunctions(const D2RL::PluginContext* context, char* report, siz
 	for (const SlotFunction& f : Functions) {
 		bool ok = f.slot >= d2r::rva::SrvDoFirstFree && f.slot < skill_router::Slot;
 		if (ok) {
-			const uint64_t rva = d2r::rva::SrvDoTable + static_cast<uint64_t>(f.slot) * 8;
+			const uint64_t rva = d2r::sig::SrvDoTable.rva + static_cast<uint64_t>(f.slot) * 8;
 			ok = context->PatchWriteU64(rva, Empty, sizeof(Empty), reinterpret_cast<uint64_t>(f.function));
 		}
 		installed += ok ? 1 : 0;
