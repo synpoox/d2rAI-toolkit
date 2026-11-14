@@ -45,7 +45,8 @@ Ghidra notes. "Hooked" = installed with the entry bytes shown and ran in game.
 | `0x34b440` | (unit) -> room | unit's room |
 | `0x34a040` | (unit, i32 xy[2]) | position |
 | `0x34a110` | (unit) -> packed position | |
-| `0x34ab60` | (unit) -> u32 | unit id |
+| `0x34ab60` | (unit) -> u32 | header `UnitModeOf`: the leech hands its result to `0x33a1f0` as the unit's mode; this row first said "unit id" (`0x34a330` is the unit id getter), so check it before relying on either reading |
+| `0x33a1f0` | (unit, u32* type, i32* class, u32* mode) | header `Disguise`: the unit's disguise form. Reads the unit's states against a table of 0x44-byte records (+0x2d: 1 monster, 2 player; +0x2e: the class) and rewrites type, class and mode. D2R's leech calls it to tell a disguised attacker from a player |
 | `0x34dbe0` | (unit, 1) | mark stats changed |
 | `0x34e790` | (unit, on) | set unit +0x124 bit 0x40 |
 | `0x34a5c0` | (unit) -> i32 | max speed (175; 250 for players in some states); min speed 15 at `0x34ab50` |
@@ -780,7 +781,7 @@ Engine facts a rule-changing plugin needs. Evidence letters as in the legend abo
 | `0x4523e0` | (unit, stat) -> value | The resist getter. A resist with no max-resist stat starts from 75 (`0x4524a5`), at most 95 | R |
 | `0x4524d0` | patch address, 13 bytes | Where the cap for stat 36 (physical damage reduction) is loaded: `41 83 7e 08 24` (cmp dword [r14+8],0x24) / `b8 32 00 00 00` (mov eax,50) / `0f 44 c8` (cmovz ecx,eax). **D2R caps damageresist at 50 (the byte at `0x4524d6`); 1.09d capped it at 75** (D2Game 0x7e580-0x7e59e: no max-resist stat gives 0 + 75, at most 95). Changing the byte to `0x4b` gives 75; check the 13 bytes first, as a patch | P |
 
-No toolkit header names this address yet (no toolkit code uses it); a plugin that patches it keeps the 13 bytes above as its expected bytes.
+Header: `DrCapLoad` (`0x4524d0`), `DrCapLoadExpected` (the 13 bytes above) and `DrCapValueOffset` (6, the cap byte). The cap value a mod wants stays in that mod.
 
 ### Life and mana leech (`0x450c90`)
 

@@ -7,6 +7,12 @@
 
 namespace d2r::rva {
 
+// The load of the damage reduction cap (stat 36) in the resist getter: where D2R puts 50 (1.09d: 75). 13 bytes, the cap
+// at DrCapValueOffset. A plugin that patches it passes these as the expected bytes (see knowledge, "Damage reduction cap").
+inline constexpr uint64_t DrCapLoad = 0x4524d0;
+inline constexpr uint8_t DrCapLoadExpected[] = {0x41, 0x83, 0x7e, 0x08, 0x24, 0xb8, 0x32, 0x00, 0x00, 0x00, 0x0f, 0x44, 0xc8};
+inline constexpr int DrCapValueOffset = 6;
+
 // --- Stats ---------------------------------------------------------------------------------------------------------
 inline constexpr uint64_t UnitStat = 0x2f5020;         // (unit, stat, param) -> value (stat with a parameter/layer)
 inline constexpr uint64_t UnitStatNoParam = 0x2f5c60;  // (unit, stat) -> value
