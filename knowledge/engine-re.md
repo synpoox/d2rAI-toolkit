@@ -67,6 +67,13 @@ analyzeHeadless <projectDir> D2R -process <dump.exe> -noanalysis -readOnly -scri
    params: same fields, +0x10 after three pointers; missile record: 1.13c's from +0x24 moved by +0x24). Classic
    ordinals map to D2R functions by behaviour, not by name.
 6. **Thread samples for hangs**: repeated RIPs in a hung game point at the loop (see 9).
+7. **Count arguments at D2R's own call sites, not in the decompile.** The Ghidra decompile of an x64 function can drop
+   stack arguments (the 5th and later go on the stack after the r9 argument), so a call written from the decompile
+   alone can pass too few. Before calling an engine function from a plugin, count its arguments in the disassembly at
+   D2R's own call sites: rcx/rdx/r8/r9 plus every `mov [rsp+0x20+...]` store before the call. Three bugs in one mod
+   (build 93847, 2026-11-14): `0x48b890` called with 3 arguments (its 4th, r9, is a filter); `0x4a8090` missing its
+   5th argument (0); `0x596340` missing its 5th argument (1). Note: `Decompile.java` writes into `C:\ghidra-work`
+   even when run from a copied project (#256); for quick checks, disassemble a private copy of the dump with capstone.
 
 Put every confirmed address in one header with its signature as a comment (the shared library's `rvas_93847.h`).
 
