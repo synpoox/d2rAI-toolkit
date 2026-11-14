@@ -39,7 +39,7 @@ Ghidra notes. "Hooked" = installed with the entry bytes shown and ran in game.
 |---|---|---|
 | `0x349860` | (unit, file, line) -> i32 | unit class id (row) |
 | `0x34a330` | (unit, file, line) -> i32 | unit id (unit +0x08) |
-| `0x34a0e0` | (unit) -> u8 | dataFlag (client functions use this) |
+| `0x34a0e0` | (unit) -> u8 | dataFlag (client functions use this): unit +0x1bd; a null unit asserts and returns **0**, an empty bank (see `0x300a90`). Entry `48 83 EC 28 48 85 C9 75 1A 88 4C 24 30 48 8D 4C` |
 | `0x34a1e0` | (unit) -> u32* | &seed |
 | `0x34a360` | (unit, file, line) -> inventory | unit inventory |
 | `0x34b440` | (unit) -> room | unit's room |
@@ -306,7 +306,7 @@ frame), +0x30 step counter (Fire Wall's).
 | `0x5817f0` | (game, player, item, target) -> bool | item spell check dispatcher. Hooked; entry `48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18` |
 | `0x581680` | (game, player, item, target) | item spell use dispatcher (caller removes a used item). Hooked; entry `48 89 5C 24 18 48 89 6C 24 20 56 57 41 57` |
 | `0x3731f0`, `0x373610`, `0x36f000` | | item getters (`0x3731f0` item type) seen in hang thread samples; signatures unverified |
-| `0x300a90` | | data tables getter, seen in the same samples; unverified |
+| `0x300a90` | (u8 dataFlag) -> data manager | bank getter: asserts dataFlag < 4, returns `*(0x2a9a580 + 16 * dataFlag)`. **Bank 3 is the live one** (D2R code loads `mov cl,3`, e.g. `0x3b1fe2`); **bank 0 is null**, so any getter called with dataFlag 0 reads null + its field offset (GetSkillRecord: a read of `0x11b8` at `0x977b1`) |
 | `0x308e80` | (item) -> 1 when the slot flag is 0 | "used up"; client puts it in the use message (`0x1c7a30`), server use-item handler `0x4f40c0` refuses unless both agree |
 
 ## Portals and objects
@@ -369,7 +369,7 @@ these need no guard.
 |---|---|---|
 | `0x44db20` | (game, victim, killer or null, flag) | unit death function (`D2Game\src\Unit\SUnitDmg.cpp`); returns at once for a monster in mode 0 / 12 or a player in mode 0 / 17; flag 1 also takes a pet off its owner's list. Hooked; entry `48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 41 56 41 57 48 83 EC 50` (24 bytes) |
 | `0x44d570` | (game, event, unit, other unit, arg) | unit event dispatch wrapper (raises an events.txt event on a unit) |
-| `0x2a9a580` | data managers, 16 bytes apart | itemstatcost array at +0x1258, count at +0x1260; record 0x144 bytes, +0x44 first event id |
+| `0x2a9a580` | data managers (banks), 16 bytes apart, indexed by dataFlag 0-3; bank 0 null, bank 3 live (`0x300a90`) | itemstatcost array at +0x1258, count at +0x1260; record 0x144 bytes, +0x44 first event id |
 | unit +0x0c | u32 | unit mode |
 
 ## Missiles, pets, potions, cube outputs
@@ -517,7 +517,7 @@ function (bytes in the header, checked before the patch); **D** data: a variable
 |---|---|---|---|---|
 | `0x8b2d0` | LocalPlayerSlot | () -> slot of the local player | Returns slot of the local player | R |
 | `0x976e0` | MonStatsRecord | (dataFlag, classId) -> monstats record or null | Returns monstats record or null | R |
-| `0x97790` | GetSkillRecord | (dataFlag, skillId) -> record or null | The skills.txt record of a skill; bound as d2r::api.getSkillRecord | C |
+| `0x97790` | GetSkillRecord | (dataFlag, skillId) -> record or null | The skills.txt record of a skill; bound as d2r::api.getSkillRecord. Skills bank: count at +0x11b8, array at +0x11b0, record 0x2ec. dataFlag 0 crashes at `0x977b1` (empty bank); take the flag from `game + 0x106` or `0x34a0e0(unit)` on the same side, never a value cached from the other side | C |
 | `0x9a480` | ClientPlayer | (slot) -> the client's player unit in that slot | Returns the client's player unit in that slot | R |
 | `0x9a5d0` | ClientFindUnit | (id, type) -> the client's unit or null | Returns the client's unit or null | R |
 | `0xcd6d0` | SetActPalette | (act byte) -> void | sets ActPalette. The client's unit placement 0x9bf00 sets it from the level record's Pal, the act load 0x86bc0 from the act. The global it writes: 0x2a2adc0. | R |
