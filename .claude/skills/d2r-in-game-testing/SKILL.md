@@ -15,11 +15,15 @@ Read ${CLAUDE_PLUGIN_ROOT}/knowledge/cheat-commands.md before the first check: i
 ## The recipe
 
 Name your run once (`MODKIT_RUN=<lane>`, PowerShell: `$env:MODKIT_RUN='<lane>'`) and use that name for every command. Name the
-slot every time; set `MODKIT_TESTING_CONFIG` if the machine's config is not `./modkit-testing.toml`.
+slot every time; set `MODKIT_TESTING_CONFIG` if the machine's config is not `./modkit-testing.toml`. When the machine has a
+slot table (`~/.d2r-modkit/slots.toml`), also set `MODKIT_PROJECT=<project>` (its owner name for your slots, or pass
+`--project`): `lock` refuses an owned slot when no project is given.
 
 1. **Lock a slot.** `python ${CLAUDE_PLUGIN_ROOT}/testing/game_slots.py status`, then `python ${CLAUDE_PLUGIN_ROOT}/testing/game_slots.py lock <N> <lane>` on a
    free slot that is yours. No free slot: wait (`--wait`), or stop and hand the steps to whoever plans the work.
-2. **Install the build** into that slot with the game closed: `python ${CLAUDE_PLUGIN_ROOT}/testing/slot_install.py --slot <N> <project>`
+2. **Install the build** into that slot with the game closed. Build first, in this worktree (the project's own build
+   steps, generators included): `slot_install.py` copies whatever the last build left in `out/`.
+   `python ${CLAUDE_PLUGIN_ROOT}/testing/slot_install.py --slot <N> <project>`
    (or, for the mod's plugins, `powershell -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}/tools/install_plugins.ps1 -Game <N> -Project <mod> -Plugins <name>[,<name>]`,
    or, for the published release, `python ${CLAUDE_PLUGIN_ROOT}/testing/release_install.py install --slot <N>`). Then run the stock check
    `slot-savepath` (`python ${CLAUDE_PLUGIN_ROOT}/testing/game_checks.py --module stock_checks run slot-savepath --slot <N>`; `--module` goes
@@ -70,13 +74,17 @@ Every test character is **level 99 with experience 3520485254, 490 stat points a
    creation), save and exit, then `python ${CLAUDE_PLUGIN_ROOT}/testing/game_ctl.py --slot <N> stop`.
 2. Set the stats on the slot's own save folder (`modkit save-set` backs the folder up first):
    `python -m modkit save-set <save.d2s> level=99 experience=3520485254 statpts=490 newskills=98` (stat names are
-   itemstatcost's; ${CLAUDE_PLUGIN_ROOT}/knowledge/saves.md). This line is checked offline against the field names and bit widths only; it has
+   itemstatcost's; ${CLAUDE_PLUGIN_ROOT}/knowledge/saves.md). Add `--extended` when the mod's `mod.json` has
+   `"extendedSaves": true` (16-bit stat ids; without it the read stops at `stat N has no CSvBits`), and
+   `--project <mod>` when the mod changes itemstatcost's `CSvBits` (the built table's widths are read).
+   `python -m modkit save-info <save.d2s>` with the same flags shows the result. This line is checked offline against the field names and bit widths only; it has
    not yet been run on a real save, so look at the character's level in game once.
 3. Open Hell (a fresh character has it closed). `save_edit.py` has no command line, call the function:
    `python -c "import sys; sys.path.insert(0, r'${CLAUDE_PLUGIN_ROOT}/testing'); from save_edit import unlock_difficulties; unlock_difficulties(r'<save.d2s>')"`.
 4. Start the game on it (recipe step 4).
 
-A Classic or Lord of Destruction character plays D2R's vanilla base tables, not the mod's (the LoD character shows an X
+A Classic or Lord of Destruction character plays D2R's vanilla base tables, not the mod's, unless the mod also
+writes `excel/base/` (the LoD character shows an X
 badge on the character select banner), and `cheat expansion 2` does not convert it: it crashed the game
 (${CLAUDE_PLUGIN_ROOT}/knowledge/cheat-commands.md).
 
