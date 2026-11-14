@@ -494,6 +494,20 @@ class SetupTests(unittest.TestCase):
         self.assertEqual((dst / "D2R.exe").read_bytes(), b"game-bytes-v2")
         self.assertTrue((dst / "extra.txt").exists())
 
+    def test_sync_removes_game_data_slot_one_dropped(self):
+        inst = Path(self.cfg.install_dir, "Data", "data")
+        (inst / "0000000012.idx").write_bytes(b"old")
+        gs.setup(self.cfg, 2)
+        dst = Path(self.cfg.slot_dir(2), "Data", "data")
+        (inst / "0000000012.idx").unlink()  # a patch replaces the index with a new one
+        (inst / "000000000d.idx").write_bytes(b"new")
+        r = gs.copy_install(self.cfg, 2)
+        self.assertEqual(r["removed"], 1)
+        self.assertFalse((dst / "0000000012.idx").exists())
+        self.assertEqual((dst / "000000000d.idx").read_bytes(), b"new")
+        self.assertEqual((dst / "big.bin").read_bytes(), b"x" * 1000)
+        self.assertEqual((inst / "big.bin").read_bytes(), b"x" * 1000)  # slot 1 untouched
+
     def test_mods_policy_copy_and_savepath_and_default_mod(self):
         cfg = make_cfg(self.tmp.name, game={"mods_policy": "copy"})
         gs.setup(cfg, 3)

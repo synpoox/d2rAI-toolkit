@@ -456,9 +456,11 @@ def _needs_copy(src: str, dst: str) -> bool:
 
 
 def copy_install(cfg: tc.Config, n: int, link: bool | None = None, dry_run: bool = False, out=None) -> dict:
-    """Copy (or sync) the user's install into slot N's folder. Never deletes, never writes into slot 1.
+    """Copy (or sync) the user's install into slot N's folder. Never writes into slot 1.
     Only changed files are copied. With hardlinks, files under game.link_dirs share their bytes with slot 1:
-    they are read-only game data and nothing may edit them in place."""
+    they are read-only game data and nothing may edit them in place. Under game.link_dirs the slot mirrors slot 1:
+    a file slot 1 no longer has is removed from the slot (a game patch drops old CASC .idx and data.NNN files, and
+    a left-over newer-numbered .idx makes D2R fail with "needs repair"). Nothing else in the slot is deleted."""
     dst_root = guard_writable(cfg, n)
     src_root = cfg.install_dir
     if not os.path.isdir(src_root):
@@ -472,7 +474,7 @@ def copy_install(cfg: tc.Config, n: int, link: bool | None = None, dry_run: bool
         skip.add("mods")
     # the slot's own loader config is set up once and then belongs to the slot: a sync does not overwrite it
     keep = {os.path.normpath(cfg["loader"]["config_file"])}
-    stats = {"copied": 0, "linked": 0, "same": 0, "bytes": 0}
+    stats = {"copied": 0, "linked": 0, "same": 0, "bytes": 0, "removed": 0}
     for root, dirs, files in os.walk(src_root):
         rel = os.path.relpath(root, src_root)
         top = "" if rel == "." else rel.split(os.sep)[0].lower()
@@ -482,6 +484,18 @@ def copy_install(cfg: tc.Config, n: int, link: bool | None = None, dry_run: bool
         droot = dst_root if rel == "." else os.path.join(dst_root, rel)
         if not dry_run:
             os.makedirs(droot, exist_ok=True)
+        if top in link_dirs and os.path.isdir(droot):
+            have = {f.lower() for f in files}
+            for f in os.listdir(droot):
+                d = os.path.join(droot, f)
+                if f.lower() in have or not os.path.isfile(d):
+                    continue
+                if out:
+                    out("remove " + os.path.relpath(d, dst_root))
+                stats["removed"] += 1
+                if not dry_run:
+                    os.chmod(d, 0o666)
+                    os.unlink(d)  # removes only the slot's own name; slot 1 has no file by this name
         for f in files:
             s, d = os.path.join(root, f), os.path.join(droot, f)
             if os.path.exists(d) and os.path.samefile(s, d):
