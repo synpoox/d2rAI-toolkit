@@ -2,7 +2,8 @@
 
 This repo (d2rAI-toolkit; Python package and CLI `modkit`) is a toolkit for building Diablo II: Resurrected mods, up to full overhauls, from D2R's own files and
 engine. This file is for working on the toolkit itself. For working on a mod that uses it, see the `d2r-toolkit`
-skill. Target: D2R 3.3 (engine addresses for build 93847 only), D2RLoader 1.3.1 (PluginSDK 0.4.0). Windows.
+skill. Target: D2R 3.3 (engine addresses for build 93847, also found by signature on other builds), D2RLoader
+1.3.1 (PluginSDK 0.4.0). Windows.
 
 ## Layout
 `modkit/` (the Python toolkit), `knowledge/` (engine facts), `docs/`, `templates/`, `testing/`, `release/`,

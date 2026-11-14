@@ -2,11 +2,18 @@
 // structures. Calling convention: plain Windows x64 (rcx, rdx, r8, r9, then stack). Unit/Game are opaque; read fields
 // with At<T>.
 //
-// Build check: Bind() refuses an image whose PE stamp is not rva::ImageStamp and leaves api null; the plugin then
-// leaves every engine part off. The entry bytes every InstallInlineHook checks are the second line of defence.
+// Two ways to an address (README.md, "Engine addresses by signature"):
+//   d2r::sig::<Name>  the signature entry (signatures.h): resolved by Bind() on any image where its code is found, from
+//                     the build's cache or by a scan. A part that reads only these lists them in `uses` (parts.h) and
+//                     installs on any image where they all resolved.
+//   d2r::rva::<Name>  the fixed RVA of build 93847 (rvas_93847.h), for code not moved to entries yet: Bind() returns
+//                     true only on that image, and a part without `uses` installs only then.
+// api is bound from the entries (a function not found stays null). The entry bytes every InstallInlineHook checks are
+// the second line of defence.
 #pragma once
 
 #include "rvas_93847.h"
+#include "signatures.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -178,7 +185,7 @@ using UnitDataFlagFn = uint8_t (*)(Unit* unit) noexcept;
 using ClientSkillTargetXYFn = int32_t (*)(Unit* unit, int32_t* x, int32_t* y) noexcept;
 using ClientCreateMissileFn = Unit* (*)(MissileParams* params, int32_t zero) noexcept;
 
-// Bound by Bind() from the image base; all null until then and on any other image.
+// Bound by Bind() from the entries d2r::sig::<same name>; null until then, and a function whose entry did not resolve.
 struct Api {
 	GetSkillRecordFn getSkillRecord;
 	EvalSkillCalcFn evalSkillCalc;
@@ -202,13 +209,20 @@ struct Api {
 	ClientCreateMissileFn clientCreateMissile;
 };
 extern Api api;
-// Image base Bind() accepted (0 before that). Engine<Fn>(rva) is for functions only one part calls.
+// Image base when it is the image rvas_93847.h describes (0 before Bind() and on any other image). Engine<Fn>(rva) is
+// for functions only one part calls.
 extern uint64_t imageBase;
 template <typename Fn>
 inline auto Engine(uint64_t offset) noexcept -> Fn {
 	return reinterpret_cast<Fn>(imageBase + offset);
 }
-// Binds api when the image is the one rvas_93847.h describes; false (api left null) on any other image.
+// The function a resolved entry found (null when it did not resolve): Engine<Fn>(d2r::sig::GetSkillRecord).
+template <typename Fn>
+inline auto Engine(const sigscan::Entry& entry) noexcept -> Fn {
+	return reinterpret_cast<Fn>(entry.address);
+}
+// Resolves every d2r::sig entry and binds api from them (on any PE image); true only when the image is the one
+// rvas_93847.h describes, the image the fixed rva:: values (and parts without `uses`) need.
 auto Bind(uint64_t exeBase) noexcept -> bool;
 
 // --- Helpers ------------------------------------------------------------------------------------------------------
@@ -270,9 +284,10 @@ inline auto RandomBelow(uint32_t* seed, uint32_t n) noexcept -> uint32_t {
 
 // Leap Attack's (0x56b170) cleanup of its damage block: the tagged object at +0x158 (bit 0 set: a heap pointer or
 // none; clear: an object in place), then the list if it outgrew its inline space (capacity without the inline bit).
+// A part that calls it lists &d2r::sig::EngineAllocator in its `uses`.
 inline void ReleaseDamage(LeapKnockback& damage) noexcept {
 	const auto release = [](void* p) {
-		void* allocator = Engine<void* (*)() noexcept>(rva::EngineAllocator)();
+		void* allocator = Engine<void* (*)() noexcept>(sig::EngineAllocator)();
 		(*reinterpret_cast<void (***)(void*, void*) noexcept>(allocator))[4](allocator, p);
 	};
 	const uint64_t tagged = damage.tagged[0];

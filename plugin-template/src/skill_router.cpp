@@ -60,11 +60,11 @@ auto InstallRouter(const D2RL::PluginContext* context, char* report, size_t size
 		std::snprintf(report, size, "no routes");
 		return false;
 	}
-	if (context == nullptr || d2r::imageBase == 0) {
+	if (context == nullptr || d2r::sig::SrvDoTable.state != sigscan::State::Ok) {
 		std::snprintf(report, size, "FAILED (image not bound)");
 		return false;
 	}
-	const uint64_t rva = d2r::rva::SrvDoTable + static_cast<uint64_t>(Slot) * 8;
+	const uint64_t rva = d2r::sig::SrvDoTable.rva + static_cast<uint64_t>(Slot) * 8;
 	const bool ok = context->PatchWriteU64(rva, Empty, sizeof(Empty), reinterpret_cast<uint64_t>(&Dispatch));
 	std::snprintf(report, size, "srvdofunc %d router, %d route(s)%s", Slot, g_count, ok ? "" : " FAILED (slot not empty)");
 	g_installed = ok;

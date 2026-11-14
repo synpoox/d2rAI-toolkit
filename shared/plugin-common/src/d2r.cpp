@@ -1,7 +1,11 @@
-// Binds d2r.h's function table to the running image, only when it is the image rvas_93847.h describes.
+// Resolves the shared signature entries on the running image and binds d2r.h's function table from them.
 #include "d2r.h"
 
 #include "build_guard.h"
+#include "log.h"
+
+#include <cstdio>
+#include <iterator>
 
 namespace d2r {
 
@@ -11,37 +15,67 @@ uint64_t imageBase = 0;
 namespace {
 
 template <typename Fn>
-void BindOne(Fn& slot, uint64_t exeBase, uint64_t offset) noexcept {
-	slot = reinterpret_cast<Fn>(exeBase + offset);
+void BindOne(Fn& slot, const sigscan::Entry& entry) noexcept {
+	slot = Engine<Fn>(entry);
+}
+
+// One log line: how the entries resolved, and the first ones that did not.
+void LogEntries(uint32_t stamp) noexcept {
+	size_t ok = 0, cached = 0;
+	char failed[700] = "";
+	size_t used = 0;
+	for (const sigscan::Entry* e : sig::Shared) {
+		ok += e->state == sigscan::State::Ok ? 1 : 0;
+		cached += e->cached ? 1 : 0;
+		if (e->state != sigscan::State::Ok && used + 1 < sizeof(failed)) {
+			const int n = std::snprintf(failed + used, sizeof(failed) - used, "%s%s %s", used == 0 ? "" : ", ", e->name,
+			                            sigscan::StateText(e->state));
+			used = n < 0 ? sizeof(failed) : used + static_cast<size_t>(n);
+		}
+	}
+	const size_t all = std::size(sig::Shared);
+	if (ok == all) {
+		plog::Info("engine addresses: %zu/%zu on image 0x%08x (%zu from the build cache)", ok, all, stamp, cached);
+	} else {
+		plog::Warn("engine addresses: %zu/%zu on image 0x%08x (%zu from the build cache); parts using the others stay "
+		           "off: %s", ok, all, stamp, cached, failed);
+	}
 }
 
 }  // namespace
 
 auto Bind(uint64_t exeBase) noexcept -> bool {
-	if (!build_guard::Matches(build_guard::ImageStamp(static_cast<uintptr_t>(exeBase)))) {
+	imageBase = 0;
+	const uint32_t stamp = build_guard::ImageStamp(static_cast<uintptr_t>(exeBase));
+	sigscan::Resolve(sig::Shared, std::size(sig::Shared), stamp != 0 ? exeBase : 0, sig::Caches, std::size(sig::Caches));
+	BindOne(api.getSkillRecord, sig::GetSkillRecord);
+	BindOne(api.evalSkillCalc, sig::EvalSkillCalc);
+	BindOne(api.skillTargetXY, sig::SkillTargetXY);
+	BindOne(api.skillTargetUnit, sig::SkillTargetUnit);
+	BindOne(api.createMissile, sig::CreateMissile);
+	BindOne(api.missileRecord, sig::MissileRecord);
+	BindOne(api.missileCount, sig::MissileCount);
+	BindOne(api.unitSeed, sig::UnitSeed);
+	BindOne(api.setUnitSkillFlag, sig::SetUnitSkillFlag);
+	BindOne(api.applyMeleeHit, sig::ApplyMeleeHit);
+	BindOne(api.unitStat, sig::UnitStat);
+	BindOne(api.unitStatNoParam, sig::UnitStatNoParam);
+	BindOne(api.summonPet, sig::SummonPet);
+	BindOne(api.setPetLevel, sig::SetPetLevel);
+	BindOne(api.petSkillStats, sig::PetSkillStats);
+	BindOne(api.addPetToParty, sig::AddPetToParty);
+	BindOne(api.pickSkillMissile, sig::PickSkillMissile);
+	BindOne(api.unitDataFlag, sig::UnitDataFlag);
+	BindOne(api.clientSkillTargetXY, sig::ClientSkillTargetXY);
+	BindOne(api.clientCreateMissile, sig::ClientCreateMissile);
+	if (stamp == 0) {
+		return false;
+	}
+	LogEntries(stamp);
+	if (!build_guard::Matches(stamp)) {
 		return false;
 	}
 	imageBase = exeBase;
-	BindOne(api.getSkillRecord, exeBase, rva::GetSkillRecord);
-	BindOne(api.evalSkillCalc, exeBase, rva::EvalSkillCalc);
-	BindOne(api.skillTargetXY, exeBase, rva::SkillTargetXY);
-	BindOne(api.skillTargetUnit, exeBase, rva::SkillTargetUnit);
-	BindOne(api.createMissile, exeBase, rva::CreateMissile);
-	BindOne(api.missileRecord, exeBase, rva::MissileRecord);
-	BindOne(api.missileCount, exeBase, rva::MissileCount);
-	BindOne(api.unitSeed, exeBase, rva::UnitSeed);
-	BindOne(api.setUnitSkillFlag, exeBase, rva::SetUnitSkillFlag);
-	BindOne(api.applyMeleeHit, exeBase, rva::ApplyMeleeHit);
-	BindOne(api.unitStat, exeBase, rva::UnitStat);
-	BindOne(api.unitStatNoParam, exeBase, rva::UnitStatNoParam);
-	BindOne(api.summonPet, exeBase, rva::SummonPet);
-	BindOne(api.setPetLevel, exeBase, rva::SetPetLevel);
-	BindOne(api.petSkillStats, exeBase, rva::PetSkillStats);
-	BindOne(api.addPetToParty, exeBase, rva::AddPetToParty);
-	BindOne(api.pickSkillMissile, exeBase, rva::PickSkillMissile);
-	BindOne(api.unitDataFlag, exeBase, rva::UnitDataFlag);
-	BindOne(api.clientSkillTargetXY, exeBase, rva::ClientSkillTargetXY);
-	BindOne(api.clientCreateMissile, exeBase, rva::ClientCreateMissile);
 	return true;
 }
 

@@ -13,6 +13,16 @@ auto SkipReason(const Part& part, bool imageOk, const char* pluginName, char* ou
 		std::snprintf(out, size, "off: left out by %s-off.txt", pluginName);
 		return true;
 	}
+	if (part.engine && !part.uses.empty()) {
+		for (const sigscan::Entry* e : part.uses) {
+			if (e == nullptr || e->state != sigscan::State::Ok) {
+				std::snprintf(out, size, "off: engine address %s %s on this game image", e != nullptr ? e->name : "(null)",
+				              sigscan::StateText(e != nullptr ? e->state : sigscan::State::Unresolved));
+				return true;
+			}
+		}
+		return false;
+	}
 	if (part.engine && !imageOk) {
 		std::snprintf(out, size, "off: game image differs from the one this plugin was built for");
 		return true;
