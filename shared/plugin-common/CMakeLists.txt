@@ -29,6 +29,7 @@ add_library(plugin_common STATIC
 	src/log.cpp
 	src/off_switch.cpp
 	src/parts.cpp
+	src/sig.cpp
 )
 target_include_directories(plugin_common PUBLIC src)
 target_link_libraries(plugin_common PUBLIC D2RLPlugin::D2RLPlugin)
@@ -41,7 +42,7 @@ endif()
 if(PROJECT_IS_TOP_LEVEL)
 	enable_testing()
 	# One executable per test file: tests/<name>.cpp builds plugin_common_<name> (add the name here).
-	foreach(test guard_test ai_registry_test level_palette_test parts_test)
+	foreach(test guard_test ai_registry_test level_palette_test parts_test sig_test sig_dump_test)
 		add_executable(plugin_common_${test} tests/${test}.cpp)
 		target_link_libraries(plugin_common_${test} PRIVATE plugin_common)
 		if(MSVC)
@@ -49,5 +50,6 @@ if(PROJECT_IS_TOP_LEVEL)
 			set_property(TARGET plugin_common_${test} PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
 		endif()
 		add_test(NAME plugin_common_${test} COMMAND plugin_common_${test})
+		set_tests_properties(plugin_common_${test} PROPERTIES SKIP_RETURN_CODE 77)  # sig_dump_test without a dump
 	endforeach()
 endif()

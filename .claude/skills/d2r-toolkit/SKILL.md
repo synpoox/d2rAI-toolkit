@@ -6,8 +6,8 @@ description: What the d2rAI-toolkit offers a Diablo II Resurrected mod project a
 # Using the D2R toolkit from a mod
 
 The toolkit builds Diablo II: Resurrected mods, up to full overhauls, from D2R's own files and engine. You make the
-mod with it: the user says what they want, you do it. Target: D2R 3.3 (engine addresses for build 93847 only),
-D2RLoader 1.3.1 (PluginSDK 0.4.0). Windows.
+mod with it: the user says what they want, you do it. Target: D2R 3.3 (engine addresses for build 93847, also
+found by signature on other builds), D2RLoader 1.3.1 (PluginSDK 0.4.0). Windows.
 
 Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you are inside the toolkit repo: use its root). Run `python -m modkit` with that folder as the working directory and the mod project as an argument.
 
@@ -102,9 +102,11 @@ address, a fix), add it to `${CLAUDE_PLUGIN_ROOT}/knowledge/` in the toolkit and
    ${CLAUDE_PLUGIN_ROOT}/knowledge/crash-triage.md. Porting a classic mod goes through the d2r-port skill and
    ${CLAUDE_PLUGIN_ROOT}/knowledge/porting-classic-mods.md, and only with the mod creators' permission: confirm it with the user first.
 8. **Saves**: back up first; edit only with `modkit save-set`; never hand-write items.
-9. **Plugins are tied to one game image.** Engine addresses belong to build 93847 only (image timestamp
-   `0x6ab3782c`); the plugin checks the timestamp and installs nothing on a mismatch. Re-find addresses after any
-   game or D2RLoader update. Look for an existing D2RLoader hook on a function before you patch it. Version checks
+9. **Plugins are tied to the game image.** Fixed engine addresses (`d2r::rva::`) belong to build 93847 only (image
+   timestamp `0x6ab3782c`): a part that reads them installs only on that image. A part that reads only signature
+   entries (`d2r::sig::`, listed in its `uses`) installs on any image where all of them are found exactly once, and
+   stays off alone otherwise (`shared/plugin-common/README.md`, "Engine addresses by signature"). Re-check addresses
+   after any game or D2RLoader update. Look for an existing D2RLoader hook on a function before you patch it. Version checks
    in installers and requirements use the game's major.minor (`3.3`), never a build number: Steam and Battle.net
    ship the same program under different builds.
    **Item types:** keep D2R-only itemtypes rows at D2R's numbers, and run

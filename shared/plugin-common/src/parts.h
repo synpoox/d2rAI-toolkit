@@ -6,18 +6,26 @@
 //       {"envguard", false, InstallEnvironment},          // no game address: runs on any image
 //       {"skills",   true,  InstallSkills},               // uses game addresses: installed only on the expected image
 //       {"hook",     true,  InstallHook, HookState},      // optional: a live state line for the status command
+//       {"calls",    true,  InstallCalls, nullptr, CallsUses},  // reads only signature entries: see below
 //   };
 //   parts::InstallAll(g_parts, std::size(g_parts), context, PluginName, d2r::Bind(context->exeBase));
 //   // in the console command:
 //   parts::WriteStatus(g_parts, std::size(g_parts), command);
 //
-// Rule 6: a part with `engine` set is never installed on an image other than the one rvas_93847.h describes (the
-// caller passes the result of d2r::Bind()); its report says so instead.
+// Rule 6, the image gate, two ways:
+// - an engine part with `uses` (the signature entries it reads, sig.h / signatures.h):
+//       sigscan::Entry* const CallsUses[] = {&d2r::sig::CreateMissile, &d2r::sig::SrvDoTable};
+//   installs on any image where every one of them resolved; else it stays off and its report names the entry.
+// - an engine part without `uses` (it reads fixed d2r::rva:: values) installs only on the image rvas_93847.h describes
+//   (the caller passes the result of d2r::Bind()); its report says so instead.
 #pragma once
+
+#include "sig.h"
 
 #include <D2RLPlugin/api.h>
 
 #include <cstddef>
+#include <span>
 
 namespace parts {
 
@@ -32,10 +40,12 @@ struct Part {
 	bool engine;       // uses game addresses: installed only on the expected image
 	InstallFn install;
 	StateFn state = nullptr;
+	std::span<sigscan::Entry* const> uses {};  // the signature entries it reads (engine parts gated by them, see above)
 	char report[512] = "";  // what the install said, or why the part is off
 };
 
-// Why a part is not installed ("" when it is): left out by the off file, or an engine part on an unexpected image.
+// Why a part is not installed ("" when it is): left out by the off file, an entry in `uses` that did not resolve, or
+// an engine part without `uses` on an image other than 93847's.
 // Writes the reason into `out` and returns true when the part must be skipped.
 auto SkipReason(const Part& part, bool imageOk, const char* pluginName, char* out, size_t size) noexcept -> bool;
 
