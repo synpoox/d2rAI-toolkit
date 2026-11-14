@@ -114,6 +114,10 @@ inline constexpr uint64_t UnitPackedXY = 0x34a110;               // (unit) -> ui
 inline constexpr uint64_t UnitCoords = 0x34a040;  // (unit, int32 xy[2])
 inline constexpr uint64_t UnitId = 0x34a330;  // (unit, file, line) -> unit id
 inline constexpr uint64_t UnitClassOf = 0x349860;  // (unit, file, line) -> class id (the dispatchers' item row)
+inline constexpr uint64_t UnitModeOf = 0x34ab60;  // (unit) -> u32; the leech passes it as the third value of Disguise
+// (unit, uint32* type, int32* class, uint32* mode): the unit's disguise form. It reads the unit's states against a table of
+// 0x44-byte records (+0x2d: 1 monster, 2 player; +0x2e: the class) and rewrites type, class and mode when one matches.
+inline constexpr uint64_t Disguise = 0x33a1f0;
 inline constexpr uint64_t UnitRoom = 0x34b440;  // (unit) -> its room
 // Double Throw (D2R's own srvdo 74 0x567a20, cltdo 42 0x22f3f0, Chain Lightning's srvhit 12 0x45d5e0)
 inline constexpr uint64_t UnitWeapon = 0x4242b0;  // (unit) -> weapon item the server attacks with, or null
