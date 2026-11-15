@@ -53,12 +53,11 @@ The implementer and the reviewer of one PR are different agents.
 
 ## Game slots
 - A lane does offline work first, locks a slot (`${CLAUDE_PLUGIN_ROOT}/testing/game_slots.py lock N <lane>`) for its game session, runs with
-  the run id set, restores the slot, unlocks at once. One lock attempt, no waiting. No slot free: the lane
+  the run id set and using the `d2r-in-game-testing` skill, restores the slot, unlocks at once. One lock attempt, no waiting. No slot free: the lane
   stops, files (or asks the orchestrator to file) a `ready-for-agent` issue for the run, and reports.
 - Slot number on **every** command that touches saves or a game folder. Never kill processes by filter. Never touch
   slot 1.
 - Tests: targeted (map changed files to checks). Full suite only at milestones, one game at a time.
-- Player-facing change: also test a release-like install, not only the developer install.
 
 ## Review and merge
 1. When an implementer's PR arrives, start a **reviewer** (a separate agent, strongest model). It reads the diff and

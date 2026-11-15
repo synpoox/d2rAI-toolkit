@@ -37,6 +37,7 @@ Git
 - A change players notice adds a `changelog.d/` fragment (never edit `CHANGELOG.md`). Keep docs in step with your change. Do not bump the release version unless your task says so.
 
 Game slots and tests
+- A lane that needs the game runs the `d2r-in-game-testing` skill.
 - Tests run in the background only: no synthetic keyboard or mouse input (SendInput, SetCursorPos,
   SetForegroundWindow), no focus stealing.
 - Game slots (`[testing].game_slots`) are queued, never added. Lock one for your whole game session, put its number on
