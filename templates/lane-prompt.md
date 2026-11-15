@@ -5,7 +5,7 @@
 > Guide: [docs/ai-workflow.md](../docs/ai-workflow.md#9-writing-a-good-lane-prompt).
 >
 > Brief rules (a lane starts with no memory; this prompt is everything it knows):
-> 1. One job per prompt. If it needs "and also", write two prompts.
+> 1. One job per prompt. If it needs "and also", write two prompts. Keep it short and simple.
 > 2. Goal in one sentence, and why it matters. Name docs and files by path, not by description.
 > 3. Scope: the files it may change; everything else is out of bounds.
 > 4. Known facts and suspicions, kept apart: say "suspicion" when you have not checked. List what was ruled out.
