@@ -45,9 +45,10 @@ CLASS_OFFSET, LEVEL_OFFSET = 0x18, 0x1B
 
 def assert_plugin_loaded(ctx, plugin: str, mod: str, expect: tuple[str, ...] = (), scope: str = "auto",
                          timeout: float = 90, since_size: int = 0, prefix: str | None = None) -> str:
-    """The mod runs and `plugin` logged its load line `<plugin>: <version> loaded (mod <mod>, ...)`. Every string in
-    `expect` must also be in the log since that load (for example a plugin's own "environment ok" line). Returns the
-    load line. The log may hold earlier runs: the latest load line counts, so to require one from this run take
+    """The mod runs and `plugin` logged its load line `<prefix>: <version> loaded (mod <mod>, ...)` (`prefix`
+    defaults to `plugin`; pass it when the plugin writes its lines under another name than its log file). Every
+    string in `expect` must also be in the log since that load (for example a plugin's own "environment ok" line).
+    Returns the load line. The log may hold earlier runs: the latest load line counts, so to require one from this run take
     `since_size = check_helpers.plugin_log_size(ctx, plugin, scope)` before the game starts and pass it here (only
     log text after that byte offset is looked at)."""
     ctx.ensure_running()
@@ -55,9 +56,9 @@ def assert_plugin_loaded(ctx, plugin: str, mod: str, expect: tuple[str, ...] = (
         game_ctl.wait_for(lambda: check_helpers.plugin_log(ctx, plugin, scope, since_size=since_size, prefix=prefix), timeout, 2.0,
                           f"{plugin}'s load line")
     except game_ctl.WaitTimeout:
-        raise AssertionError(f"no '{plugin}: ... loaded' line in the plugin log (plugin not loaded?)")
+        raise AssertionError(f"no '{prefix or plugin}: ... loaded' line in the plugin log (plugin not loaded?)")
     log = check_helpers.plugin_log(ctx, plugin, scope, since_size=since_size, prefix=prefix)
-    m = re.search(rf"{re.escape(plugin)}: (\S+ loaded \([^\n]*)", log)
+    m = re.search(rf"{re.escape(prefix or plugin)}: (\S+ loaded \([^\n]*)", log)
     assert m, f"no load line in the plugin log of {plugin}"
     loaded = m.group(1)
     assert f"loaded (mod {mod}," in loaded, f"expected mod {mod}: {loaded}"

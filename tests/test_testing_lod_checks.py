@@ -142,6 +142,16 @@ class AssertLoaded(Base):
         with self.assertRaises(AssertionError):
             lc.assert_plugin_loaded(self.ctx, "p", "MyMod", expect=("nope",))
 
+    def test_prefix(self):
+        self.write(ch.plugin_log_path(self.cfg, 2, "file", "mod"), "q: 1.0 loaded (mod MyMod, x)\nq: environment ok\n")
+        line = lc.assert_plugin_loaded(self.ctx, "file", "MyMod", expect=("environment ok",), prefix="q")
+        self.assertTrue(line.startswith("1.0 loaded (mod MyMod,"))
+        with mock.patch.object(lc.game_ctl, "wait_for", side_effect=lc.game_ctl.WaitTimeout("x")):
+            with self.assertRaises(AssertionError):
+                lc.assert_plugin_loaded(self.ctx, "file", "MyMod")
+        with self.assertRaises(AssertionError):
+            lc.assert_plugin_loaded(self.ctx, "file", "Other", prefix="q")
+
     def test_not_loaded(self):
         with mock.patch.object(lc.game_ctl, "wait_for", side_effect=lc.game_ctl.WaitTimeout("x")):
             with self.assertRaises(AssertionError):
