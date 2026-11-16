@@ -697,7 +697,7 @@ function (bytes in the header, checked before the patch); **D** data: a variable
 | `0x4a6e50` | AiSetDelay | (game, unit, frames) | think again after frames, mode kept | R |
 | `0x4a7270` | AiStepBeforeWalk | (unit, 1, 0, 0) | vanilla's step before each new walk (name unknown); the Dark Wanderer's think calls it (#1006) | R |
 | `0x4a78e0` | AiAttack | (game, unit, mode, target) | melee in mode 4 (A1) or 5 (A2) | R |
-| `0x4a7930` | DeathMode | (game, unit, 0, 0, 0) | mode 0 (death), no kill; the Dark Wanderer leaves through it (#1006) | R |
+| `0x4a7930` | AiSetModeXY | (game, unit, mode, a, b) | mode command with two args; the Dark Wanderer calls it with mode 0 (death) (#1006) | R |
 | `0x4a7bc0` | AiUseSkill | (game, unit, mode, skill, target, x, y, 0) -> non-zero once cast | Casts a skill from a think; on failure it idles 10 | R |
 | `0x4a8740` | AiApproach | (game, unit, target, 0) | walk at the target | R |
 | `0x4a8850` | WalkToSpot | (game, unit, x, y) | walk to the spot; the Dark Wanderer's think (#1006) | R |

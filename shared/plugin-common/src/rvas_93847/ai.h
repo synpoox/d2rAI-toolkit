@@ -39,7 +39,7 @@ inline constexpr uint64_t AiApproach = 0x4a8740;  // (game, unit, target, 0): wa
 inline constexpr uint64_t WalkToSpot = 0x4a8850;        // (game, unit, x, y): walk to the spot (the Dark Wanderer, #1006)
 inline constexpr uint64_t SpotDistance = 0x596980;      // (unit, x, y) -> distance to the spot
 inline constexpr uint64_t AiStepBeforeWalk = 0x4a7270;  // (unit, 1, 0, 0): vanilla's step before each new walk (name unknown)
-inline constexpr uint64_t DeathMode = 0x4a7930;         // (game, unit, 0, 0, 0): mode 0, death, no kill
+inline constexpr uint64_t AiSetModeXY = 0x4a7930;       // (game, unit, mode, a, b): mode command with two args
 inline constexpr uint64_t AiDarkWanderer = 0x5c87a0;    // monai row 91's think: the Dark Wanderer
 
 // --- Mode commands -------------------------------------------------------------------------------------------------
