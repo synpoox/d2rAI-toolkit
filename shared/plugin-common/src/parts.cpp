@@ -55,9 +55,9 @@ void WriteStatus(const Part* parts, size_t count, const D2RL::ConsoleCommandCont
 		return;
 	}
 	for (size_t i = 0; i < count; ++i) {
-		char state[900];
+		char state[ReportSize];
 		Line(parts[i], state, sizeof(state));
-		char line[1000];
+		char line[ReportSize + 64];
 		std::snprintf(line, sizeof(line), "%s %s", parts[i].word, state);
 		command->plugin->WriteConsoleMessage(line);
 	}
