@@ -4,7 +4,7 @@
 
 Run it after the project's whole build (data merged, `modkit build`, plugins built, companions fetched). It
   1. folds changelog.d/*.md into the changelog in memory and checks the `### <version> (<date>)` section exists,
-  2. checks the game image (D2R.exe's PE timestamp against game.image_timestamp, when the config sets one) and the
+  2. checks the game image (D2R.exe's PE timestamp against game.image_timestamp, when the config sets one and game.check_image is not false) and the
      item type ids of out/data (plugin-template/tools/item_type_ids.py, unless stage.item_type_check = false),
   3. lays the mod folder out in <out>/.stage-mod/<name>/ (a folder this tool creates and removes, nothing else) as `modkit install` does: out/data, modinfo, loader metadata and
      config, the companions (release/companions.py overlay, the vanilla tables they read from DIR) and the built plugins,
@@ -253,7 +253,9 @@ def run(a, root: Path, out: Path, config_path: Path, cfg: dict) -> int:
     section = cl.notes_section(text, version)  # checked before anything is written or deleted
     for dll, source in extra:
         section += "\n\n" + extra_plugin_note(dll, source)
-    if exe.is_file():
+    if not cfg["game"]["check_image"]:
+        pass  # opted out: image_timestamp only feeds the manifest
+    elif exe.is_file():
         check_game_image(cfg, exe)
     elif cfg["game"].get("image_timestamp"):
         raise ReleaseError(f"{exe} missing: the game image cannot be checked")

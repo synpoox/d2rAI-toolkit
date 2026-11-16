@@ -37,6 +37,7 @@ DEFAULTS = {
         "version": "3.3.0",          # D2R's version, shown in the notes
         "build": "93847",            # the D2R build the plugin needs
         "image_timestamp": "",       # optional: PE TimeDateStamp of D2R.exe, e.g. "0x6ab3782c"
+        "check_image": True,         # false: the stager does not compare D2R.exe with image_timestamp (the manifest still gets it)
     },
     "d2rloader": {                   # the pinned D2RLoader: informational for the downloader (it never downloads it)
         "version": "1.3.1-beta",

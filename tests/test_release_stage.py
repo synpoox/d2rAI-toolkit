@@ -395,6 +395,18 @@ class MainTests(unittest.TestCase):
         notes = (root / "dist" / "RELEASE_NOTES-0.2.0.md").read_text("utf-8")
         self.assertIn(f"x: src 1, sha256 {hashlib.sha256(b'x').hexdigest()}", notes)
 
+    def test_check_image_false_skips_the_game_image_check(self):
+        def prepare(check):
+            def write(root):
+                (root / "release.toml").write_text('[mod]\nfolder = "M"\n[stage]\nitem_type_check = false\n'
+                                                   f'[game]\nimage_timestamp = "0x1"\ncheck_image = {check}\n', "utf-8")
+            return write
+        ran = lambda *a, **k: mock.Mock(returncode=3)  # noqa: E731
+        _, code, _ = self.run_main(ran, prepare=prepare("true"))
+        self.assertEqual(code, 1)  # no D2R.exe in the game folder: the image cannot be checked
+        _, code, _ = self.run_main(ran, prepare=prepare("false"))
+        self.assertEqual(code, 3)  # past the check, up to package_release
+
     def test_a_missing_version_section_changes_nothing(self):
         root, code, log = self.run_main(lambda *a, **k: mock.Mock(returncode=0), version_section=False)
         self.assertEqual(code, 1)

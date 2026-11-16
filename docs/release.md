@@ -693,7 +693,7 @@ A command-line option beats an environment variable, which beats the file, which
 | Section | Keys |
 |---|---|
 | `[mod]` | `name` (shown to players), `folder` (one plain word: the folder under `mods/` and the 7z's top folder), `save_folder` (`savepath`), `website`. |
-| `[game]` | `version`, `build`, optional `image_timestamp`. |
+| `[game]` | `version`, `build`, optional `image_timestamp`, `check_image` (default true; false: `stage.py` does not compare `D2R.exe`'s timestamp with `image_timestamp`, which still goes into the manifest). |
 | `[d2rloader]` | `version`, `url`, `size`, `sha256`, `signerThumbprint`. Informational: the downloader never downloads the loader. |
 | `[launch]` | `default_mod`, `launch_arguments`: written into the manifest's `launch`. |
 | `[package]` | `dist`, `plugin_dir`, `plugin_forbidden_strings`, `preserve`, `forbidden` (regular expressions on the path in the mod folder), `data_dir`, `keep_identical`. |
