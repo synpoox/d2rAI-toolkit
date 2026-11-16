@@ -94,6 +94,26 @@ int main() {
 	}
 	Check(classes && !RegisterWith(&Write, &w, 1, 0x5b1ca0, &D2rThink, 99, &PortA), "MaxClasses classes per row, no more");
 
+	// The table passed in, 16 rows, and the before-think callback
+	ResetForTest();
+	Check(RegisterWithTable(&Write, &w, 0x2000, 4, 0x5b1ca0, &D2rThink, 5, &PortA) &&
+	          w.slot == 0x2000 + 4u * d2r::rva::AiRowSize,
+	      "RegisterWithTable writes the slot in the given table");
+	Check(MaxRows == 16, "sixteen rows");
+	ResetForTest();
+	for (int row = 0; row < MaxRows; ++row) {
+		RegisterWith(&Write, &w, row, 0x5b1ca0, &D2rThink, 5, &PortA);
+	}
+	Check(Vanilla(MaxRows - 1) == &D2rThink, "the last of 16 rows registers");
+	g_calls[1] = 0;
+	SetBeforeThink([](d2r::Unit*, int32_t classId) noexcept { g_calls[1] += 100 + classId; });
+	FakeUnit c(1, 5), d(1, 9);
+	Run(0, c.unit());
+	Run(0, d.unit());
+	Check(g_calls[1] == 100 + 5 + 1, "the callback runs before a registered think, not before D2R's");
+	SetBeforeThink(nullptr);
+	Check(!RegisterAt(nullptr, 3, 0x1000, 5, &PortA), "RegisterAt refuses when the image is not bound");
+
 	std::printf("%d failure(s)\n", g_failures);
 	return g_failures == 0 ? 0 : 1;
 }

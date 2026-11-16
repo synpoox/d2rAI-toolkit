@@ -25,7 +25,7 @@ namespace ai_registry {
 // A think function, D2R's signature: (game, unit, tick). The tick's fields are d2r::rva::AiTick*.
 using ThinkFn = void (*)(d2r::Game* game, d2r::Unit* unit, uint8_t* tick) noexcept;
 
-inline constexpr int MaxRows = 10;     // monai rows one plugin can take over
+inline constexpr int MaxRows = 16;     // monai rows one plugin can take over
 inline constexpr int MaxClasses = 8;   // classes per row
 
 // Runs `think` instead of D2R's think of monai row `monaiRow` for monsters of monstats class `classId`; other classes on
@@ -36,6 +36,18 @@ inline constexpr int MaxClasses = 8;   // classes per row
 auto Register(const D2RL::PluginContext* context, int32_t monaiRow, uint64_t d2rThink, int32_t classId,
               ThinkFn think) noexcept -> bool;
 
+// The same by signature entries, for a plugin that reads no fixed rva (parts.h `uses`): `d2rThinkAddress` is the resolved
+// address of D2R's think in that row (d2r::sig::AiMephisto.address, ...); the row's slot is in d2r::sig::AiTable, which
+// must be listed in the part's `uses` too. False when either did not resolve (address 0), or as Register.
+auto RegisterAt(const D2RL::PluginContext* context, int32_t monaiRow, uint64_t d2rThinkAddress, int32_t classId,
+                ThinkFn think) noexcept -> bool;
+
+// A callback run on the server thread just before a registered think, with the unit and its class: for what every
+// ported monster needs first (a test aid, a shared per-tick rule). Null (the default) runs nothing. Set it once, from an
+// install or a console command; the next dispatch sees it.
+using BeforeThinkFn = void (*)(d2r::Unit* unit, int32_t classId) noexcept;
+void SetBeforeThink(BeforeThinkFn before) noexcept;
+
 // D2R's own think of a registered row (null for any other row): a registered think calls it for what it leaves to D2R.
 auto Vanilla(int32_t monaiRow) noexcept -> ThinkFn;
 
@@ -44,6 +56,10 @@ auto Vanilla(int32_t monaiRow) noexcept -> ThinkFn;
 using SlotWriter = bool (*)(uint64_t slotRva, uint64_t expectedRva, ThinkFn trampoline, void* user) noexcept;
 auto RegisterWith(SlotWriter write, void* user, int32_t monaiRow, uint64_t d2rThink, ThinkFn vanilla, int32_t classId,
                   ThinkFn think) noexcept -> bool;
+
+// RegisterWith for any table: `tableRva` is the rva of the monai table (RegisterWith uses d2r::rva::AiTable).
+auto RegisterWithTable(SlotWriter write, void* user, uint64_t tableRva, int32_t monaiRow, uint64_t d2rThink,
+                       ThinkFn vanilla, int32_t classId, ThinkFn think) noexcept -> bool;
 
 // What a registered row's trampoline does (row index k in registration order): the registered think of the unit's class,
 // else D2R's. Exposed for tests.
