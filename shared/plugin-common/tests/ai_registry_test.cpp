@@ -101,10 +101,11 @@ int main() {
 	      "RegisterWithTable writes the slot in the given table");
 	Check(MaxRows == 16, "sixteen rows");
 	ResetForTest();
+	bool all16 = true;
 	for (int row = 0; row < MaxRows; ++row) {
-		RegisterWith(&Write, &w, row, 0x5b1ca0, &D2rThink, 5, &PortA);
+		all16 = RegisterWith(&Write, &w, row, 0x5b1ca0, &D2rThink, 5, &PortA) && all16;
 	}
-	Check(Vanilla(MaxRows - 1) == &D2rThink, "the last of 16 rows registers");
+	Check(all16 && Vanilla(MaxRows - 1) == &D2rThink, "all 16 rows register, the last included");
 	g_calls[1] = 0;
 	SetBeforeThink([](d2r::Unit*, int32_t classId) noexcept { g_calls[1] += 100 + classId; });
 	FakeUnit c(1, 5), d(1, 9);
@@ -112,7 +113,20 @@ int main() {
 	Run(0, d.unit());
 	Check(g_calls[1] == 100 + 5 + 1, "the callback runs before a registered think, not before D2R's");
 	SetBeforeThink(nullptr);
-	Check(!RegisterAt(nullptr, 3, 0x1000, 5, &PortA), "RegisterAt refuses when the image is not bound");
+	Check(!RegisterAt(nullptr, 3, 0x1000, 5, &PortA), "RegisterAt refuses when its table entry did not resolve");
+
+	// By signature entry: the base comes from the entry, with d2r::imageBase still 0 (an image Bind() did not accept)
+	ResetForTest();
+	sigscan::Entry table {"AiTable", "test", sigscan::Kind::Rip, 0, 0, ""};
+	Check(!RegisterAtWith(&Write, &w, table, 3, 0x7ff600005000, 5, &PortA), "an unresolved table entry is refused");
+	table.state = sigscan::State::Ok;
+	table.rva = 0x2000;
+	table.address = 0x7ff600000000 + 0x2000;
+	w.count = 0;
+	Check(!RegisterAtWith(&Write, &w, table, 3, 0x1000, 5, &PortA) && w.count == 0, "a think below the image base is refused");
+	Check(RegisterAtWith(&Write, &w, table, 3, 0x7ff600000000 + 0x5b1ca0, 5, &PortA), "RegisterAt works by entry");
+	Check(w.slot == 0x2000 + 3u * d2r::rva::AiRowSize && w.expected == 0x5b1ca0,
+	      "it writes table.rva + row, expecting the think's rva");
 
 	std::printf("%d failure(s)\n", g_failures);
 	return g_failures == 0 ? 0 : 1;

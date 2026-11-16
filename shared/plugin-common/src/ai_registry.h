@@ -57,6 +57,11 @@ using SlotWriter = bool (*)(uint64_t slotRva, uint64_t expectedRva, ThinkFn tram
 auto RegisterWith(SlotWriter write, void* user, int32_t monaiRow, uint64_t d2rThink, ThinkFn vanilla, int32_t classId,
                   ThinkFn think) noexcept -> bool;
 
+// RegisterAt with the slot write passed in, for a test: the slot is `table.rva` + row, the expected think is
+// `d2rThinkAddress - (table.address - table.rva)`, so it needs no d2r::imageBase. False when `table` did not resolve.
+auto RegisterAtWith(SlotWriter write, void* user, const sigscan::Entry& table, int32_t monaiRow,
+                    uint64_t d2rThinkAddress, int32_t classId, ThinkFn think) noexcept -> bool;
+
 // RegisterWith for any table: `tableRva` is the rva of the monai table (RegisterWith uses d2r::rva::AiTable).
 auto RegisterWithTable(SlotWriter write, void* user, uint64_t tableRva, int32_t monaiRow, uint64_t d2rThink,
                        ThinkFn vanilla, int32_t classId, ThinkFn think) noexcept -> bool;

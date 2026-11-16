@@ -39,13 +39,19 @@ auto Slot(uint64_t tableRva, int32_t row) noexcept -> uint64_t {
 	return tableRva + static_cast<uint64_t>(row) * d2r::rva::AiRowSize;
 }
 
+// What WriteSlot needs: the context to patch through and the image base the expected think rva is added to.
+struct Target {
+	const D2RL::PluginContext* context;
+	uint64_t base;
+};
+
 auto WriteSlot(uint64_t slotRva, uint64_t expectedRva, ThinkFn trampoline, void* user) noexcept -> bool {
-	const auto* context = static_cast<const D2RL::PluginContext*>(user);
-	const uint64_t vanilla = d2r::imageBase + expectedRva;
+	const auto* target = static_cast<const Target*>(user);
+	const uint64_t vanilla = target->base + expectedRva;
 	uint8_t expected[8];
 	std::memcpy(expected, &vanilla, sizeof(expected));
-	return context != nullptr &&
-	       context->PatchWriteU64(slotRva, expected, sizeof(expected), reinterpret_cast<uint64_t>(trampoline));
+	return target->context != nullptr &&
+	       target->context->PatchWriteU64(slotRva, expected, sizeof(expected), reinterpret_cast<uint64_t>(trampoline));
 }
 
 }  // namespace
@@ -109,14 +115,28 @@ void SetBeforeThink(BeforeThinkFn before) noexcept {
 	g_before.store(before);
 }
 
+auto RegisterAtWith(SlotWriter write, void* user, const sigscan::Entry& table, int32_t monaiRow,
+                    uint64_t d2rThinkAddress, int32_t classId, ThinkFn think) noexcept -> bool {
+	// The image base comes from the entry (address - rva), not from d2r::imageBase, which is 0 off build 93847
+	if (table.state != sigscan::State::Ok || table.address < table.rva) {
+		return false;  // an unresolved entry: touch nothing
+	}
+	const uint64_t base = table.address - table.rva;
+	if (d2rThinkAddress < base) {
+		return false;
+	}
+	return RegisterWithTable(write, user, table.rva, monaiRow, d2rThinkAddress - base,
+	                         reinterpret_cast<ThinkFn>(d2rThinkAddress), classId, think);
+}
+
 auto RegisterAt(const D2RL::PluginContext* context, int32_t monaiRow, uint64_t d2rThinkAddress, int32_t classId,
                 ThinkFn think) noexcept -> bool {
 	const sigscan::Entry& table = d2r::sig::AiTable;
-	if (d2r::imageBase == 0 || d2rThinkAddress < d2r::imageBase || table.state != sigscan::State::Ok) {
-		return false;  // an unresolved entry: touch nothing
+	if (table.state != sigscan::State::Ok || table.address < table.rva) {
+		return false;
 	}
-	return RegisterWithTable(&WriteSlot, const_cast<D2RL::PluginContext*>(context), table.rva, monaiRow,
-	                         d2rThinkAddress - d2r::imageBase, reinterpret_cast<ThinkFn>(d2rThinkAddress), classId, think);
+	Target target {context, table.address - table.rva};
+	return RegisterAtWith(&WriteSlot, &target, table, monaiRow, d2rThinkAddress, classId, think);
 }
 
 auto Register(const D2RL::PluginContext* context, int32_t monaiRow, uint64_t d2rThink, int32_t classId,
@@ -124,8 +144,9 @@ auto Register(const D2RL::PluginContext* context, int32_t monaiRow, uint64_t d2r
 	if (d2r::imageBase == 0) {
 		return false;  // Bind() refused the image or has not run: touch nothing
 	}
-	return RegisterWith(&WriteSlot, const_cast<D2RL::PluginContext*>(context), monaiRow, d2rThink,
-	                    reinterpret_cast<ThinkFn>(d2r::imageBase + d2rThink), classId, think);
+	Target target {context, d2r::imageBase};
+	return RegisterWith(&WriteSlot, &target, monaiRow, d2rThink, reinterpret_cast<ThinkFn>(d2r::imageBase + d2rThink),
+	                    classId, think);
 }
 
 auto Vanilla(int32_t monaiRow) noexcept -> ThinkFn {
