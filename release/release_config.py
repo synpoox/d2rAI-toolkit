@@ -82,6 +82,7 @@ DEFAULTS = {
         "companions": False,          # install generated/companions/ (release/companions.py fetch) with the mod
         "companions_manifest": "",    # "" = companions/manifest.json
         "item_type_check": True,      # run plugin-template/tools/item_type_ids.py on out/data's itemtypes.txt
+        "loader_from_game": False,    # pin --game's official D2RLoader.exe in the catalog (catalog.loader_files stays empty)
     },
     "site": {
         "url": "https://files.example.com/mymod/",   # what players' downloaders read (HTTPS, ends in '/')

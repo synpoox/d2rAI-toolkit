@@ -243,6 +243,38 @@ class StageTests(unittest.TestCase):
             self.assertFalse(stale.exists())
 
 
+class ExtraPluginTests(StageTests):
+    def test_an_extra_plugin_ships_and_leaves_a_traceable_note(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.project(Path(tmp) / "p")
+            extra = Path(tmp) / "side.dll"
+            extra.write_bytes(b"side")
+            dll, source = stage.parse_extra_plugin(f"{extra}@sibling abc123")
+            self.assertEqual((dll, source), (extra, "sibling abc123"))
+            mod = stage.stage(root, Path(tmp) / "stage", config(), extra_plugins=[dll])
+            self.assertEqual((mod / "d2rloader/plugins/side.dll").read_bytes(), b"side")
+            self.assertEqual(stage.extra_plugin_note(dll, source),
+                             f"side: sibling abc123, sha256 {hashlib.sha256(b'side').hexdigest()}")
+            self.assertTrue(stage.extra_plugin_note(dll, "").startswith("side: sha256 "))
+
+    def test_an_extra_plugin_must_be_an_existing_dll(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "a.txt").write_text("x")
+            for spec in (str(Path(tmp) / "missing.dll"), str(Path(tmp) / "a.txt")):
+                with self.assertRaises(stage.ReleaseError):
+                    stage.parse_extra_plugin(spec)
+
+    def test_with_loader_pins_the_game_loader_in_the_catalog(self):
+        text = '[d2rloader]\r\nversion = "1.2"\r\n[catalog]\r\nloader_versions = ["1.2"]\r\n'
+        conf = stage.tomllib.loads(stage.with_loader(text, Path("C:/g/D2RLoader.exe")))
+        self.assertEqual(conf["catalog"]["loader_files"], [{"path": "C:/g/D2RLoader.exe", "version": "1.2"}])
+        self.assertEqual(conf["catalog"]["loader_versions"], ["1.2"])
+        for bad in ('[d2rloader]\nversion = "1"\n', '[catalog]\n',
+                    '[d2rloader]\nversion = "1"\n[catalog]\nloader_files = []\n'):
+            with self.assertRaises(stage.ReleaseError):
+                stage.with_loader(bad, Path("x.exe"))
+
+
 class GuardTests(unittest.TestCase):
     def test_game_image_timestamp(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -305,6 +337,25 @@ class MainTests(unittest.TestCase):
     def assert_restored(self, root, log):
         self.assertEqual((root / "CHANGELOG.md").read_text("utf-8"), log)
         self.assertEqual([f.name for f in (root / "changelog.d").iterdir()], ["1-a.md"])
+
+    def test_loader_from_game_and_extra_plugins_reach_package_release(self):
+        seen = {}
+        side = tempfile.TemporaryDirectory()
+        self.addCleanup(side.cleanup)
+        dll = Path(side.name) / "x.dll"
+        dll.write_bytes(b"x")
+
+        def run(cmd, **k):
+            seen["config"] = Path(cmd[cmd.index("--config") + 1]).read_text("utf-8")
+            return mock.Mock(returncode=3)
+
+        def prepare(root):
+            (root / "release.toml").write_text('[mod]\nfolder = "M"\n[stage]\nitem_type_check = false\n'
+                                               'loader_from_game = true\n[d2rloader]\nversion = "9.9"\n[catalog]\n', "utf-8")
+        root, code, log = self.run_main(run, prepare=prepare, args=["--extra-plugin", f"{dll}@src"])
+        self.assertIn('version = "9.9"', seen["config"])
+        self.assertIn("D2RLoader.exe", seen["config"])
+        self.assertEqual([str(p.name) for p in self.staged.call_args.args[-1]], ["x.dll"])
 
     def test_a_missing_version_section_changes_nothing(self):
         root, code, log = self.run_main(lambda *a, **k: mock.Mock(returncode=0), version_section=False)

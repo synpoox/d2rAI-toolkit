@@ -427,6 +427,12 @@ folder (`out/data`, modinfo, loader metadata, `stage.plugins` from `stage.plugin
 `stage.companions` the [companion plugins](#companion-plugins) and the vanilla tables they read), runs
 `package_release.py`, and writes the changelog section as the release notes. The fragments are deleted only after all of
 that succeeded. The `[stage]` and `repos.fragments` keys are in `release/release.example.toml`.
+Two optional extras for a mod that ships a plugin built elsewhere or pins the official loader. `--extra-plugin
+PATH[@SOURCE]` (repeatable) ships one more prebuilt DLL next to `stage.plugins` and adds the line
+`<dll name>: <SOURCE>, sha256 <hash>` to the release notes, so the release stays traceable to that exact file.
+`stage.loader_from_game = true` pins `<--game>/D2RLoader.exe` in `catalog.loader_files` at the `[d2rloader]` version
+(through a copy of release.toml in the staging folder; release.toml must then not set `catalog.loader_files`).
+
 
 The stager refuses a `mod.json` `name` that is not a single plain folder name or differs from `mod.folder`, and it
 runs `package_release.py` in the project folder, so `--root` works from any folder. It leaves only the release assets

@@ -12,7 +12,12 @@ Run it after the project's whole build (data merged, `modkit build`, plugins bui
 The fragments are deleted only when the whole run succeeded; any failure leaves the changelog and fragments as they were.
 
 Everything a mod decides is in release.toml (see release.example.toml, [stage]): which plugins to ship, where they are
-built, whether companions are installed. The version defaults to mod.json's.
+built, whether companions are installed, whether the official D2RLoader.exe of --game is pinned in the catalog.
+The version defaults to mod.json's.
+
+--extra-plugin PATH[@SOURCE] (repeatable) ships one more prebuilt plugin DLL from outside the build folder, such as a
+sibling project's current build, and adds the line "<name>: <SOURCE>, sha256 <hash>" (SOURCE optional: where it was
+built from) to the release notes, so the release stays traceable to that file.
 """
 from __future__ import annotations
 
@@ -25,6 +30,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 from typing import Callable
 
@@ -103,15 +109,48 @@ def check_name(mod: dict, cfg: dict) -> str:
     return name
 
 
-def stage(root: Path, out: Path, cfg: dict, read: Callable[[str], bytes] | None = None) -> Path:
-    """Lay out the installed mod folder in out/<name>/ (emptied first), as modkit install and companions install do."""
+def parse_extra_plugin(spec: str) -> tuple[Path, str]:
+    """`PATH` or `PATH@SOURCE` of --extra-plugin as (DLL path, source text)."""
+    path, _, source = spec.partition("@")
+    p = Path(path)
+    if p.suffix.lower() != ".dll" or not p.is_file():
+        raise ReleaseError(f"--extra-plugin {spec!r}: no .dll file at {p}")
+    return p, source.strip()
+
+
+def extra_plugin_note(dll: Path, source: str) -> str:
+    """The release-notes line that records which build of an extra plugin ships: its source, if given, and its SHA-256."""
+    where = f"{source}, " if source else ""
+    return f"{dll.stem}: {where}sha256 {hashlib.sha256(dll.read_bytes()).hexdigest()}"
+
+
+def with_loader(text: str, exe: Path) -> str:
+    """The release.toml text with catalog.loader_files pointing at `exe` (the official D2RLoader.exe of --game, a machine
+    path), pinned at [d2rloader] version. Fails when [catalog] is missing or already sets loader_files."""
+    text = text.replace("\r\n", "\n")
+    conf = tomllib.loads(text)
+    if "catalog" not in conf:
+        raise ReleaseError("release.toml has no [catalog] table: stage.loader_from_game needs one")
+    if "loader_files" in conf["catalog"]:
+        raise ReleaseError("release.toml sets catalog.loader_files and stage.loader_from_game: use one of them")
+    version = conf.get("d2rloader", {}).get("version")
+    if not version:
+        raise ReleaseError("release.toml has no [d2rloader] version to pin the loader at")
+    line = f'loader_files = [{{path = "{exe.as_posix()}", version = "{version}"}}]'
+    return re.sub(r"^\[catalog\][ \t]*$", lambda m: m.group(0) + "\n" + line, text, count=1, flags=re.M)
+
+
+def stage(root: Path, out: Path, cfg: dict, read: Callable[[str], bytes] | None = None,
+          extra_plugins: list[Path] = ()) -> Path:
+    """Lay out the installed mod folder in out/<name>/ (emptied first), as modkit install and companions install do.
+    `extra_plugins` are prebuilt DLLs shipped next to the built ones."""
     root = Path(root)
     s = cfg["stage"]
     mod = read_mod_json(root)
     name = check_name(mod, cfg)  # before anything is deleted: the name is a folder under `out`
     build_dir = root / s["plugin_build_dir"]
     dlls = [build_dir / f"{p}.dll" for p in s["plugins"]]
-    needed = [root / "out" / "data", *dlls]
+    needed = [root / "out" / "data", *dlls, *extra_plugins]
     if s["companions"]:
         needed.append(root / "generated" / "companions")
     for p in needed:
@@ -149,7 +188,7 @@ def stage(root: Path, out: Path, cfg: dict, read: Callable[[str], bytes] | None 
             if read is None:
                 raise ReleaseError("the companions read vanilla tables: pass --game")
             comp.fill_tables(dest / f"{name}.mpq" / "data" / "global" / "excel", read, tables)
-    for dll in dlls:
+    for dll in [*dlls, *extra_plugins]:
         shutil.copy2(dll, d2rl / "plugins" / dll.name)
     return dest
 
@@ -175,6 +214,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--version", help="release version (default: mod.json's)")
     ap.add_argument("--out", type=Path, help="output folder (default: <root>/<package.dist>)")
     ap.add_argument("--config", type=Path, help="release.toml (default: <root>/release.toml)")
+    ap.add_argument("--extra-plugin", action="append", default=[], metavar="PATH[@SOURCE]",
+                    help="ship one more prebuilt plugin DLL and record its SHA-256 (and SOURCE) in the notes; repeatable")
     a = ap.parse_args(argv)
     root = a.root.resolve()
     config_path = (a.config or root / "release.toml").resolve()
@@ -200,8 +241,11 @@ def run(a, root: Path, out: Path, config_path: Path, cfg: dict) -> int:
     log = root / cfg["repos"]["changelog"]
     frag = cfg["repos"]["fragments"]
     exe = a.game / "D2R.exe"
+    extra = [parse_extra_plugin(spec) for spec in a.extra_plugin]
     text, fragments = cl.pending(root, version, cfg["repos"]["changelog"], frag)
     section = cl.notes_section(text, version)  # checked before anything is written or deleted
+    for dll, source in extra:
+        section += "\n\n" + extra_plugin_note(dll, source)
     if exe.is_file():
         check_game_image(cfg, exe)
     elif cfg["game"].get("image_timestamp"):
@@ -221,17 +265,18 @@ def run(a, root: Path, out: Path, config_path: Path, cfg: dict) -> int:
         shutil.rmtree(work)
     work.mkdir(parents=True)
     try:
-        return package(a, root, out, config_path, cfg, work, version, section, text, fragments, exe, read)
+        return package(a, root, out, config_path, cfg, work, version, section, text, fragments, exe, read,
+                       [dll for dll, _ in extra])
     finally:
         shutil.rmtree(work, ignore_errors=True)  # the release assets stay; nothing else under `out` is touched
 
 
-def package(a, root, out, config_path, cfg, work, version, section, text, fragments, exe, read) -> int:
+def package(a, root, out, config_path, cfg, work, version, section, text, fragments, exe, read, extra=()) -> int:
     log = root / cfg["repos"]["changelog"]
     frag = cfg["repos"]["fragments"]
     before = log.read_text("utf-8")
     try:
-        mod = stage(root, work, cfg, read)
+        mod = stage(root, work, cfg, read, list(extra))
     except OSError as e:  # no game storage, no cache, a locked file
         raise ReleaseError(f"cannot stage the mod folder: {e}")
     folded = bool(fragments)
@@ -242,6 +287,10 @@ def package(a, root, out, config_path, cfg, work, version, section, text, fragme
     code = 1
     try:
         try:
+            if cfg["stage"]["loader_from_game"]:  # the catalog pins the official loader by hash: a machine path, so a copy
+                pinned = work / "release.toml"
+                pinned.write_text(with_loader(config_path.read_text("utf-8"), a.game / "D2RLoader.exe"), "utf-8", newline="")
+                config_path = pinned
             cmd = [sys.executable, str(HERE / "package_release.py"), "--mod-dir", str(mod), "--version", version,
                    "--config", str(config_path), "--out", str(out)]
             if exe.is_file():
