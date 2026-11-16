@@ -150,6 +150,13 @@ class GateTests(unittest.TestCase):
                               ids.Table.of(["skill", "x"], [["Bash", "<1>"]]), {}, spell=lambda t, c, v, r: f"<{v}>")
         self.assertEqual(custom.open, [])  # a project's spell runs with no lists too
 
+    def test_a_project_can_name_its_own_reference_columns(self):
+        src = ids.Table.of(["code", "missiletype"], [["axe", "fire"]])
+        mod = ids.Table.of(["code", "missiletype"], [["axe", "7"]])
+        refs = {"weapons": {"missiletype": "missiles"}}
+        self.assertEqual(diff.compare("weapons", src, mod, {}).open, [("weapons.axe.missiletype", "fire", "7")])
+        self.assertEqual(diff.compare("weapons", src, mod, {}, id_map={"missiles": {"fire": "7"}}, num_refs=refs).open, [])
+
     def test_a_renamed_column_d2r_split_in_several_is_compared_in_each(self):
         self.write("src", "hireling", table("Hireling | Resist", "Rogue | 5"))
         self.write("mod", "hireling", table("Hireling | ResistFire | ResistCold", "Rogue | 5 | 7"))

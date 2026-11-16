@@ -97,13 +97,13 @@ def compare(name: str, src: Table, mod: Table, ren: dict[str, dict[str, str]] | 
             lists: dict[str, list[ids.Line]] | None = None, rows: str | list[str] = "name", *,
             id_map: dict[str, dict[str, str]] | None = None, by_row: tuple[str, ...] = (),
             list_paired: tuple[str, ...] = (), fix_row: ids.FixRow | None = None, fix: Fix | None = None,
-            spell: ids.Spell = ids.spell) -> Result:
+            spell: ids.Spell = ids.spell, num_refs: dict[str, dict[str, str]] | None = None) -> Result:
     """Deviations of `mod` from `src`: missing columns (table.*.col), missing rows (table.row.*), changed cells.
     The source's comment columns and eol are not data; a column D2R keeps only as a comment (*Id) is the row's
     position, and a repeated column is read once, as the merge reads it. The source's rows, columns and cells are read
     in the mod's spelling: columns matched as the merges match them (ids.source_columns), rows renamed by `ren`
     (ids.renames), cells spelled by `spell`, fixed by the
-    project's `fix_row` and `fix`, and NUM_REFS and ID_COLS columns in the mod's ids (`id_map`, ids.ids_of). `rows`
+    project's `fix_row` and `fix`, and the num_refs (default NUM_REFS) and ID_COLS columns in the mod's ids (`id_map`, ids.ids_of). `rows`
     pairs a tables.json table's rows as its merge did. Excel's quote marks are not data."""
     res = Result(name)
     def data(i: int) -> bool:
@@ -127,7 +127,7 @@ def compare(name: str, src: Table, mod: Table, ren: dict[str, dict[str, str]] | 
         if fix:
             fix(name, mod.header, want, src.header, pr)
         for j, c in enumerate(mod.header):  # level tables' row numbers, in the mod's ids
-            t = ids.NUM_REFS.get(name, {}).get(c) or (name if ids.ID_COLS.get(name) == c else None)
+            t = (ids.NUM_REFS if num_refs is None else num_refs).get(name, {}).get(c) or (name if ids.ID_COLS.get(name) == c else None)
             if id_map and t:
                 want[j] = id_map.get(t, {}).get(want[j], want[j])
         res.open += [(f"{name}.{row}.{c}", pr[i], mr[j]) for c, i, j in cols if not same(want[j], mr[j])]
@@ -188,7 +188,7 @@ def gate(src_excel: Path, mod_excel: Path, d2r_excel: Path, deviation_list: Path
     the report counts them (no default: each project names its own). `lists` are the project's id lists, `tables_json` its
     tables.json (for each table's `rows`); `renames` are the merge's other renames (tables.extra_renames), added to
     the id lists'; compare_args(table) gives that table's extra compare() arguments (id_map,
-    by_row, list_paired, fix_row, fix, spell). A deviation list pattern for a whole merged table (whole_table:
+    by_row, list_paired, fix_row, fix, spell, num_refs). A deviation list pattern for a whole merged table (whole_table:
     `t.*`, `t*`, `*.*.*`) fails the run.
     `own(file name)` says whether the project owns (imports) a table that is in mod_excel (default: every one is);
     its result is labelled `own_label` (default "merged"). A table in mod_excel that is not owned is D2R's, committed
