@@ -29,8 +29,9 @@ using SrvDoFn = int64_t (*)(d2r::Game* game, d2r::Unit* unit, int32_t skillId, i
 // Missile functions (signatures as documented in knowledge/ for build 93847):
 using MissileSrvDoFn = int64_t (*)(d2r::Game* game, d2r::Unit* missile) noexcept;
 // srvhit: `hit` is null when the missile hit nothing. The return value is the hit result: D2R's collision (0x4639a0)
-// deals the missile's damage only when it has bit 2 (srvhit 4 returns 3, or 1 without a missile row; srvhit 12 returns
-// 1 or 3), so a function that wants the normal damage returns 3.
+// deals the missile's damage only when the result has the value 0x2 (srvhit 4 returns 3, or 1 without a missile row; srvhit 12 returns
+// 1 or 3), so a function that wants the normal damage returns 3. The value 0x4 skips the damage and ends the hit: never
+// return 4 or 6 by mistake.
 using MissileSrvHitFn = int32_t (*)(d2r::Game* game, d2r::Unit* missile, d2r::Unit* hit) noexcept;
 // cltdo: the second argument is a float (xmm1 on x64), not an int.
 using MissileCltDoFn = void (*)(d2r::Unit* missile, float partFrame) noexcept;
