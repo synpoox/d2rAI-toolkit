@@ -384,7 +384,7 @@ def merge_table(table: str, src: Table, d2r: Table, lines: list[Line], ren: dict
 
 # tables whose rows hold item properties (code, [cube: chance,] param, min, max columns): fix_props
 PROPS = {"uniqueitems", "setitems", "sets", "runes", "magicprefix", "magicsuffix", "automagic", "cubemain", "gems",
-         "qualityitems"}
+         "qualityitems", "monprop"}
 # tables written by the rule of the table they follow row for row (follow): objtype's rows are objects'
 FOLLOWERS = {"objects": "objtype"}
 # D2R columns computed from the source row (the column dict a Finish gets), where D2R's own rows hold the value
@@ -657,6 +657,26 @@ def ids_of(lists: dict[str, list[Line]], src_names: dict[str, list[str]]) -> dic
         mod = {p.lower(): i for p, i, _ in lists[t]}
         out[t] = {str(k): str(mod[p.lower()]) for k, p in enumerate(ident(names)) if mod[p.lower()] != LEFT_OUT}
     return out
+
+
+def entry_key(level_name: str) -> str:
+    """The LevelEntry key of a source-only level: D2R's area banner ("Entering ...") shows "Missing string" for an empty
+    LevelEntry, and a 1.13c table has no such column. "Graveyard Map" -> "EnteringGraveyardMap"; the mod's strings step
+    writes the text unless D2R has the key."""
+    return "Entering" + "".join(c for c in level_name if c.isalnum())
+
+
+def fix_levels(lv: Table, first: int, last_type: int) -> None:
+    """The level records from `first` on (the source-only ones): a LevelEntry key (entry_key) where they have a
+    LevelName and none, and LevelType 0 ("None") where the type is past D2R's last lvltypes id (`last_type`), since a
+    mod that ships no lvltypes.txt leaves D2R a null row to read at startup. Call it on merge_table's levels result."""
+    name, entry, ltype = (lv.header.index(c) for c in ("LevelName", "LevelEntry", "LevelType"))
+    for k in lv.records()[first:]:
+        r = lv.rows[k]
+        if r[name] and not r[entry]:
+            r[entry] = entry_key(r[name])
+        if r[ltype] and int(r[ltype]) > last_type:
+            r[ltype] = "0"
 
 
 def write(table: str, merged: Table, out_data: Path, dropped: list[str] | tuple[str, ...] = (),

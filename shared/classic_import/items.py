@@ -186,11 +186,15 @@ def item_pictures(upscale: Callable[[Path, dict], dict], art: Path, src_data: Pa
 def hd_items(hd_dir: Path, src: dict[str, I.Table], d2r: dict[str, I.Table],
              uniques: list[tuple[str, str, str | None, str]], sets: list[tuple[str, str, str | None, str]],
              pictures: dict[str, str] | None = None, models: dict[str, str] | None = None,
-             borrowed: dict[tuple[str, str], str] | None = None) -> dict[str, list[dict]]:
+             borrowed: dict[tuple[str, str], str] | None = None,
+             neutral_model: dict[str, str] | None = None) -> dict[str, list[dict]]:
     """D2R's items.json, uniques.json and sets.json (from hd_dir) plus an entry for every item code, unique and set item
     that has none. An item whose invfile is in pictures (item_pictures) shows it; else a new code shows the picture
     of the D2R item in the same table with the same invfile, else of one in another table, else the table's
-    first. borrowed gets {(table, asset): its D2R table} for each other-table picture: D2R looks an asset up in the
+    first (neutral_model: table -> an asset to use instead, when D2R has it in that table). A source stack
+    (a code of the base's three letters plus `s`) with the base's flippyfile draws the base's model, and an item
+    whose flippyfile a D2R item has draws that item's model, ahead of the type's.
+    borrowed gets {(table, asset): its D2R table} for each other-table picture: D2R looks an asset up in the
     item's own table's folder, so borrow_pictures copies it there. A unique or set item shows the
     D2R row it was merged onto, else its base item.
     uniques / sets: (mod name, base code, D2R name at its id or None, invfile).
@@ -207,22 +211,31 @@ def hd_items(hd_dir: Path, src: dict[str, I.Table], d2r: dict[str, I.Table],
         dtab = d2r[t]
         di, dt = dtab.header.index("invfile"), dtab.header.index("type")
         by_inv = {r[di]: asset[r[dtab.key]] for r in dtab.rows if r[dtab.key] in asset}
-        by_type = {}
+        fi = dtab.header.index("flippyfile") if "flippyfile" in dtab.header else None
+        pf = ptab.header.index("flippyfile") if "flippyfile" in ptab.header else None
+        by_type, by_flippy = {}, {}
         for r in dtab.rows:
             if r[dtab.key] in asset:
                 by_type.setdefault(r[dt], asset[r[dtab.key]])
+                if fi is not None and r[fi]:
+                    by_flippy.setdefault(r[fi], asset[r[dtab.key]])
         first = next((asset[r[dtab.key]] for r in dtab.rows if r[dtab.key] in asset), None)
         if first is None:
             raise I.IdError(f"{t}: no D2R row has an items.json entry in {hd_dir}")
+        if (neutral_model or {}).get(t) in asset.values():
+            first = neutral_model[t]
         pi, pt = ptab.header.index("invfile"), ptab.header.index("type")
+        flippy_of = {r[ptab.key]: r[pf] for r in ptab.rows} if pf is not None else {}
         for r in ptab.rows:
             code = r[ptab.key]
+            base = code[:3] if code.endswith("s") and flippy_of.get(code[:3]) == flippy_of.get(code) else code
             if len(code) == 4 and not ord(code[3]) & 0x20:  # the UI sets bit 0x20 of the key's 4th byte
                 raise I.IdError(f"{t} {code}: the UI keys items.json by {code[:3]}{chr(ord(code[3]) | 0x20)}, "
                                 "so this code would draw no picture; give it a 4th character with bit 0x20 set")
             if code and r[pi].lower() in pictures:
                 models.setdefault(pictures[r[pi].lower()],
-                                  asset.get(code) or by_inv.get(r[pi]) or by_type.get(r[pt]) or first)
+                                  asset.get(code) or asset.get(base) or by_inv.get(r[pi])
+                                  or (by_flippy.get(r[pf]) if pf is not None else None) or by_type.get(r[pt]) or first)
                 asset[code] = pictures[r[pi].lower()]
                 hd.set_list_entry(files["items.json"], code, {"asset": asset[code]})
             elif code and code not in asset:
@@ -291,7 +304,8 @@ def ground_models(hd_items_dir: Path, out: Path, pictures: dict[str, str], model
 
 def apply(rule: Path, src_data: Path, d2r_data: Path, out_data: Path, ctx: I.Context, vanilla: dict[str, int],
           suffix: str, upscale: Callable[[Path, dict], dict] | None = None, cube_fixes: Sequence[CUBE_FIX] = (),
-          cube_after: Sequence[CUBE_FIX] = (), by_source_order: set[str] = frozenset(), source: str = "the source's"
+          cube_after: Sequence[CUBE_FIX] = (), by_source_order: set[str] = frozenset(), source: str = "the source's",
+          neutral_model: dict[str, str] | None = None
           ) -> None:
     """The merge driver's rule kind for the item-tables rule file (bind the rest with functools.partial). ctx: the
     project's Context for its id-listed tables (ids.context_of). With the three item tables merged, it also writes the
@@ -342,7 +356,7 @@ def apply(rule: Path, src_data: Path, d2r_data: Path, out_data: Path, ctx: I.Con
         print(f"  item pictures: {len(pictures)} upscaled from the source's")
         models: dict[str, str] = {}
         borrowed: dict[tuple[str, str], str] = {}
-        files = hd_items(d2r_data / "hd" / "items", src, d2r, uniques, sets, pictures, models, borrowed)
+        files = hd_items(d2r_data / "hd" / "items", src, d2r, uniques, sets, pictures, models, borrowed, neutral_model)
         borrow_pictures(d2r_data / "hd", out_data / "hd", borrowed)
         print(f"  other-table pictures: {len(borrowed)} ({', '.join(f'{t} {a}' for t, a in sorted(borrowed))})")
         ground_models(d2r_data / "hd" / "items", out_data / "hd" / "items", pictures, models, uses)

@@ -137,6 +137,21 @@ class HdTests(unittest.TestCase):
         self.assertEqual(files["items.json"][-1], {"ne2": {"asset": "src/mine"}})
         self.assertEqual(models, {"src/mine": "bow1"})
 
+    def test_ground_models_follow_a_shared_flippyfile_a_stack_and_a_neutral_model(self):
+        d2r = {"weapons": table("code|type|invfile|flippyfile", "hax|axe|inv_axe|flip_axe", "bow|bow|inv_bow|flip_bow")}
+        head = "code|type|invfile|flippyfile"
+
+        def model(*rows: str, neutral=None) -> dict[str, str]:
+            models: dict[str, str] = {}
+            items.hd_items(self.hd, {"weapons": table(head, *rows)}, d2r, [], [], {"mine": "src/mine"}, models, None,
+                           neutral)
+            return models
+        self.assertEqual(model("ne1|none|mine|flip_bow", neutral={"weapons": "axe1"}), {"src/mine": "bow1"}, "flippyfile")
+        self.assertEqual(model("hax|axe|inv_axe|flip_axe", "haxs|none|mine|flip_axe", neutral={"weapons": "bow1"}),
+                         {"src/mine": "axe1"}, "a stack draws its base's model")
+        self.assertEqual(model("ne3|none|mine|x", neutral={"weapons": "bow1"}), {"src/mine": "bow1"}, "neutral model")
+        self.assertEqual(model("ne3|none|mine|x"), {"src/mine": "axe1"}, "no neutral model: the table's first")
+
     def test_a_four_letter_code_needs_bit_0x20_in_its_last_letter(self):
         with self.assertRaisesRegex(I.IdError, "bit 0x20"):
             items.hd_items(self.hd, self.src("abcD|axe|inv_axe"), self.d2r, [], [])
