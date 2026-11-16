@@ -10,7 +10,7 @@ Windows is needed to run the game; everything else (locks, config, checks, relea
 | `game_slots.py` | Slots = separate copies of the game install. Setup, sync, lock, unlock, status. |
 | `game_ctl.py` | Starts, stops and drives one slot's game: screenshots, keys, clicks, console commands. |
 | `check_helpers.py` | `pair` (warp, light up, HD \| legacy side-by-side PNG) and `moved` (did the character move?), run as `game_ctl.py` subcommands; also the shared plugin-log reader (`plugin_log_path`). |
-| `check_helpers.py` (`plugin_log`, `plugin_log_path`) | A plugin's log since its last load line, from the mod, game-wide or configured log, for checks to read. |
+| `check_helpers.py` (`plugin_log`, `plugin_log_path`) | A plugin's log since its last load line (optional `prefix` when the lines carry another name; line ends come back as LF), from the mod, game-wide or configured log, for checks to read. |
 | `lod_checks.py` | Reusable Lord of Destruction checks: plugin loaded, read and verify a `.d2s`, Save and Exit, create / save / reload a character. Plugin, mod and character are parameters. |
 | `menu_layout.py` | Menu click positions (fractions of the window) for `lod_checks`; measured for D2R 3.3 at 1920x1080, re-measure for another version. |
 | `game_checks.py` | Small checks framework: `@check` registry, runner, results JSON, summary, screenshots. |
