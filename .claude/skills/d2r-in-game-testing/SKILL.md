@@ -36,6 +36,7 @@ slot table (`~/.d2r-modkit/slots.toml`), also set `MODKIT_PROJECT=<project>` (it
    `python ${CLAUDE_PLUGIN_ROOT}/testing/game_ctl.py --slot <N> start`.
 5. **Set the cheats** through the console, one line each: `debug_mode`, then for example `cheat god 1`,
    `cheat nogethit 1`, `cheat speedup 300` (`python ${CLAUDE_PLUGIN_ROOT}/testing/game_ctl.py --slot <N> console "cheat god 1"`).
+   God mode also kills any unit the character damages in one hit, so never judge a boss's life, stages or immunity from the character's hits; lower its life with the plugin's test commands instead.
 6. **Warp** with `cheat goto <levelId>,<x>,<y>`. The formula from a DS1 tile is in `${CLAUDE_PLUGIN_ROOT}/knowledge/cheat-commands.md`;
    `${CLAUDE_PLUGIN_ROOT}/testing/warps.py` makes the lines for a level's reference spots.
 7. **Shoot** with `game_ctl.py --slot <N> shot <name>`, or `game_ctl.py --slot <N> pair <name> <level,x,y>` for an
