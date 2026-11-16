@@ -85,6 +85,18 @@ class PluginLog(Base):
         with self.assertRaises(ValueError):
             ch.plugin_log_path(self.cfg, 2, "p", "x")
 
+    def test_crlf_comes_back_as_lf(self):
+        path = ch.plugin_log_path(self.cfg, 2, "p", "mod")
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        Path(path).write_bytes(b"p: 1.0 loaded (x)\r\nline\r\n")
+        self.assertEqual(ch.plugin_log(self.ctx, "p"), "p: 1.0 loaded (x)\nline\n")
+
+    def test_prefix_names_the_load_line(self):
+        self.write(ch.plugin_log_path(self.cfg, 2, "file", "mod"), "q: 0.9 loaded (old)\nold\nq: 1.0 loaded (x)\nnew\n")
+        self.assertEqual(ch.plugin_log(self.ctx, "file"), "")
+        self.assertTrue(ch.plugin_log(self.ctx, "file", prefix="q").startswith("q: 1.0 loaded"))
+        self.assertNotIn("old", ch.plugin_log(self.ctx, "file", prefix="q"))
+
     def test_plugin_name_is_literal(self):
         self.write(ch.plugin_log_path(self.cfg, 2, "a.b", "mod"), "aXb: 1 loaded (x)\n")
         self.assertEqual(ch.plugin_log(self.ctx, "a.b"), "")
@@ -129,6 +141,16 @@ class AssertLoaded(Base):
             lc.assert_plugin_loaded(self.ctx, "p", "Other")
         with self.assertRaises(AssertionError):
             lc.assert_plugin_loaded(self.ctx, "p", "MyMod", expect=("nope",))
+
+    def test_prefix(self):
+        self.write(ch.plugin_log_path(self.cfg, 2, "file", "mod"), "q: 1.0 loaded (mod MyMod, x)\nq: environment ok\n")
+        line = lc.assert_plugin_loaded(self.ctx, "file", "MyMod", expect=("environment ok",), prefix="q")
+        self.assertTrue(line.startswith("1.0 loaded (mod MyMod,"))
+        with mock.patch.object(lc.game_ctl, "wait_for", side_effect=lc.game_ctl.WaitTimeout("x")):
+            with self.assertRaises(AssertionError):
+                lc.assert_plugin_loaded(self.ctx, "file", "MyMod")
+        with self.assertRaises(AssertionError):
+            lc.assert_plugin_loaded(self.ctx, "file", "Other", prefix="q")
 
     def test_not_loaded(self):
         with mock.patch.object(lc.game_ctl, "wait_for", side_effect=lc.game_ctl.WaitTimeout("x")):
