@@ -55,6 +55,14 @@ int main() {
 	Check(!parts::SkipReason(table[0], false, "test-plugin", why, sizeof(why)), "SkipReason: nothing to skip");
 	Check(parts::SkipReason(table[1], false, "test-plugin", why, sizeof(why)), "SkipReason: an engine part on another image");
 
+	// A report of one entry per installed slot is kept whole (it was cut at 511 bytes)
+	parts::Part longPart {"long", false, nullptr};
+	std::memset(longPart.report, 'x', 2500);
+	longPart.report[2500] = '\0';
+	static char big[parts::ReportSize];
+	parts::Line(longPart, big, sizeof(big));
+	Check(std::strlen(big) == 2500, "a 2500-byte report fits a part and its status line");
+
 	std::printf("%d failure(s)\n", g_failures);
 	return g_failures == 0 ? 0 : 1;
 }
