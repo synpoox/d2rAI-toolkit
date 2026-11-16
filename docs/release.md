@@ -436,7 +436,6 @@ PATH[@SOURCE]` (repeatable) ships one more prebuilt DLL next to `stage.plugins` 
 `stage.loader_from_game = true` pins `<--game>/D2RLoader.exe` in `catalog.loader_files` at the `[d2rloader]` version
 (through a copy of release.toml in the staging folder; release.toml must then not set `catalog.loader_files`).
 
-
 The stager refuses a `mod.json` `name` that is not a single plain folder name or differs from `mod.folder`, and it
 runs `package_release.py` in the project folder, so `--root` works from any folder. It leaves only the release assets
 in the output folder (the staged mod folder is removed). `repos.fragments` must be a folder below the project, not the

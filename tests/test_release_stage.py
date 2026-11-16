@@ -243,7 +243,9 @@ class StageTests(unittest.TestCase):
             self.assertFalse(stale.exists())
 
 
-class ExtraPluginTests(StageTests):
+class ExtraPluginTests(unittest.TestCase):
+    project = StageTests.project
+
     def test_an_extra_plugin_ships_and_leaves_a_traceable_note(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.project(Path(tmp) / "p")
@@ -264,13 +266,33 @@ class ExtraPluginTests(StageTests):
                 with self.assertRaises(stage.ReleaseError):
                     stage.parse_extra_plugin(spec)
 
+    def test_an_at_sign_in_the_path_is_not_the_source_separator(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / "me@home"
+            folder.mkdir()
+            (folder / "side.dll").write_bytes(b"s")
+            self.assertEqual(stage.parse_extra_plugin(f"{folder / 'side.dll'}@src @1"), (folder / "side.dll", "src @1"))
+            self.assertEqual(stage.parse_extra_plugin(str(folder / "side.dll")), (folder / "side.dll", ""))
+
+    def test_an_extra_plugin_may_not_reuse_a_plugin_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.project(Path(tmp) / "p")
+            same = Path(tmp) / "ONE.dll"
+            same.write_bytes(b"other")
+            with self.assertRaisesRegex(stage.ReleaseError, "two plugins"):
+                stage.stage(root, Path(tmp) / "stage", config(), extra_plugins=[same])
+
     def test_with_loader_pins_the_game_loader_in_the_catalog(self):
         text = '[d2rloader]\r\nversion = "1.2"\r\n[catalog]\r\nloader_versions = ["1.2"]\r\n'
         conf = stage.tomllib.loads(stage.with_loader(text, Path("C:/g/D2RLoader.exe")))
         self.assertEqual(conf["catalog"]["loader_files"], [{"path": "C:/g/D2RLoader.exe", "version": "1.2"}])
         self.assertEqual(conf["catalog"]["loader_versions"], ["1.2"])
+        commented = stage.tomllib.loads(stage.with_loader('[d2rloader]\nversion = "1"\n[catalog]  # pins\nx = 1\n', Path("x.exe")))
+        self.assertEqual(commented["catalog"]["loader_files"], [{"path": "x.exe", "version": "1"}])
         for bad in ('[d2rloader]\nversion = "1"\n', '[catalog]\n',
-                    '[d2rloader]\nversion = "1"\n[catalog]\nloader_files = []\n'):
+                    '[d2rloader]\nversion = "1"\n[catalog]\nloader_files = []\n',
+                    '[d2rloader]\nversion = "1"\ncatalog = {product_id = "x"}\n',
+                    '[d2rloader]\nversion = "1"\ncatalog.product_id = "x"\n'):
             with self.assertRaises(stage.ReleaseError):
                 stage.with_loader(bad, Path("x.exe"))
 
@@ -356,6 +378,22 @@ class MainTests(unittest.TestCase):
         self.assertIn('version = "9.9"', seen["config"])
         self.assertIn("D2RLoader.exe", seen["config"])
         self.assertEqual([str(p.name) for p in self.staged.call_args.args[-1]], ["x.dll"])
+
+    def test_the_extra_plugin_note_reaches_the_release_notes(self):
+        side = tempfile.TemporaryDirectory()
+        self.addCleanup(side.cleanup)
+        dll = Path(side.name) / "x.dll"
+        dll.write_bytes(b"x")
+
+        def run(cmd, **k):
+            out = Path(cmd[cmd.index("--out") + 1])
+            (out / "RELEASE_NOTES-0.2.0.md").write_text(SKELETON)
+            (out / "SHA256SUMS").write_text(f"{'0' * 64}  RELEASE_NOTES-0.2.0.md\n")
+            return mock.Mock(returncode=0)
+        root, code, log = self.run_main(run, args=["--extra-plugin", f"{dll}@src 1"])
+        self.assertEqual(code, 0)
+        notes = (root / "dist" / "RELEASE_NOTES-0.2.0.md").read_text("utf-8")
+        self.assertIn(f"x: src 1, sha256 {hashlib.sha256(b'x').hexdigest()}", notes)
 
     def test_a_missing_version_section_changes_nothing(self):
         root, code, log = self.run_main(lambda *a, **k: mock.Mock(returncode=0), version_section=False)

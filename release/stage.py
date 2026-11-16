@@ -111,11 +111,11 @@ def check_name(mod: dict, cfg: dict) -> str:
 
 def parse_extra_plugin(spec: str) -> tuple[Path, str]:
     """`PATH` or `PATH@SOURCE` of --extra-plugin as (DLL path, source text)."""
-    path, _, source = spec.partition("@")
-    p = Path(path)
-    if p.suffix.lower() != ".dll" or not p.is_file():
+    m = re.fullmatch(r"(.+?\.dll)(?:@(.*))?", spec, flags=re.I | re.S)  # the first `.dll@`: a folder name may hold an @
+    p = Path(m.group(1)) if m else Path(spec.partition("@")[0])
+    if not m or not p.is_file():
         raise ReleaseError(f"--extra-plugin {spec!r}: no .dll file at {p}")
-    return p, source.strip()
+    return p, (m.group(2) or "").strip()
 
 
 def extra_plugin_note(dll: Path, source: str) -> str:
@@ -137,7 +137,10 @@ def with_loader(text: str, exe: Path) -> str:
     if not version:
         raise ReleaseError("release.toml has no [d2rloader] version to pin the loader at")
     line = f'loader_files = [{{path = "{exe.as_posix()}", version = "{version}"}}]'
-    return re.sub(r"^\[catalog\][ \t]*$", lambda m: m.group(0) + "\n" + line, text, count=1, flags=re.M)
+    text, n = re.subn(r"^\[catalog\][ \t]*(?:#.*)?$", lambda m: m.group(0) + "\n" + line, text, count=1, flags=re.M)
+    if not n:  # [catalog] written as dotted keys or an inline table: no header line to put loader_files under
+        raise ReleaseError("release.toml's [catalog] has no plain [catalog] header line: stage.loader_from_game needs one")
+    return text
 
 
 def stage(root: Path, out: Path, cfg: dict, read: Callable[[str], bytes] | None = None,
@@ -150,6 +153,9 @@ def stage(root: Path, out: Path, cfg: dict, read: Callable[[str], bytes] | None 
     name = check_name(mod, cfg)  # before anything is deleted: the name is a folder under `out`
     build_dir = root / s["plugin_build_dir"]
     dlls = [build_dir / f"{p}.dll" for p in s["plugins"]]
+    names = [d.name.lower() for d in [*dlls, *extra_plugins]]
+    for n in sorted({n for n in names if names.count(n) > 1}):
+        raise ReleaseError(f"two plugins are named {n}: an extra plugin would overwrite another in the package")
     needed = [root / "out" / "data", *dlls, *extra_plugins]
     if s["companions"]:
         needed.append(root / "generated" / "companions")
@@ -217,6 +223,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--extra-plugin", action="append", default=[], metavar="PATH[@SOURCE]",
                     help="ship one more prebuilt plugin DLL and record its SHA-256 (and SOURCE) in the notes; repeatable")
     a = ap.parse_args(argv)
+    a.game = a.game.resolve()  # package_release.py runs in the project folder: a relative path would point elsewhere
     root = a.root.resolve()
     config_path = (a.config or root / "release.toml").resolve()
     try:
