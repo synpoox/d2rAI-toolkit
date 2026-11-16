@@ -27,6 +27,10 @@ Example: "The game no longer crashes when a player enters the Catacombs with a W
 - `<doc 2>` (why)
 - `knowledge/<topic>.md`
 
+## Game slot
+<"No game needed." or "Needs a game check: Use the `d2r-in-game-testing` skill, lock a slot as the rules say (one attempt, no waiting); if none is free, stop and file a `ready-for-agent` issue.">
+Checks to run: `<list>`.
+
 ## Scope
 You may change:
 - `<path or glob>`
@@ -58,10 +62,6 @@ Do not change anything else. If you find another problem, list it in your report
 ## Git
 - Branch `ticket/<n>-<slug>` (or `research/<topic>`, `refactor/<topic>`; see the d2r-project-conventions skill) from `origin/main`. Open a PR to `main`. Do not merge, and do not wait for CI: push, open the PR, report. A separate reviewer checks it.
 - Do not bump the release version. <Or: "Bump to the next free version after main's.">
-
-## Game slot
-<"No game needed." or "Needs a game check: Use the `d2r-in-game-testing` skill, lock a slot as the rules say (one attempt, no waiting); if none is free, stop and file a `ready-for-agent` issue.">
-Checks to run: `<list>`.
 
 ## Report
 PR URL, head SHA, files changed, tests run with results, what is left, any incident. Do not end your turn while

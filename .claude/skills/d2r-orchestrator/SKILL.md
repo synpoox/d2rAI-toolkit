@@ -35,7 +35,8 @@ workflow doc once at the start of a project.
 - Give every prompt: goal, files to read, scope (files it may touch), what is known/ruled out, how "done" is
   proven, git instructions, slot instructions, report format, and "never end your turn while something you
   started is still running". The brief rules are in the lane prompt template.
-- Start lanes from `main`. Lanes started while you have another branch checked out carry that branch along.
+- Provide specific yet concise instructions for the implementer and the reviewer. 
+- Start lanes from `main`.
 - A worker never waits on CI and never touches runners: it pushes, opens the PR and reports. The reviewer or you
   read the checks later.
 
@@ -43,9 +44,9 @@ workflow doc once at the start of a project.
 | Job | Tier |
 |---|---|
 | Reviewer | Opus |
-| Researcher | Opus |
+| Researcher, including extremely difficult reverse-engineering tasks | Opus |
 | Implementer | Sonnet |
-| Housekeeping | Haiku |
+| Writing/Reading Documentation, General Housekeeping | Haiku |
 
 The implementer and the reviewer of one PR are different agents.
 
