@@ -11,7 +11,7 @@
 # `git submodule update --init third_party/PluginSDK`) and the shared library (shared/plugin-common). MODKIT_SDK_DIR and
 # MODKIT_COMMON_DIR still override either path.
 #
-# One project can build several plugins: call modkit_add_plugin() once per DLL (see the end of this file). Each plugin has
+# One project can build several plugins: call modkit_add_plugin() (cmake/ModkitPlugin.cmake in the toolkit) once per DLL (see the end of this file). Each plugin has
 # its own id, version, mod name and sound-row count, and all share plugin-common.
 cmake_minimum_required(VERSION 3.29)
 project(modkit_plugin LANGUAGES CXX RC)
