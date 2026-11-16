@@ -131,9 +131,12 @@ def plugin_log_size(ctx, plugin: str, scope: str = "auto") -> int:
     return game_ctl.file_size(plugin_log_path(ctx.cfg, ctx.slot, plugin, scope))
 
 
-def plugin_log(ctx, plugin: str, scope: str = "auto", skip_if_missing: bool = False, since_size: int = 0) -> str:
-    """The text of <plugin>'s log since its last load line (`<plugin>: <version> loaded (`), so an old run's lines
-    do not count. Only text after byte `since_size` is looked at (default: the whole file; ignored when the file is
+def plugin_log(ctx, plugin: str, scope: str = "auto", skip_if_missing: bool = False, since_size: int = 0,
+               prefix: str | None = None) -> str:
+    """The text of <plugin>'s log since its last load line (`<prefix>: <version> loaded (`; `prefix` is the log-line
+    prefix, default the plugin name: a plugin may write its lines under another name than its log file), so an old
+    run's lines do not count. Line ends come back as "\n" (the loader writes "\r\n").
+    Only text after byte `since_size` is looked at (default: the whole file; ignored when the file is
     now smaller, as after a new log). "" when there is no file or no load line yet; with skip_if_missing a missing
     file skips the check (ctx.skip). `ctx` needs .cfg and .slot (a game_checks Context)."""
     path = plugin_log_path(ctx.cfg, ctx.slot, plugin, scope)
@@ -143,8 +146,8 @@ def plugin_log(ctx, plugin: str, scope: str = "auto", skip_if_missing: bool = Fa
         return ""
     with open(path, "rb") as f:
         raw = f.read()
-    text = (raw[since_size:] if 0 < since_size <= len(raw) else raw).decode("utf-8", errors="replace")
-    starts = [m.start() for m in re.finditer(rf"{re.escape(plugin)}: \S+ loaded \(", text)]
+    text = (raw[since_size:] if 0 < since_size <= len(raw) else raw).decode("utf-8", errors="replace").replace("\r\n", "\n")
+    starts = [m.start() for m in re.finditer(rf"{re.escape(prefix or plugin)}: \S+ loaded \(", text)]
     return text[starts[-1]:] if starts else ""
 
 
