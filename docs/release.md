@@ -378,7 +378,10 @@ folder. Options per entry, for what only some companions need:
 
 The project's own settings for a companion (a filter file, plugin configs) are listed in the manifest's top-level
 `config` (default `["companions/config/"]`) and replace the zip's defaults; `install` also overwrites a player's edits to
-those files in `d2rloader/config/`. `d2rloader.toml` is refused there: use `loader_settings`, which merges. A top-level
+those files in `d2rloader/config/`. `d2rloader.toml` is refused there: use `loader_settings`, which merges. The
+top-level `project_files` (`{"companions/x/settings.txt": "{mod}.mpq/data/global/excel/x/settings.txt"}`) copies project
+files to other places in the mod folder (`{mod}` is its name) when `install` or the stager overlays the companions; a
+missing source file is an error. A top-level
 or per-entry `game` (`"3.3"`, major.minor only, never a build number) is compared with the Version in
 `<game>/.build.info` before `install` copies anything; a mismatch refuses, and an unreadable `.build.info` (Steam) only
 warns. Bump one companion per change, after a coexistence check in a test slot. `fetch` never commits anything:
