@@ -695,9 +695,12 @@ function (bytes in the header, checked before the patch); **D** data: a variable
 | `0x494a60` | MonsterSpawned | (spawn params, monster) | D2R's per-class setup of a monster that its spawn core 0x493cc0 (D2Game\src\Monster\MonsterSpawn.cpp) just made; 0x493cc0 is its only caller, and 0x492cf0 and the other spawners all go through 0x493cc0. The monster's stats and its monstats Align alignment (0x48e600) are set by then. mov [rsp+0x18],rbx / mov [rsp+0x20],rbp / push rsi / push rdi / push r15 | H |
 | `0x4a6d10` | AiIdle | (game, unit, frames) | mode neutral, think again after frames | R |
 | `0x4a6e50` | AiSetDelay | (game, unit, frames) | think again after frames, mode kept | R |
+| `0x4a7270` | AiStepBeforeWalk | (unit, 1, 0, 0) | vanilla's step before each new walk (name unknown); the Dark Wanderer's think calls it (#1006) | R |
 | `0x4a78e0` | AiAttack | (game, unit, mode, target) | melee in mode 4 (A1) or 5 (A2) | R |
+| `0x4a7930` | AiSetModeXY | (game, unit, mode, a, b) | mode command with two args; the Dark Wanderer calls it with mode 0 (death) (#1006) | R |
 | `0x4a7bc0` | AiUseSkill | (game, unit, mode, skill, target, x, y, 0) -> non-zero once cast | Casts a skill from a think; on failure it idles 10 | R |
 | `0x4a8740` | AiApproach | (game, unit, target, 0) | walk at the target | R |
+| `0x4a8850` | WalkToSpot | (game, unit, x, y) | walk to the spot; the Dark Wanderer's think (#1006) | R |
 | `0x4ff1a0` | FirstPet | (game, owner, pet type, 1) -> the type's first pet, or null | Returns the type's first pet, or null | R |
 | `0x4ffd30` | RemovePet | (game, owner, pet id, 1) | takes the pet off the list and kills it, as the pet add's loop over a group does | R |
 | `0x5013f0` | PetEntry | (dataFlag, pet table, pet type) -> the type's entry (stride 0x20) | Returns the type's entry (stride 0x20) | R |
@@ -726,6 +729,7 @@ function (bytes in the header, checked before the patch); **D** data: a variable
 | `0x5896e0` | CastEventSkill | (unit, skill, level, target, 0) -> non-zero cast | a skill cast from unit at target as an event, sent to clients (aura event 33 0x42f300 casts this way); refuses while the unit has state 54 | R |
 | `0x58a050` | ItemStaffMods | - | The staffmods roll on a new item (0x58a050, D2Game\src\Items\ItemsMagic.cpp; 1.13c D2Game +0x13de0): (item, drop params). It reads the itemtypes StaffMods class and that class's skill count, then rolls 1.13c's tiers in 0x58af50 (DropFlags 0x20 adds the item level as bonus) or, on a version-0 item, 0x58b7c0. Entry: mov [rsp+0x10],rbx / push rbp / push rdi / push r14 / sub rsp,0x30 / mov rdi,rdx | H |
 | `0x58e2f0` | OperateChestFn | - | D2R's chest operate (OperateFn 4, D2Game\src\Objects\ObjMode.cpp): mode 0 only; it sets mode 1 with event 1 at the open frames (or mode 2), plays sound 0xb for a locked chest, then drops the act's chest TC. | R |
+| `0x596980` | SpotDistance | (unit, x, y) -> distance | distance from the unit to the spot; the Dark Wanderer's think (#1006) | R |
 | `0x5a8450` | PrimesDrop | - | D2R's own drop on the three prime evils' deaths (1.13c 0x6fd0aa30, D2Game\src\Quests\QuestsFX.cpp): it flags 704/705/709 dead in the game and, once all three are, drops the Hellfire Torch and a Standard of Heroes per player. The unique-monster death switch 0x4a1480 tail-calls it (0x4a1645). A ret (0xc3) written over the first byte makes it return at once. | P |
 | `0x5a8b80` | AiBaalCrab | - | Baal crab think function (monai row) | R |
 | `0x5b1ca0` | AiMephisto | - | Mephisto think function (monai row) | R |
@@ -734,6 +738,7 @@ function (bytes in the header, checked before the patch); **D** data: a variable
 | `0x5bae30` | AiHide | - | D2R's own hide and unhide, 1.13c D2Game 0x7be10 / 0x89730, as the FrogDemon (monai 52, 0x5afb80) and Vulture (23) thinks call them. Hide (game, unit): unit flags 0xe off, the room's collision 0x1000 and 0x100 at the unit cleared, path mask 0, think in 12. Unhide (game, unit) -> 0 when the unit has no room to stand: flags 0xe on, the unit placed (TeleportUnit), collision 0x100 marked, path mask 0x3c01, think in 12. | R |
 | `0x5bafb0` | AiUnhide | - | D2R's own hide and unhide, 1.13c D2Game 0x7be10 / 0x89730, as the FrogDemon (monai 52, 0x5afb80) and Vulture (23) thinks call them. Hide (game, unit): unit flags 0xe off, the room's collision 0x1000 and 0x100 at the unit cleared, path mask 0, think in 12. Unhide (game, unit) -> 0 when the unit has no room to stand: flags 0xe on, the unit placed (TeleportUnit), collision 0x100 marked, path mask 0x3c01, think in 12. | R |
 | `0x5c2290` | AiOverseer | - | row 120's think | R |
+| `0x5c87a0` | AiDarkWanderer | - | monai row 91's think (the Dark Wanderer); PD2's think gate is in the port (#1006) | R |
 | `0x5c8d40` | AiDiablo | - | Diablo think function (monai row) | R |
 | `0x5cfb20` | AiTrappedSoul | - | row 99's think, read from the table | R |
 | `0x5e5a91` | SealSweepKillReturn | - | The Chaos Sanctuary sweep (0x5e5990, D2Game\src\Quests\a4q2.cpp; 1.13c's D2Game +0xbb3b0): once the fifth seal opens, it kills every monster but Diablo (243) in level 108's rooms, each through ModeCmdInit (unit, 0, &cmd) at 0x5e5a8c, then ModeCmdRun. This is the return address of that kill call. | P |

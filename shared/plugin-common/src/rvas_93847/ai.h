@@ -36,6 +36,11 @@ inline constexpr uint64_t AiIdle = 0x4a6d10;      // (game, unit, frames): mode 
 inline constexpr uint64_t AiSetDelay = 0x4a6e50;  // (game, unit, frames): think again after frames, mode kept
 inline constexpr uint64_t AiAttack = 0x4a78e0;    // (game, unit, mode, target): melee in mode 4 (A1) or 5 (A2)
 inline constexpr uint64_t AiApproach = 0x4a8740;  // (game, unit, target, 0): walk at the target
+inline constexpr uint64_t WalkToSpot = 0x4a8850;        // (game, unit, x, y): walk to the spot (the Dark Wanderer, #1006)
+inline constexpr uint64_t SpotDistance = 0x596980;      // (unit, x, y) -> distance to the spot
+inline constexpr uint64_t AiStepBeforeWalk = 0x4a7270;  // (unit, 1, 0, 0): vanilla's step before each new walk (name unknown)
+inline constexpr uint64_t AiSetModeXY = 0x4a7930;       // (game, unit, mode, a, b): mode command with two args
+inline constexpr uint64_t AiDarkWanderer = 0x5c87a0;    // monai row 91's think: the Dark Wanderer
 
 // --- Mode commands -------------------------------------------------------------------------------------------------
 // The mode command AiIdle sends: (unit, mode, &cmd), cmd +0x10 the unit, then (game, &cmd, 1)
