@@ -73,6 +73,13 @@ class MergeTests(unittest.TestCase):
                                 merge_args={"spell": lambda t, c, v, ren: v + "!"})
         self.assertEqual(cube.rows[0][1], "1!")
 
+    def test_merge_args_can_be_per_table(self):
+        src = table("name|code|type", "Hand Axe|hax|axe", key=1)
+        d2r = table("name|code|type", "Hand Axe d2r|hax|swor", key=1)
+        per = lambda t: {"d2r_columns": ("type",)} if t == "weapons" else {}
+        self.assertEqual(items.merge_keyed("weapons", src, d2r, CTX, {"weapons": 1}, " X", merge_args=per).rows[0][2], "swor")
+        self.assertEqual(items.merge_keyed("armor", src, d2r, CTX, {"armor": 1}, " X", merge_args=per).rows[0][2], "axe")
+
     def test_by_source_order_ranks_source_rows_first(self):
         src = table("Treasure Class|Picks", "B|1", "A|1")
         d2r = table("Treasure Class|Picks", "A|1", "Z|1", "B|1")
