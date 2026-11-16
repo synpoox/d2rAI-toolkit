@@ -424,7 +424,7 @@ a release in one fail-fast run:
 py -3 release/stage.py --root path/to/mod --game <D2R folder> [--version 1.2.3] [--out dist]
 ```
 
-It folds the fragments in memory and checks the version's section exists, checks the game image (D2R.exe's PE
+It folds the fragments in memory and checks the version's section exists, checks the game image (D2RLoader.exe's PE
 timestamp against `game.image_timestamp`, when set) and the item type ids of `out/data`, lays out the installed mod
 folder (`out/data`, modinfo, loader metadata, `stage.plugins` from `stage.plugin_build_dir`, and with
 `stage.companions` the [companion plugins](#companion-plugins) and the vanilla tables they read), runs
@@ -693,7 +693,7 @@ A command-line option beats an environment variable, which beats the file, which
 | Section | Keys |
 |---|---|
 | `[mod]` | `name` (shown to players), `folder` (one plain word: the folder under `mods/` and the 7z's top folder), `save_folder` (`savepath`), `website`. |
-| `[game]` | `version`, `build`, optional `image_timestamp`. |
+| `[game]` | `version`, `build`, optional `image_timestamp` (PE TimeDateStamp of D2RLoader.exe, the image plugins check; the stager reads it from `--game`). |
 | `[d2rloader]` | `version`, `url`, `size`, `sha256`, `signerThumbprint`. Informational: the downloader never downloads the loader. |
 | `[launch]` | `default_mod`, `launch_arguments`: written into the manifest's `launch`. |
 | `[package]` | `dist`, `plugin_dir`, `plugin_forbidden_strings`, `preserve`, `forbidden` (regular expressions on the path in the mod folder), `data_dir`, `keep_identical`. |

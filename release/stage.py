@@ -4,7 +4,7 @@
 
 Run it after the project's whole build (data merged, `modkit build`, plugins built, companions fetched). It
   1. folds changelog.d/*.md into the changelog in memory and checks the `### <version> (<date>)` section exists,
-  2. checks the game image (D2R.exe's PE timestamp against game.image_timestamp, when the config sets one) and the
+  2. checks the game image (D2RLoader.exe's PE timestamp against game.image_timestamp, when the config sets one) and the
      item type ids of out/data (plugin-template/tools/item_type_ids.py, unless stage.item_type_check = false),
   3. lays the mod folder out in <out>/.stage-mod/<name>/ (a folder this tool creates and removes, nothing else) as `modkit install` does: out/data, modinfo, loader metadata and
      config, the companions (release/companions.py overlay, the vanilla tables they read from DIR) and the built plugins,
@@ -62,7 +62,8 @@ def pe_timestamp(exe: Path) -> int:
 
 
 def check_game_image(cfg: dict, exe: Path) -> None:
-    """Refuse a D2R.exe whose image differs from game.image_timestamp (engine addresses belong to one image)."""
+    """Refuse a D2RLoader.exe whose image differs from game.image_timestamp: plugins check the loader's image, and the game's
+    own D2R.exe on disk is encrypted, so its header says nothing about the engine addresses."""
     want = str(cfg["game"].get("image_timestamp") or "")
     if not want:
         return
@@ -248,15 +249,16 @@ def run(a, root: Path, out: Path, config_path: Path, cfg: dict) -> int:
     log = root / cfg["repos"]["changelog"]
     frag = cfg["repos"]["fragments"]
     exe = a.game / "D2R.exe"
+    loader = a.game / "D2RLoader.exe"  # the image the plugins check
     extra = [parse_extra_plugin(spec) for spec in a.extra_plugin]
     text, fragments = cl.pending(root, version, cfg["repos"]["changelog"], frag)
     section = cl.notes_section(text, version)  # checked before anything is written or deleted
     for dll, source in extra:
         section += "\n\n" + extra_plugin_note(dll, source)
-    if exe.is_file():
-        check_game_image(cfg, exe)
+    if loader.is_file():
+        check_game_image(cfg, loader)
     elif cfg["game"].get("image_timestamp"):
-        raise ReleaseError(f"{exe} missing: the game image cannot be checked")
+        raise ReleaseError(f"{loader} missing: the game image cannot be checked")
     if cfg["stage"]["item_type_check"]:
         check_item_types(root / "out" / "data")
     base = []

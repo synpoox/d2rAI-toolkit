@@ -15,7 +15,7 @@ website = "https://example.com/your-name/your-mod"
 [game]
 version = "3.3.0"                # D2R's version (for the release notes)
 build = "93847"                  # the D2R build your plugin needs (manifest d2r.build)
-image_timestamp = ""             # optional: PE TimeDateStamp of that D2R.exe, e.g. "0x6ab3782c" for 93847
+image_timestamp = ""             # optional: PE TimeDateStamp of D2RLoader.exe (the image plugins check), e.g. "0x6ab3782c" for 93847
 
 # The D2RLoader your release needs. The downloader compares "version" with the player's D2RLoader.exe and shows a
 # button to the site; it never downloads D2RLoader. size and sha256 are informational: fill them in from the file you
