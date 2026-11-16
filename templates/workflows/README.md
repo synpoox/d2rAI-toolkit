@@ -47,6 +47,8 @@ instead; the owner re-enables auto-merge once the gate has passed. No secret is 
 | `PYTHON_VERSION` | tests | `3.13` | Python for the unit tests |
 | `TEST_DIR` | tests | `tests` | Folder `unittest discover` starts in |
 | `TEST_REQUIREMENTS` | tests | none | Extra pip packages, space separated |
+| `RUFF_VERSION` | tests | none | Ruff release; set it to add a `ruff check` step |
+| `RUFF_DIR` | tests | `tools` | Folder `ruff check` runs on |
 | `RUNNER_LABELS` | gate, cache-verify, release | `["self-hosted","windows"]` | Labels of the owner's runner, JSON array |
 | `D2R_TOOLKIT` | gate, cache-verify, release | none (required) | Path of the toolkit checkout on the runner |
 | `D2R_GAME` | gate, cache-verify, release | none (required) | Path of the game install (or frozen copy) on the runner |

@@ -8,6 +8,8 @@ name: tests
 #   PYTHON_VERSION   default 3.13
 #   TEST_DIR         folder `unittest discover` starts in, default tests (the toolkit's own layout)
 #   TEST_REQUIREMENTS  extra pip packages, space separated, default none
+#   RUFF_VERSION     a ruff release (for example 0.17.5): adds a `ruff check` step over RUFF_DIR; default none (no lint step)
+#   RUFF_DIR         folder `ruff check` runs on, default tools
 # The steps are written for bash (set as the default shell below; Git Bash exists on Windows hosted runners).
 on:
   push:
@@ -43,3 +45,11 @@ jobs:
       - env:
           TEST_DIR: ${{ vars.TEST_DIR || 'tests' }}
         run: python -m unittest discover -s "$TEST_DIR" -v
+      - name: Ruff
+        if: ${{ vars.RUFF_VERSION != '' }}
+        env:
+          RUFF_VERSION: ${{ vars.RUFF_VERSION }}
+          RUFF_DIR: ${{ vars.RUFF_DIR || 'tools' }}
+        run: |
+          python -m pip install --quiet --disable-pip-version-check "ruff==$RUFF_VERSION"
+          python -m ruff check "$RUFF_DIR"
