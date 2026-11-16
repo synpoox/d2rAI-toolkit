@@ -61,18 +61,26 @@ def _finish(table: str, ctx: I.Context, finish: I.Finish | None) -> I.Finish | N
     return I.finishes(I.props_finish(ctx.ren, ctx.ids, ctx.props) if table in I.PROPS else None, finish)
 
 
+def _merge_args(table: str, ctx: I.Context, finish: I.Finish | None, merge_args: dict | None, **fixed) -> dict:
+    """The keyword arguments of ids.merge_table: `fixed`, then `merge_args` over them; a `finish` in merge_args runs
+    after the property fixes and the `finish` argument."""
+    extra = dict(merge_args or {})
+    return {**fixed, "finish": _finish(table, ctx, I.finishes(finish, extra.pop("finish", None))), **extra}
+
+
 def merge_keyed(table: str, src: I.Table, d2r: I.Table, ctx: I.Context, vanilla: dict[str, int], suffix: str, *,
                 by_source_order: set[str] = frozenset(), finish: I.Finish | None = None,
                 fix_row: I.FixRow | None = None, spell: I.Spell = I.spell, source: str = "the source's",
                 merge_args: dict | None = None) -> I.Table:
     """The table merged by key around D2R's rows (`vanilla`: rows below the project's vanilla count keep their ids;
-    `suffix` names a clashing source row; merge_args: more keyword arguments for ids.merge_table, such as d2r_columns,
-    add_columns or num_refs). A table in by_source_order is named, never numbered, and a row must come
+    `suffix` names a clashing source row; merge_args: more keyword arguments for ids.merge_table that override the
+    ones set here, such as spell, fix_row, d2r_columns, add_columns or num_refs; a `finish` in it runs after the
+    `finish` argument). A table in by_source_order is named, never numbered, and a row must come
     after the rows it names (treasure classes): the source's rows in the source's order, then D2R-only ones. The
     merged table's `dropped` is the source columns D2R has no place for."""
     lines = I.seed(table, src.names(), d2r.names(), [], vanilla.get(table, 0), suffix)
-    merged, dropped = I.merge_table(table, src, d2r, lines, ctx.ren, ctx.ids, spell=spell, fix_row=fix_row,
-                                    finish=_finish(table, ctx, finish), source=source, **(merge_args or {}))
+    merged, dropped = I.merge_table(table, src, d2r, lines, ctx.ren, ctx.ids, **_merge_args(
+        table, ctx, finish, merge_args, spell=spell, fix_row=fix_row, source=source))
     merged.dropped = dropped
     if table in by_source_order:
         rank = {n: k for k, (_, _, n) in enumerate(lines)}
@@ -92,8 +100,8 @@ def merge_cube(src: I.Table, d2r: I.Table, ctx: I.Context, fixes: Sequence[CUBE_
     d2r_only = [r for r in d2r.rows if signature(d2r, r) not in src_sigs]
     empty = I.Table.of(d2r.header, [], d2r.newline, 0)
     lines = [(p, k, I.base(p).replace('"', "")) for k, p in enumerate(I.ident(src.names()))]
-    merged, dropped = I.merge_table("cubemain", src, empty, lines, ctx.ren, ctx.ids,
-                                    finish=_finish("cubemain", ctx, finish), source=source, **(merge_args or {}))
+    merged, dropped = I.merge_table("cubemain", src, empty, lines, ctx.ren, ctx.ids, **_merge_args(
+        "cubemain", ctx, finish, merge_args, source=source))
     for fix in fixes:
         fix(merged)
     merged.rows += [list(r) for r in d2r_only]

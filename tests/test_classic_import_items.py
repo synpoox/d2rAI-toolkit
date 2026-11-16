@@ -66,6 +66,12 @@ class MergeTests(unittest.TestCase):
         merged = items.merge_keyed("weapons", src, d2r, CTX, {"weapons": 1}, " X", merge_args={"d2r_columns": ("type",)})
         self.assertEqual(merged.rows[0][2], "swor", "d2r_columns keeps D2R's value")
         self.assertEqual(items.merge_keyed("weapons", src, d2r, CTX, {"weapons": 1}, " X").rows[0][2], "axe")
+        shout = items.merge_keyed("weapons", src, d2r, CTX, {"weapons": 1}, " X", merge_args={
+            "spell": lambda t, c, v, ren: v.upper(), "finish": lambda h, row, s, own: row.append("f")})
+        self.assertEqual(shout.rows[0][:3], ["HAND AXE", "hax", "AXE"], "spell overrides the default")
+        cube = items.merge_cube(table("description|numinputs", "a|1"), table("description|numinputs"), CTX,
+                                merge_args={"spell": lambda t, c, v, ren: v + "!"})
+        self.assertEqual(cube.rows[0][1], "1!")
 
     def test_by_source_order_ranks_source_rows_first(self):
         src = table("Treasure Class|Picks", "B|1", "A|1")
