@@ -300,7 +300,7 @@ class ExtraPluginTests(unittest.TestCase):
 class GuardTests(unittest.TestCase):
     def test_game_image_timestamp(self):
         with tempfile.TemporaryDirectory() as tmp:
-            exe = pe_exe(Path(tmp) / "D2R.exe", 0x6AB3782C)
+            exe = pe_exe(Path(tmp) / "D2RLoader.exe", 0x6AB3782C)
             self.assertEqual(stage.pe_timestamp(exe), 0x6AB3782C)
             cfg = release_config.defaults()
             stage.check_game_image(cfg, exe)  # no timestamp in the config: no check

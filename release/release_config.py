@@ -36,7 +36,7 @@ DEFAULTS = {
     "game": {
         "version": "3.3.0",          # D2R's version, shown in the notes
         "build": "93847",            # the D2R build the plugin needs
-        "image_timestamp": "",       # optional: PE TimeDateStamp of D2R.exe, e.g. "0x6ab3782c"
+        "image_timestamp": "",       # optional: PE TimeDateStamp of D2RLoader.exe (the image plugins check), e.g. "0x6ab3782c"
     },
     "d2rloader": {                   # the pinned D2RLoader: informational for the downloader (it never downloads it)
         "version": "1.3.1-beta",
