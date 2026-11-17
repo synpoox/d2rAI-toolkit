@@ -132,14 +132,4 @@ inline constexpr uint64_t ActEclipseOn = 0x3526f0, ActLightSet = 0x3525c0;
 inline constexpr uint64_t EnvSpeedNormal = 0x2376848;  // int 128 (1.13c 0x6fdeb238); the eclipse's is 4 (0x237684c)
 inline constexpr int UnitAct = 0x20, ActEnv = 8, EnvSpeed = 0x2c, EnvPause = 0x30, EnvEclipse = 0x34;
 
-// --- Automap -------------------------------------------------------------------------------------------------------
-// (levelType, tileType, style, sequence) -> cel or -1 (0xffffffff): the automap tile lookup. It matches AutoMap.txt
-// rows of the type's range (36 ranges, so types 36+ read past them), style 0xff any, start sequence 0xff any, else
-// start <= sequence <= end; then cels[Roll(seed) % count].
-inline constexpr uint64_t AutomapCel = 0x32bdf0;
-inline constexpr uint8_t AutomapCelEntry[] = {0x48, 0x89, 0x5c, 0x24, 0x10, 0x48, 0x89, 0x74,
-                                              0x24, 0x18, 0x48, 0x89, 0x7c, 0x24, 0x20};
-inline constexpr int AutomapLevelTypes = 36;  // AutoMap.txt loader 0x32cae0 matches 36 names (table 0x1cfe110)
-inline constexpr uint64_t AutomapSeedPtr = 0x2372a40;  // pointer to the {lo, hi} seed 0x32bdf0 rolls (its decompile)
-
 }  // namespace d2r::rva
