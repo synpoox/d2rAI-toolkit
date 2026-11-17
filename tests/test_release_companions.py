@@ -256,6 +256,32 @@ class CompanionTests(unittest.TestCase):
             companions.overlay(root, mod)
             self.assertEqual(toml.read_text(), "[d2rcore.other]\nitem_stat_ranges = false\n" + ITEM_RANGES)
 
+    def test_install_removes_only_dropped_companion_files(self):
+        zipped = make_zip({"d2rloader/plugins/x.dll": b"dll", "Other.mpq/data/sfx/a.flac": b"a"})
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.project(Path(tmp), zipped)
+            companions.fetch(root, download=lambda *a: zipped)
+            mod = root / "game" / "mods" / "Mod"
+            plugins = mod / "d2rloader" / "plugins"
+            companions.overlay(root, mod, prune=True)
+            (plugins / "foreign.dll").write_bytes(b"other")  # not ours: never touched
+            # the manifest drops the companion; a second one stays
+            gone_zip = make_zip({"d2rloader/plugins/y.dll": b"y"})
+            manifest = json.loads((root / "companions" / "manifest.json").read_text())
+            manifest["companions"] = [dict(manifest["companions"][0], asset="y.zip", sha256=hashlib.sha256(gone_zip).hexdigest(),
+                                           files={"d2rloader/plugins/y.dll": "d2rloader/plugins/y.dll"})]
+            self.write_manifest(root, manifest)
+            companions.fetch(root, download=lambda *a: gone_zip)
+            self.assertEqual(companions.overlay(root, mod, prune=True),
+                             ["Mod.mpq/data/sfx/a.flac", "d2rloader/plugins/x.dll"])
+            self.assertEqual(sorted(p.name for p in plugins.iterdir()), ["foreign.dll", "y.dll"])
+            self.assertEqual(companions.overlay(root, mod, prune=True), [])
+            # without a record (an older install) or without prune (the stager) nothing is deleted
+            (plugins / "x.dll").write_bytes(b"old")
+            (mod / companions.RECORD).unlink()
+            self.assertEqual(companions.overlay(root, mod, prune=True), [])
+            self.assertTrue((plugins / "x.dll").is_file())
+
     def test_overlay_copies_project_files_into_the_mod_folder(self):
         zipped = make_zip({"d2rloader/plugins/x.dll": b"dll", "Other.mpq/data/sfx/a.flac": b"a"})
         with tempfile.TemporaryDirectory() as tmp:
