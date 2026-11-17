@@ -169,17 +169,19 @@ class GateTests(unittest.TestCase):
         with self.assertRaisesRegex(diff.GateError, "lvlmaze.*merged"):
             self.gate()
 
-    def test_a_whole_table_pattern_with_any_wildcard_segments_is_refused_for_a_merged_table(self):
+    def test_a_whole_table_pattern_with_any_wildcard_segments_is_refused_for_a_merged_table_when_strict(self):
         self.write("src", "lvlmaze", table("Name | MonLvl", "Blood Moor | 2"))
         self.write("d2r", "lvlmaze", table("Name | MonLvl", "Blood Moor | 1"))
         self.write("mod", "lvlmaze", table("Name | MonLvl", "Blood Moor | 1"))
         for pat in ("lvlmaze.*", "lvlmaze.*.*", "lvlmaze.**.*", "lvlmaze.?*", "lvlmaze.*?", "lvlm*", "lvlmaz[e].*", "*.*.*"):
             self.deviations(f"| Whole table | not yet | `{pat}` | P4 |\n")
             with self.assertRaisesRegex(diff.GateError, "merged now", msg=pat):
+                self.gate(strict_whole_table=True)
+            if pat != "lvlmaze.*":  # by default only the exact `t.*` is refused: a project may allow `t.*.*` on purpose
                 self.gate()
         self.deviations("| Narrow | not yet | `lvlmaze.*.monlvl` `lvlmaze.blood moor.*` | P4 |\n"
                         "| Unnamed | not yet | `lvlmaze.*.` | P4 |\n")
-        self.gate()
+        self.gate(strict_whole_table=True)
 
     def test_a_table_the_project_does_not_own_is_d2rs_and_an_edit_to_it_is_open(self):
         self.write("src", "automap", table("Name | Cel1", "1 Town | 0"))
