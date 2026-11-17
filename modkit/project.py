@@ -10,6 +10,9 @@ A project is a folder:
       files/data/...    files copied as they are into the mod (applied before the patches)
       generated/data/...  optional, git-ignored output of the project's own generator (e.g. merged data from another
                         mod), copied after files/ and before the patches
+      "gameCopies" in mod.json: {"data/global/chars/am/": "data/global/monsters/am/"} copies the game's files under
+                        the first prefix to the second, at build time (for game files a mod must reuse under another
+                        path but may not commit); a file the project already supplies is kept
 
 `modkit build mymod` starts from the pristine game files (base.py) every time, applies files/, generated/ and every patch, and
 writes only the changed files to mymod/out/data/. The same patches always give the same mod, so a patch can be
@@ -112,6 +115,12 @@ class Build:
                         dest.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(p, dest)
                         self._copied.add(rel)
+        for src, dst in self.mod.get("gameCopies", {}).items():
+            for rel in self.base.list(src):
+                dest = self.out / (dst + rel[len(src):])[5:]
+                if not dest.exists():
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    dest.write_bytes(self.base.bytes(rel))
         for patch in sorted((self.project / "patches").glob("*.json")):
             doc = json.loads(patch.read_text("utf-8"))
             ops = doc["ops"] if isinstance(doc, dict) else doc

@@ -49,6 +49,24 @@ class LayerOrderTests(unittest.TestCase):
             Build(proj, FakeBase()).run()
             self.assertEqual((proj / "out/data/global/a.txt").read_text(), "a")
 
+    def test_game_copies_write_game_files_under_a_new_prefix_and_keep_project_files(self):
+        class CopyBase(FakeBase):
+            def list(self, prefix):
+                return [prefix + "a.dcc", prefix + "sub/b.cof"]
+
+            def bytes(self, rel):
+                return rel.encode()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            proj = Path(tmp)
+            (proj / "mod.json").write_text(json.dumps(
+                {"name": "T", "savepath": "T/", "gameCopies": {"data/global/chars/am/": "data/global/monsters/am/"}}), "utf-8")
+            write(proj / "files/data/global/monsters/am/a.dcc", "mine")
+            Build(proj, CopyBase()).run()
+            out = proj / "out/data/global/monsters/am"
+            self.assertEqual((out / "a.dcc").read_text(), "mine")
+            self.assertEqual((out / "sub/b.cof").read_bytes(), b"data/global/chars/am/sub/b.cof")
+
 
 if __name__ == "__main__":
     unittest.main()

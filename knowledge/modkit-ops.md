@@ -2,7 +2,9 @@
 
 A patch is a JSON file in `<project>/patches/` holding `{"ops": [...]}`. Patches apply in file-name order (use
 numbered names: `010-skills.json`, `020-stash.json`), each op in order, on top of the pristine game files and the
-project's `files/data/` copies, then its optional git-ignored `generated/data/` copies. `modkit build` reports the
+project's `files/data/` copies, then its optional git-ignored `generated/data/` copies, then the `gameCopies` of `mod.json`
+(`{"data/global/chars/am/": "data/global/monsters/am/"}`: the game's files under the first prefix are written under
+the second; a file the project already supplies is kept). `modkit build` reports the
 first failing op with its file and index.
 
 Paths are game paths (`data/global/...`, `data/hd/...`). Table names are file names without `.txt`
