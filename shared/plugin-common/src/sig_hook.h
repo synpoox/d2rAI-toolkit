@@ -20,7 +20,7 @@ auto HookBySignature(const D2RL::PluginContext* context, const char* name, const
 	uint64_t rva = 0;
 	const int n = ScanUnique(context->exeBase, pattern, offset, &rva);
 	if (n != 1) {
-		plog::Warn("skipped %s: %d matches", name, n < 0 ? 0 : n);
+		plog::Warn(n < 0 ? "skipped %s: bad pattern or offset" : "skipped %s: %d matches", name, n);
 		return false;
 	}
 	plog::Info("found %s at 0x%llx", name, static_cast<unsigned long long>(rva));
