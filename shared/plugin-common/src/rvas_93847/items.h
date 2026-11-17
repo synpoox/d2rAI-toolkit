@@ -32,6 +32,13 @@ inline constexpr uint64_t ItemSocketable = 0x36b410;  // (item) -> non-zero: can
 inline constexpr uint64_t SetItemSockets = 0x36e880;  // (item, n): sockets, clamped to the type's max (1.13c #10599)
 inline constexpr uint64_t ItemHasSockets = 0x36c750;  // (item) -> non-zero when socketed; cube input flags 4 / 8 test it
 inline constexpr uint64_t ItemIsEthereal = 0x3740a0;  // (item) -> non-zero when ethereal; cube input flags 0x10 / 0x20
+// (target, other) -> 1 when the two may merge into one stack (D2Common Items.cpp; 1.13c #11102). Compares only the class,
+// unique/set row, stackable, ethereal, quality (1, 2, 3 pass), stats 21, 22, 23, 24, 159, 160 and sockets (194 is 0).
+// Read in the dump; not hooked yet. The first 16 bytes of the entry match twice, the whole entry once.
+// mov [rsp+8],rbx / mov [rsp+0x10],rsi / push rbp / push rdi / push r14 / mov rbp,rsp / sub rsp,0x20
+inline constexpr uint64_t ItemsCanMerge = 0x375960;
+inline constexpr uint8_t ItemsCanMergeEntry[] = {0x48, 0x89, 0x5c, 0x24, 0x08, 0x48, 0x89, 0x74, 0x24, 0x10, 0x55,
+                                                 0x57, 0x41, 0x56, 0x48, 0x8b, 0xec, 0x48, 0x83, 0xec, 0x20};
 // (item): sets the ethereal flag, then base stats times 3/2 (1.13c's D2Common #10890). Callers: the drop 0x442d60, the
 // ethereal property 0x3ccc60, the cube output 0x5269c0.
 // mov [rsp+0x10],rbx / push rdi / sub rsp,0x20 / mov rbx,rcx / test rcx,rcx

@@ -308,6 +308,25 @@ frame), +0x30 step counter (Fire Wall's).
 | `0x3731f0`, `0x373610`, `0x36f000` | | item getters (`0x3731f0` item type) seen in hang thread samples; signatures unverified |
 | `0x300a90` | (u8 dataFlag) -> data manager | bank getter: asserts dataFlag < 4, returns `*(0x2a9a580 + 16 * dataFlag)`. **Bank 3 is the live one** (D2R code loads `mov cl,3`, e.g. `0x3b1fe2`); **bank 0 is null**, so any getter called with dataFlag 0 reads null + its field offset (GetSkillRecord: a read of `0x11b8` at `0x977b1`) |
 | `0x308e80` | (item) -> 1 when the slot flag is 0 | "used up"; client puts it in the use message (`0x1c7a30`), server use-item handler `0x4f40c0` refuses unless both agree |
+| `0x375960` | (target, other) -> 1 when they may stack | `ItemsCanMerge` (header `ItemsCanMergeEntry`). The stack-equal check (D2Common Items.cpp; 1.13c #11102 rebuilt). Read in the dump, **not hooked**; entry matches once. Compares class (`0x349860`), unique/set row (`0x36ce70`), stackable (`0x374660`), ethereal bit (item data +0x18 & 0x400000), quality (refuses 0 and 4-9), stats 21, 22, 23, 24, 159, 160 equal, and stat 194 (sockets) 0 on both. No other stat is compared. Source: [pd2-resurrected#1326](https://github.com/synpoox/pd2-resurrected/issues/1326#issuecomment-6962680498) |
+| `0x36ce70` | (item) -> unique / set row | Used by the stack check `0x375960` and the cube (`0x5269c0`). Source: [pd2-resurrected#1326](https://github.com/synpoox/pd2-resurrected/issues/1326#issuecomment-6962680498) |
+| `0x374660` | (item) -> non-zero when items.txt marks it stackable | Used by `0x375960` on the target. Source: [pd2-resurrected#1326](https://github.com/synpoox/pd2-resurrected/issues/1326#issuecomment-6962680498) |
+| `0x3719e0` | - | The "below max" test used by `0x4f2a80`; arguments not given in the report. Source: [pd2-resurrected#1326](https://github.com/synpoox/pd2-resurrected/issues/1326#issuecomment-6962680498) |
+| `0x4f2a80` | (game, player, idA, idB) -> 2 when equal and below max | D2Game `PlrMsg.cpp`: checks the "stack cursor item onto item" client message (the classic 0x21 path). Handler `0x4c1940`. Source: [pd2-resurrected#1326](https://github.com/synpoox/pd2-resurrected/issues/1326#issuecomment-6962680498) |
+| `0x4c1940` | - | Handler for that message (length 0x15): moves quantity (stat 70) and frees the emptied item (`0x43ec10`). Source: [pd2-resurrected#1326](https://github.com/synpoox/pd2-resurrected/issues/1326#issuecomment-6962680498) |
+| `0x386840` / `0x386e00` | (inventory, item, start) -> first stack equal to item and below max | Callers: `0x4754c0` and `0x53d850` (server), `0x1114c0` (client vendor UI's guess). Source: [pd2-resurrected#1326](https://github.com/synpoox/pd2-resurrected/issues/1326#issuecomment-6962680498) |
+| `0x4754c0` / `0x4759e0` | - | D2Game `ItemMode.cpp`: ground pickup auto-stack (`0x4754c0` calls `0x4759e0`). Source: [pd2-resurrected#1326](https://github.com/synpoox/pd2-resurrected/issues/1326#issuecomment-6962680498) |
+| `0x53d850` | - | D2Game `SUnitNpc.cpp`: vendor buy merging into a stack you hold. Source: [pd2-resurrected#1326](https://github.com/synpoox/pd2-resurrected/issues/1326#issuecomment-6962680498) |
+| `0x1114c0` | (client) | Client `npcmenu.cpp`: the vendor UI's own guess of the same stack. Source: [pd2-resurrected#1326](https://github.com/synpoox/pd2-resurrected/issues/1326#issuecomment-6962680498) |
+| `0x388430` / `0x38d0d0` | (inventory, cell) | `0x38d0d0` is the place-at-cell check, which returns 6 ("would stack") when the cursor item equals the cell's item; called by `0x388430`. Client callers `0x159dd0`, `0x15c220`, `0x15c600` use it for the cursor. Source: [pd2-resurrected#1326](https://github.com/synpoox/pd2-resurrected/issues/1326#issuecomment-6962680498) |
+| `0x2c81d0` / `0x2c7540` | - | Client cursor click: `0x2c7540` decides stack versus swap and calls `0x2c81d0` (`0x2c81d0` is its callee). Source: [pd2-resurrected#1326](https://github.com/synpoox/pd2-resurrected/issues/1326#issuecomment-6962680498) |
+
+Stack merge facts (pd2-resurrected#1326, read in the dump and Ghidra; none of it tested in game):
+
+- One hook at `0x375960` covers the drop-onto merge, ground pickup and vendor buys on the server, and the client's cursor guess, with the same answer. Client and server share the image.
+- Not called by the cube (`cube_stacks.cpp` counts its own stacks), nor by the stash save path (`0x41a730`). Maps are not `AdvancedStashStackable`, so the RotW stash tabs do not matter.
+- Split (Ctrl+click) is not settled statically: D2R has no stack split of its own; D2RLoader's `ItemService::splitStack` (outside the image) takes N-1 back. Whether the N-1 keeps stats such as `cartographer_map_level` (564) and `map_force_event` (553) is unknown and needs a game check.
+- Stat reads: `UnitStatEntries` (`0x2f84b0`) returns all layers of a stat; `UnitStat` (`0x2f5020`) and `0x2f48c0` are the single-value getters (D2RCore jumps; call them, do not walk the stat list by hand).
 
 ## Portals and objects
 
@@ -792,7 +811,7 @@ Header: `DrCapLoad` (`0x4524d0`), `DrCapLoadExpected` (the 13 bytes above) and `
 
 | RVA | Signature | Meaning | Ev |
 |---|---|---|---|
-| `0x450c90` | (game, attacker, target, &damage) | The leech of a hit (header `Leech`, entry bytes `LeechEntry`; hooked in game with an entry check). Reads the life and mana steal percents at damage +0x120 / +0x124 | H |
+| `0x450c90` | (game, attacker, target, &damage) | The leech of a hit (header `Leech`, entry bytes `LeechEntry`; hooked in game with an entry check). Reads the life and mana steal percents at damage +0x120 / +0x124. Entry `40 55 56 57 41 56 48 83 EC 58 41 83 B9 20 01 00 00 00` (18 bytes, unique in the dump; [d2r-tools#540](https://github.com/synpoox/d2r-tools/issues/540#issuecomment-6962269634)). Registers: rcx game, rdx attacker, r8 target, r9 damage block (1/256 life: +0x18 physical, +0x20 / +0x2c / +0x30 / +0x34 elements, counted with flag 0x40, +0x120 life steal) | H |
 | `0x3af240` | (unit) -> non-zero for a pet monster | D2R's leech asks it at `0x450e31` (header `IsPet`) | R |
 
 D2R's rule: the percents are shifted `<< 6` (1/64 fixed point) first, and divided by the difficulty's LifeStealDivisor /
@@ -808,6 +827,18 @@ through D2R's code, hand it a percent whose steps end the same: `pct / d * d` fo
 `(pct / d * d) << 6 / d` that is `(pct / d) << 6`), `pct / d` for any other attacker on a monster, `pct * d` for a
 player's hit on a player (1.09d divides only on monsters). Everything else (Drain, the damage cap, the life and mana adds)
 stays D2R's. Afterwards write back the steal fields stock D2R would have left, as the caller reads them.
+
+### Physical damage as an element on monsters (no hook)
+
+Source: [d2r-tools#540](https://github.com/synpoox/d2r-tools/issues/540#issuecomment-6962269634), read in the dump; not tested in game.
+
+| RVA | Signature | Meaning | Ev |
+|---|---|---|---|
+| `0x588d50` | - | Called on `SetMode(1)` before monster setup (`0x494a60`); sets stats 21 / 22 to the monster's A1 min / max | R |
+| `0x3a26c0` | - (flags 8) | Fallback when stats 21 / 22 read 0: min / max come back in `out[5]` / `out[6]` | R |
+
+- Element stats (value is a percent of the physical min / max): fire 48 / 49, light 50 / 51, magic 52 / 53, cold 54 / 55 (56 is the cold length).
+- Poison 57 / 58 is per frame: `v * dmg * 256 / (100 * len)` gives a true `v`%. PD2 used the raw value.
 
 ### Level packets: act darkness (0x53) and level sound (0x2c)
 
@@ -986,3 +1017,10 @@ Region record layout (the record at the level's slot of `0x508740`, build 93847)
 | +0x2bc, +0x2bd | MonUMin, MonUMax |
 | +0x2c8 | packs made so far |
 | +0x2e8 onward | terror zone fields |
+
+Extra groups (region groups added by a plugin; [d2r-tools#540](https://github.com/synpoox/d2r-tools/issues/540#issuecomment-6962269634), D8):
+
+- An added group row does spawn. pd2-resurrected#400 passed it twice in game (`adds monster 1128 as group 8`, wraiths spawned). The earlier "never seen" result came from a weight-1 group against heavy native weights.
+- The pack picker weighs groups by the group's +2 byte (see `0x419e80`), so an extra group needs weight to be seen.
+- `spawn` (monstats +0x54) gets swapped in about 79% of the time (the comment's figure), so the proposed check warns when `spawn` is set.
+- The plugin write (`PlanRecord`, a plugin function, not an engine RVA) sets the group count at +0x10 and +0x12 to n and member byte +3 to 0.
