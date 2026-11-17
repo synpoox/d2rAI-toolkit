@@ -20,7 +20,7 @@ workflow doc once at the start of a project.
 2. Copy `${CLAUDE_PLUGIN_ROOT}/templates/agents/` into the repo (`AGENTS.md`, `docs/agents/`) and a `.d2r-project.toml` from `${CLAUDE_PLUGIN_ROOT}/templates/d2r-project.example.toml`; adapt them. Create `docs/PLAN.md`, `docs/deviations.md` and a `changelog.d/` folder
    (`CHANGELOG.md` starts from its README) from the templates.
 3. Make the private-words list **outside** the repo (`~/.d2r-modkit/private_terms.txt` or similar) and run
-   `py -3 ${CLAUDE_PLUGIN_ROOT}/tools/check_public.py --root <mod repo>` before every commit (it scans `--root`, default the current directory, so never run it from the toolkit folder).
+   `py -3 ${CLAUDE_PLUGIN_ROOT}/tools/check_public.py --root <mod repo>` before every commit (it scans `--root`, default the current directory, so never run it from the toolkit folder); install it as the mod's git hooks with `py -3 <toolkit clone>/tools/install_hooks.py --root <mod repo>` (a clone, not the plugin cache: the hooks keep its path).
 4. Set up game slots (frozen copies of the install, each with its own saves) and mark the owner's real game
    untouchable. Slots are queued, never added.
 5. Secrets: the owner puts tokens in files in their home folder. Never ask for them in chat.

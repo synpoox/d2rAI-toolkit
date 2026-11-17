@@ -16,7 +16,7 @@ Per-repo values (repo, labels, kept branches, gate, game slots, junctions) are i
 
 ## Branches and commits
 - Prefixes come from `[branches]` (defaults): `ticket/<n>-<slug>` for an issue, `research/<topic>` for findings, `refactor/<topic>`, `backup/<topic>` to preserve unfinished work.
-- Branches in `[branches].keep` (default `research/*`, `issue-assets`, `handoff/*`, `backup/*`) are never merged and never deleted: docs and issues link to them.
+- Branches in `[branches].keep` (default `research/*`, `issue-assets`, `handoff/*`, `backup/*`) are never merged and never deleted: docs and issues link to them. `issue-assets` keeps old links only: never add a game screenshot to it or to any other branch.
 - Commit subject: conventional prefix plus issue number, e.g. `fix(items): stop affix overflow (#123)`; prefixes `feat fix docs refactor test chore`.
 
 ## Merge gate

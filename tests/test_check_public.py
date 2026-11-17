@@ -28,8 +28,8 @@ def chunk(ctype: bytes, payload: bytes) -> bytes:
     return struct.pack(">I", len(payload)) + ctype + payload + struct.pack(">I", zlib.crc32(ctype + payload))
 
 
-def make_png(*extra: bytes) -> bytes:
-    ihdr = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
+def make_png(*extra: bytes, size=(1, 1)) -> bytes:
+    ihdr = struct.pack(">IIBBBBB", *size, 8, 2, 0, 0, 0)
     idat = zlib.compress(b"\x00\xff\x00\x00")
     return cp.PNG_MAGIC + chunk(b"IHDR", ihdr) + b"".join(extra) + chunk(b"IDAT", idat) + chunk(b"IEND", b"")
 
@@ -198,6 +198,23 @@ class PngTests(unittest.TestCase):
         sc = scanner(())
         sc.scan_bytes("a.png", make_png(chunk(b"eXIf", b"MM\x00*")))
         self.assertEqual(kinds(sc), ["png-metadata"])
+
+    def test_screenshot_size_flagged_art_size_not(self):
+        for size, want in (((1920, 1080), ["screenshot"]), ((600, 360), ["screenshot"]), ((224, 448), []),
+                           ((1600, 250), [])):
+            sc = scanner(())
+            sc.scan_bytes("a.png", make_png(size=size))
+            self.assertEqual(kinds(sc), want, size)
+
+    def test_truncated_png_does_not_crash(self):
+        sc = scanner(())
+        sc.scan_bytes("a.png", cp.PNG_MAGIC + b"\x00\x00\x00\x0dIHDR\x00\x00")
+        self.assertEqual(sc.hits, [])
+
+    def test_screenshot_allow_listed_by_path(self):
+        sc = scanner((), cp.Allow(rules=[("docs/hero/*.png", None)]))
+        sc.scan_bytes("docs/hero/banner.png", make_png(size=(1920, 1080)))
+        self.assertEqual(sc.hits, [])
 
     def test_strip_png(self):
         dirty = make_png(chunk(b"tEXt", b"Software\x00tool"), chunk(b"eXIf", b"MM\x00*"))
@@ -381,9 +398,7 @@ class HookTests(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which("sh") and shutil.which("git"), "needs sh and git")
     def test_hook_blocks_a_bad_commit(self):
-        # a copy of the scanner inside the temp repo, as in a real clone
-        (self.repo / "tools").mkdir()
-        shutil.copy(ROOT / "tools" / "check_public.py", self.repo / "tools" / "check_public.py")
+        # no scanner inside the temp repo, as in a mod repo: the hook runs the toolkit's
         terms = Path(self._tmp.name) / "terms.txt"
         terms.write_text(TERM + "\n", encoding="utf-8")
         quiet_install(["--root", str(self.repo)])
@@ -407,6 +422,22 @@ class HookTests(unittest.TestCase):
         (self.repo / "ok2.md").write_text("fine too\n")
         git(self.repo, "add", "ok2.md")
         self.assertNotEqual(commit("mention " + TERM).returncode, 0)
+        git(self.repo, "reset", "-q", "ok2.md")
+        (self.repo / "1191").mkdir()
+        (self.repo / "1191" / "after.png").write_bytes(make_png(size=(1920, 1080)))
+        git(self.repo, "add", "1191/after.png")
+        res = commit("proof shot")
+        self.assertNotEqual(res.returncode, 0)
+        self.assertIn("screenshot", res.stdout + res.stderr)
+
+    @unittest.skipUnless(shutil.which("sh") and shutil.which("git"), "needs sh and git")
+    def test_hook_says_rerun_when_the_toolkit_moved(self):
+        quiet_install(["--root", str(self.repo)])
+        hook = self.repo / ".git" / "hooks" / "pre-commit"
+        hook.write_bytes(hook.read_bytes().replace((ROOT / "tools").as_posix().encode(), b"/gone/tools"))
+        res = subprocess.run(["sh", str(hook)], cwd=self.repo, capture_output=True, text=True)
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("rerun install_hooks.py", res.stderr)
 
 
 if __name__ == "__main__":

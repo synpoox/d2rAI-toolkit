@@ -41,8 +41,8 @@ slot table (`~/.d2r-modkit/slots.toml`), also set `MODKIT_PROJECT=<project>` (it
    `${CLAUDE_PLUGIN_ROOT}/testing/warps.py` makes the lines for a level's reference spots.
 7. **Shoot** with `game_ctl.py --slot <N> shot <name>`, or `game_ctl.py --slot <N> pair <name> <level,x,y>` for an
    HD | legacy pair. Look at every picture before the next click (a held cursor item hides tooltips).
-8. **Keep the evidence outside the repository.** Pictures land in `<runs.dir>/<lane>/screenshots/`. Never commit a
-   screenshot, a save or a log (docs/testing.md, "Screenshots and results"). Report what each picture shows in words; if the
+8. **Keep the evidence outside the repository.** Pictures land in `<runs.dir>/<lane>/screenshots/`. Never commit or push a
+   screenshot (no branch is an exception, orphan or assets branches included), a save or a log (docs/testing.md, "Screenshots and results"). Report what each picture shows in words; if the
    owner needs to see one, say where it is on disk.
 9. **Close out** right after the check, also when it failed: `game_ctl.py --slot <N> stop`, `force_ds1.py --slot <N> --reset`
    if you pinned, then `python ${CLAUDE_PLUGIN_ROOT}/testing/game_slots.py unlock <N> <lane>`.

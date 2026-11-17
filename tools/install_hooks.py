@@ -4,6 +4,7 @@
     python tools/install_hooks.py            install pre-commit and commit-msg
     python tools/install_hooks.py --force    overwrite hooks that did not come from here
     python tools/install_hooks.py --remove   remove the hooks this script installed
+    python tools/install_hooks.py --root <mod repo>   install them into a mod repo (they run this toolkit's scanner)
 
 The hooks run tools/check_public.py before each commit. It reads banned terms from a file outside the repository
 (~/.d2r-modkit/private_terms.txt, or $D2RAI_PRIVATE_TERMS); without one it still runs the generic checks.
@@ -45,6 +46,8 @@ def install(root: Path, force: bool) -> int:
             rc = 1
             continue
         data = (HERE / "hooks" / name).read_bytes().replace(b"\r\n", b"\n")   # sh needs LF endings
+        # a mod repo has no tools/check_public.py of its own: the hook falls back to this toolkit's scanner
+        data = data.replace(b"@TOOLKIT_SCANNER@", (HERE / "check_public.py").as_posix().encode())
         target.write_bytes(data)
         target.chmod(target.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         print(f"installed {target}")
