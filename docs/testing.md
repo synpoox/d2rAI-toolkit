@@ -78,6 +78,10 @@ What makes a slot independent:
   deletes anything.
 - **Own saves.** `setup` writes `savepath` in the mod's `modinfo.json` files so slot 2 saves into
   `.../mods/MyMod-s2/`, never into your `.../mods/MyMod/`. The folder is created.
+- **Lock guard.** Every `game_ctl.py` command except `status` and `start` (`stop`, `shot`, `key`, `click`, `console`,
+  `harness`, `release`, `pair`, `moved`) refuses unless the slot's lock owner is this run (`MODKIT_RUN` or `--owner`), so a run
+  whose `lock` failed cannot send input to, screenshot or stop another run's game. `start` refuses when another owner holds
+  the lock. `game_slots.py check <N> <owner>` exits 0 only when `<owner>` holds the lock: call it before writing into a slot folder.
 - **Own loader.** Slot N copies `D2RLoader.exe` to `D2RLoader-sN.exe`, so its process can be told apart. The tools
   also match a process by the folder its program file lives in, never by name alone, because every slot's game is
   called `D2R.exe`.

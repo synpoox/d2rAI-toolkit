@@ -440,6 +440,59 @@ class LockTests(unittest.TestCase):
         self.assertFalse(gs.acquire_wait(solo, "any", "x")[0])
 
 
+class LockGuardTests(unittest.TestCase):
+    """A run that does not hold a slot's lock cannot drive its game (#285)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.cfg = make_cfg(self.tmp.name)
+        import game_ctl
+        self.gc = game_ctl
+
+    def cli(self, owner, *argv):
+        err = io.StringIO()
+        game = mock.MagicMock()
+        real = self.gc.Game.require_lock
+        game.require_lock.side_effect = lambda: real(game)
+        game.cfg, game.slot, game.owner = self.cfg, 2, owner
+        with mock.patch.object(self.gc, "Game", return_value=game), mock.patch.object(self.gc.tc, "load", return_value=self.cfg),                 contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+            rc = self.gc.main(["--slot", "2", "--owner", owner, *argv])
+        return rc, err.getvalue(), game
+
+    def test_holds_lock(self):
+        self.assertIn("not locked", gs.holds_lock(self.cfg, 2, "lane-a"))
+        gs.acquire(self.cfg, 2, "lane-a")
+        self.assertIsNone(gs.holds_lock(self.cfg, 2, "lane-a"))
+        self.assertIn("lane-a", gs.holds_lock(self.cfg, 2, "lane-b"))
+        self.assertIsNotNone(gs.holds_lock(self.cfg, 2, None))
+        self.assertIsNotNone(gs.holds_lock(self.cfg, 1, "lane-a"))
+
+    def test_check_command(self):
+        gs.acquire(self.cfg, 2, "lane-a")
+        with mock.patch.object(gs.tc, "load", return_value=self.cfg), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(gs.main(["check", "2", "lane-a"]), 0)
+            self.assertEqual(gs.main(["check", "2", "lane-b"]), 1)
+
+    def test_a_second_owner_is_refused_and_the_owner_passes(self):
+        gs.acquire(self.cfg, 2, "lane-a")
+        for argv in (["console", "cheat god 1"], ["click", "0.5", "0.5"], ["key", "g"], ["shot", "x"], ["stop"], ["harness", "on"]):
+            with self.subTest(argv):
+                rc, err, game = self.cli("lane-b", *argv)
+                self.assertEqual(rc, 2)
+                self.assertIn("lane-a", err)
+                for name in ("console_text", "click", "key", "shot", "stop", "harness_switch"):
+                    getattr(game, name).assert_not_called()
+        rc, err, game = self.cli("lane-a", "key", "g")
+        self.assertEqual((rc, err), (0, ""))
+        game.key.assert_called_once_with("g")
+
+    def test_an_unlocked_slot_refuses_too(self):
+        rc, err, _ = self.cli("lane-a", "console", "cheat god 1")
+        self.assertEqual(rc, 2)
+        self.assertIn("not locked", err)
+
+
 class SetupTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
