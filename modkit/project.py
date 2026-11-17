@@ -116,11 +116,7 @@ class Build:
                         shutil.copy2(p, dest)
                         self._copied.add(rel)
         for src, dst in self.mod.get("gameCopies", {}).items():
-            for rel in self.base.list(src):
-                dest = self.out / (dst + rel[len(src):])[5:]
-                if not dest.exists():
-                    dest.parent.mkdir(parents=True, exist_ok=True)
-                    dest.write_bytes(self.base.bytes(rel))
+            self._game_copy(src.replace("\\", "/"), dst.replace("\\", "/"))
         for patch in sorted((self.project / "patches").glob("*.json")):
             doc = json.loads(patch.read_text("utf-8"))
             ops = doc["ops"] if isinstance(doc, dict) else doc
@@ -133,6 +129,24 @@ class Build:
                 except (KeyError, ValueError, BuildError) as e:
                     raise BuildError(f"{patch.name} op {n} ({kind}): {e}") from e
         self.finish()
+
+    def _game_copy(self, src: str, dst: str) -> None:
+        for key in (src, dst):
+            if not (key.startswith("data/") and key.endswith("/")):
+                raise BuildError(f"gameCopies: '{key}' must start with 'data/' and end with '/'")
+        try:
+            files = self.base.list(src)
+        except OSError as e:  # FileNotFoundError is an OSError
+            raise BuildError(f"gameCopies needs the game install (CASC): {e}") from e
+        if not files:
+            raise BuildError(f"gameCopies: no game files under {src}")
+        for rel in files:
+            to = dst + rel[len(src):]
+            dest = self.out / to[5:]
+            if not dest.exists():  # a file the project supplies wins
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_bytes(self.base.bytes(rel))
+                self._copied.add(to)
 
     def finish(self) -> None:
         for rel, t in self.tables.items():

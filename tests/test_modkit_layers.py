@@ -6,6 +6,7 @@ from pathlib import Path
 from modkit.project import Build
 
 SKILLS = "data/global/excel/skills.txt"
+BSA = "data/a/".replace("/", chr(92))  # backslash spelling
 
 
 class FakeBase:
@@ -66,6 +67,45 @@ class LayerOrderTests(unittest.TestCase):
             out = proj / "out/data/global/monsters/am"
             self.assertEqual((out / "a.dcc").read_text(), "mine")
             self.assertEqual((out / "sub/b.cof").read_bytes(), b"data/global/chars/am/sub/b.cof")
+
+    def _copy_build(self, copies, files):
+        class B(FakeBase):
+            def list(self, prefix):
+                return [f for f in files if f.startswith(prefix)]
+
+            def bytes(self, rel):
+                return b"x"
+
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        proj = Path(tmp.name)
+        (proj / "mod.json").write_text(json.dumps({"name": "T", "savepath": "T/", "gameCopies": copies}), "utf-8")
+        return Build(proj, B())
+
+    def test_game_copies_reject_bad_prefixes_and_empty_matches(self):
+        from modkit.project import BuildError
+
+        for copies in ({"data/a": "data/b/"}, {"data/a/": "b/"}, {"data/a/": "data/b"}):
+            with self.assertRaises(BuildError):
+                self._copy_build(copies, ["data/a/f"]).run()
+        with self.assertRaisesRegex(BuildError, "no game files under data/a/"):
+            self._copy_build({BSA: "data/b/"}, []).run()
+        b = self._copy_build({BSA: "data/b/"}, ["data/a/f"])
+        b.run()
+        self.assertIn("data/b/f", b._copied)
+
+    def test_game_copies_without_game_install_is_a_build_error(self):
+        from modkit.project import BuildError
+
+        class NoGame(FakeBase):
+            def list(self, prefix):
+                raise FileNotFoundError("CascLib.dll missing")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            proj = Path(tmp)
+            (proj / "mod.json").write_text(json.dumps({"name": "T", "gameCopies": {"data/a/": "data/b/"}}), "utf-8")
+            with self.assertRaisesRegex(BuildError, "needs the game install"):
+                Build(proj, NoGame()).run()
 
 
 if __name__ == "__main__":
