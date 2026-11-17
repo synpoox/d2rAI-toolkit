@@ -46,8 +46,8 @@ def install(root: Path, force: bool) -> int:
             rc = 1
             continue
         data = (HERE / "hooks" / name).read_bytes().replace(b"\r\n", b"\n")   # sh needs LF endings
-        # a mod repo has no tools/check_public.py of its own: point the hook at this toolkit's scanner
-        data = data.replace(b"$root/tools/check_public.py", (HERE / "check_public.py").as_posix().encode())
+        # a mod repo has no tools/check_public.py of its own: the hook falls back to this toolkit's scanner
+        data = data.replace(b"@TOOLKIT_SCANNER@", (HERE / "check_public.py").as_posix().encode())
         target.write_bytes(data)
         target.chmod(target.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         print(f"installed {target}")

@@ -253,7 +253,7 @@ class Scanner:
 
     def scan_png(self, path: str, data: bytes, where: str) -> None:
         # Mod art is item/icon sized (<= 336 px); game screenshots are window sized. shortcut: PNG only, add JPEG if one slips through.
-        w, h = struct.unpack(">II", data[16:24]) if data[12:16] == b"IHDR" else (0, 0)
+        w, h = struct.unpack(">II", data[16:24]) if len(data) >= 24 and data[12:16] == b"IHDR" else (0, 0)
         if w >= SCREENSHOT_MIN[0] and h >= SCREENSHOT_MIN[1] and not self.allow.allows(path, "screenshot", "screenshot"):
             self._add(Hit(where, "IHDR", "screenshot", f"{w}x{h} image looks like a game screenshot: never commit or push "
                           "one (any branch); keep it in the run folder and report it in words"))

@@ -206,6 +206,11 @@ class PngTests(unittest.TestCase):
             sc.scan_bytes("a.png", make_png(size=size))
             self.assertEqual(kinds(sc), want, size)
 
+    def test_truncated_png_does_not_crash(self):
+        sc = scanner(())
+        sc.scan_bytes("a.png", cp.PNG_MAGIC + b"\x00\x00\x00\x0dIHDR\x00\x00")
+        self.assertEqual(sc.hits, [])
+
     def test_screenshot_allow_listed_by_path(self):
         sc = scanner((), cp.Allow(rules=[("docs/hero/*.png", None)]))
         sc.scan_bytes("docs/hero/banner.png", make_png(size=(1920, 1080)))
@@ -424,6 +429,15 @@ class HookTests(unittest.TestCase):
         res = commit("proof shot")
         self.assertNotEqual(res.returncode, 0)
         self.assertIn("screenshot", res.stdout + res.stderr)
+
+    @unittest.skipUnless(shutil.which("sh") and shutil.which("git"), "needs sh and git")
+    def test_hook_says_rerun_when_the_toolkit_moved(self):
+        quiet_install(["--root", str(self.repo)])
+        hook = self.repo / ".git" / "hooks" / "pre-commit"
+        hook.write_bytes(hook.read_bytes().replace((ROOT / "tools").as_posix().encode(), b"/gone/tools"))
+        res = subprocess.run(["sh", str(hook)], cwd=self.repo, capture_output=True, text=True)
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("rerun install_hooks.py", res.stderr)
 
 
 if __name__ == "__main__":
