@@ -169,6 +169,34 @@ class GateTests(unittest.TestCase):
         with self.assertRaisesRegex(diff.GateError, "lvlmaze.*merged"):
             self.gate()
 
+    def test_a_whole_table_pattern_with_any_wildcard_segments_is_refused_for_a_merged_table_when_strict(self):
+        self.write("src", "lvlmaze", table("Name | MonLvl", "Blood Moor | 2"))
+        self.write("d2r", "lvlmaze", table("Name | MonLvl", "Blood Moor | 1"))
+        self.write("mod", "lvlmaze", table("Name | MonLvl", "Blood Moor | 1"))
+        for pat in ("lvlmaze.*", "lvlmaze.*.*", "lvlmaze.**.*", "lvlmaze.?*", "lvlmaze.*?", "lvlm*", "lvlmaz[e].*", "*.*.*"):
+            self.deviations(f"| Whole table | not yet | `{pat}` | P4 |\n")
+            with self.assertRaisesRegex(diff.GateError, "merged now", msg=pat):
+                self.gate(strict_whole_table=True)
+            if pat != "lvlmaze.*":  # by default only the exact `t.*` is refused: a project may allow `t.*.*` on purpose
+                self.gate()
+        self.deviations("| Narrow | not yet | `lvlmaze.*.monlvl` `lvlmaze.blood moor.*` | P4 |\n"
+                        "| Unnamed | not yet | `lvlmaze.*.` | P4 |\n")
+        self.gate(strict_whole_table=True)
+
+    def test_a_table_the_project_does_not_own_is_d2rs_and_an_edit_to_it_is_open(self):
+        self.write("src", "automap", table("Name | Cel1", "1 Town | 0"))
+        self.write("d2r", "automap", table("Name | Cel1", "1 Town | 0"))
+        self.write("mod", "automap", table("Name | Cel1", "1 Town | 99"))
+        res = self.gate(own=lambda name: False, own_label="committed").results[0]
+        self.assertEqual((res.source, res.open), ("D2R", [("automap.1 Town.Cel1", "0", "99")]))
+        res = self.gate(own=lambda name: name == "automap.txt", own_label="committed").results[0]
+        self.assertEqual(res.source, "committed", "an owned table is labelled")
+        self.deviations("| Own | approximated | `automap.*` | P4 |\n")
+        with self.assertRaisesRegex(diff.GateError, "merged now"):
+            self.gate(own=lambda name: False)
+        self.deviations("| Own | approximated | `automap.1 town.cel1` | P4 |\n")
+        self.assertEqual(self.gate(own=lambda name: False).open(), [])
+
     def test_excels_quote_marks_are_not_data(self):
         self.write("src", "lvlmaze", table("Name | MonLvl", 'Blood Moor | "2"'))
         self.write("mod", "lvlmaze", table("Name | MonLvl", "Blood Moor | 2"))

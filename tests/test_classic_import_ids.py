@@ -311,6 +311,20 @@ class HookTests(unittest.TestCase):
         self.assertEqual(s("skills", "reqskill1", "Old", self.ren), "New Name")  # a reference, not a number
         self.assertEqual(s("skills", "calc1", "skill('old'.blvl)*-2", self.ren), "skill('New Name'.blvl)*(0-2)")
 
+    def test_monprop_is_a_property_table_and_fix_levels_keys_the_source_only_levels(self):
+        self.assertIn("monprop", ids.PROPS)
+        h = ["id", "prop1", "chance1", "par1", "min1", "max1"]  # monprop's property columns get the property fixes
+        row = ["m", "Mixed-Case", "5", "old", "1", "2"]
+        self.assertEqual(ids.prop_columns(h), [(1, 3)])
+        ids.fix_props(h, row, self.ren, {}, {"Mixed-Case": "skill"})
+        self.assertEqual(row[3], "New Name")
+        self.assertEqual(ids.fix_cells({}, {"Mixed-Case": "mixed-case"})("monprop", h, ["m", "Mixed-Case", "5", "x", "1", "2"])[1],
+                         "mixed-case")
+        self.assertEqual(ids.entry_key("Graveyard Map (2)"), "EnteringGraveyardMap2")
+        t = table("Name|LevelName|LevelEntry|LevelType\nA|Town|EnteringTown|1\nB|Grave Map||7\nC|||1\n")
+        ids.fix_levels(t, 1, 3)  # A is D2R's: left alone
+        self.assertEqual([r[2:] for r in t.rows], [["EnteringTown", "1"], ["EnteringGraveMap", "0"], ["", "1"]])
+
     def test_fix_cells(self):
         fix = ids.fix_cells({"misc": {("gfx", "toolong"): {"gfx": "tool", "missing": "x"}}},
                             words={"Mixed-Case": "mixed-case"})

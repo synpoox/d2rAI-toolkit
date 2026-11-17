@@ -19,10 +19,14 @@ that is not new, so the list never goes stale.
                      like's folder (overlay.txt `Character`); the copy's name keeps the source's spelling with D2R's `_`
                      between a letter and a digit. Run after the table merge that writes overlay.txt.
 
+    copy_sequence_state  not a rule kind: a class's state machine (hd/character/player/<class>/<class>_state_machine.json)
+                     with a state for a source skill that D2R sequences under another skill (see its docstring).
+
 Each apply reads the rule file, D2R's data and the table the merge wrote, and is a rule kind for the merge driver.
 """
 from __future__ import annotations
 
+import copy
 import json
 import re
 from collections import Counter
@@ -34,6 +38,7 @@ HD_MISSILES = Path("hd") / "missiles" / "missiles.json"
 HD_MONSTERS = Path("hd") / "character" / "monsters.json"
 HD_OBJECTS = Path("hd") / "objects"
 HD_OVERLAYS = Path("hd") / "overlays"
+SEQUENCE_MODE = 18  # the state machine's mode of a skill that plays a sequence (skills.txt `SQ`)
 
 
 class HdError(ValueError):
@@ -293,3 +298,37 @@ def apply_overlays(rule: Path, src_data: Path, d2r_data: Path, out_data: Path) -
         raise OverlayHdError(f"lines for overlays that are not new: {', '.join(sorted(stale))}")
     merged_path.write_bytes(merged.text().encode("latin-1"))
     print(f"  vfx-overlays: {len(likes)} new overlays given a D2R stand-in")
+
+
+def copy_sequence_state(sm: dict, new_skill: int, src_skill: int, name: str, suffix: str) -> dict:
+    """A copy of a class's state machine `sm` with a sequence state (mode SEQUENCE_MODE) for skill `new_skill`.
+    D2R's HD renderer picks the body clip of a sequence skill by skill id from the class's state machine, so a source
+    skill put on a sequence D2R has no state for under that skill's id plays no clip. The new state copies the
+    sequence state of D2R's skill `src_skill` (the one whose clip fits), is named `name`, and gets a transition into
+    it wherever one leads to the copied state, and a group of its own out of it; their names end in `suffix`. Raises
+    ValueError when there is no such source state or group, or when `new_skill` already has a state."""
+    sm = copy.deepcopy(sm)
+    src = next((s for s in sm["states"] if s["modeId"] == SEQUENCE_MODE and s["skillIndex"] == src_skill), None)
+    if src is None:
+        raise ValueError(f"state machine has no sequence state for skill {src_skill}")
+    if any(s["skillIndex"] == new_skill and s["modeId"] == SEQUENCE_MODE for s in sm["states"]):
+        raise ValueError(f"state machine already has a sequence state for skill {new_skill}")
+    new_id = max(s["stateId"] for s in sm["states"]) + 1
+    state = copy.deepcopy(src)
+    state.update(stateId=new_id, skillIndex=new_skill, _name=name)
+    sm["states"].append(state)
+    own = None
+    for g in list(sm["transitions"]):
+        for item in g["settings"]:
+            if item["to"] == src["stateId"]:
+                new = copy.deepcopy(item)
+                new.update(to=new_id, name=item["name"] + suffix)
+                g["settings"].append(new)
+                break
+        if g["from"] == src["stateId"]:
+            own = copy.deepcopy(g)
+            own.update(**{"from": new_id, "name": g["name"] + suffix})
+    if own is None:
+        raise ValueError("no transition group for the source state")
+    sm["transitions"].append(own)
+    return sm

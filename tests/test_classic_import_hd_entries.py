@@ -260,5 +260,27 @@ class OverlayTests(unittest.TestCase):
                     H.apply_overlays(path, Path(tmp) / "src", d2r, out)
 
 
+class SequenceStateTests(unittest.TestCase):
+    SM = {"states": [{"stateId": 1, "modeId": 18, "skillIndex": 53, "_name": "Chain", "animationBindings": ["a"]},
+                     {"stateId": 2, "modeId": 1, "skillIndex": 0}],
+          "transitions": [{"from": 2, "name": "idle", "settings": [{"to": 1, "name": "go"}]},
+                          {"from": 1, "name": "chain", "settings": [{"to": 2, "name": "back"}]}]}
+
+    def test_the_new_state_copies_the_source_state_and_is_wired_in_and_out(self):
+        sm = H.copy_sequence_state(self.SM, 64, 53, "Orb", "_orb")
+        new = sm["states"][-1]
+        self.assertEqual((new["stateId"], new["skillIndex"], new["_name"], new["animationBindings"]), (3, 64, "Orb", ["a"]))
+        self.assertEqual(sm["transitions"][0]["settings"][-1], {"to": 3, "name": "go_orb"})
+        self.assertEqual(sm["transitions"][-1]["from"], 3)
+        self.assertEqual(sm["transitions"][-1]["name"], "chain_orb")
+        self.assertEqual(len(self.SM["states"]), 2, "the input is not changed")
+
+    def test_refusals(self):
+        with self.assertRaisesRegex(ValueError, "no sequence state for skill 99"):
+            H.copy_sequence_state(self.SM, 64, 99, "x", "_x")
+        with self.assertRaisesRegex(ValueError, "already has"):
+            H.copy_sequence_state(self.SM, 53, 53, "x", "_x")
+
+
 if __name__ == "__main__":
     unittest.main()
