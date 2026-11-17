@@ -17,6 +17,9 @@ A companion is a community plugin (or its data) that a mod ships next to its own
   entry's `loader_settings` to d2rloader/config/d2rloader.toml and copies the vanilla tables that the entries'
   `filter_tables` name when the build did not ship them (from the game's own files, through modkit.base.Base).
 
+install also deletes the files of a companion the manifest dropped since the last install (it records what it
+copied in d2rloader/companions-installed.json); no other file is touched, and a folder without a record loses nothing.
+
 Manifest "game" (top level, and per entry to override): the D2R major.minor the companions were built for, such as
 "3.3". `install` compares it with major.minor of the Version in <game>/.build.info (never a build number) and refuses
 on a mismatch; when the version cannot be read (the Steam install has no .build.info) it warns and goes on.
@@ -53,6 +56,7 @@ TOOLKIT = Path(__file__).resolve().parent.parent
 DEFAULT_MANIFEST = "companions/manifest.json"
 DEFAULT_CONFIG = ["companions/config/"]
 USER_AGENT = "d2r-toolkit-companions"
+RECORD = "d2rloader/companions-installed.json"  # what `install` put there, so a dropped companion can go
 
 
 class CompanionError(Exception):
@@ -325,9 +329,34 @@ def apply_settings(toml: Path, settings: dict) -> None:
     toml.write_text(text, encoding="utf-8")
 
 
-def overlay(root: Path, mod_dir: Path, manifest: Path | None = None) -> None:
+def prune_dropped(mod_dir: Path, now: set[str]) -> list[str]:
+    """Delete the files an earlier `install` recorded that `now` no longer has (a companion the manifest dropped), then
+    record `now`. Only recorded files go, never another plugin; a mod folder without a record loses nothing."""
+    mod_dir = Path(mod_dir)
+    record = mod_dir / RECORD
+    try:
+        before = set(json.loads(record.read_text("utf-8")))
+    except (OSError, ValueError, TypeError):
+        before = set()
+    gone = []
+    for rel in sorted(before - now):
+        try:
+            _safe_rel(rel, rel)
+            target = _inside(mod_dir, rel, rel)
+        except CompanionError:
+            continue  # a hand-edited record cannot point outside the mod folder
+        if target.is_file():
+            target.unlink()
+            gone.append(rel)
+    record.parent.mkdir(parents=True, exist_ok=True)
+    record.write_text(json.dumps(sorted(now), indent=1), encoding="utf-8")
+    return gone
+
+
+def overlay(root: Path, mod_dir: Path, manifest: Path | None = None, prune: bool = False) -> list[str]:
     """Copy generated/companions/ over an installed mod folder, then the manifest's project_files, and apply the
-    entries' loader settings."""
+    entries' loader settings. With `prune` (what `install` passes; the stager starts from an empty folder) the files
+    of a companion the manifest dropped since the last install are deleted; returns them."""
     root = Path(root)
     src = root / "generated" / "companions"
     if not src.is_dir():
@@ -340,12 +369,18 @@ def overlay(root: Path, mod_dir: Path, manifest: Path | None = None) -> None:
         target = _inside(Path(mod_dir), dst.replace("{mod}", Path(mod_dir).name), f"project_files target {dst!r}")
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(root / rel, target)
+    gone: list[str] = []
+    if prune:
+        now = {f.relative_to(src).as_posix() for f in src.rglob("*") if f.is_file()}
+        now |= {dst.replace("{mod}", Path(mod_dir).name) for dst in data.get("project_files", {}).values()}
+        gone = prune_dropped(Path(mod_dir), now)
     merged: dict[str, dict] = {}
     for c in data["companions"]:
         for section, keys in c.get("loader_settings", {}).items():
             merged.setdefault(section, {}).update(keys)
     if merged:
         apply_settings(Path(mod_dir) / "d2rloader" / "config" / "d2rloader.toml", merged)
+    return gone
 
 
 def fill_tables(excel: Path, read: Callable[[str], bytes], tables: list[str]) -> list[str]:
@@ -377,7 +412,8 @@ def main(argv: list[str] | None = None) -> int:
             check_game(a.game, load_manifest(a.root, a.manifest))
             print(install(a.root, a.game))
             name = json.loads((a.root / "mod.json").read_text("utf-8"))["name"]
-            overlay(a.root, a.game / "mods" / name, a.manifest)
+            for rel in overlay(a.root, a.game / "mods" / name, a.manifest, prune=True):
+                print(f"removed dropped companion file: {rel}")
             tables = filter_tables(load_manifest(a.root, a.manifest))
             excel = a.game / "mods" / name / f"{name}.mpq" / "data" / "global" / "excel"
             filled = fill_tables(excel, Base(a.game).bytes, tables) if tables else []

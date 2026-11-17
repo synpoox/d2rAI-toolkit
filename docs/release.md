@@ -384,7 +384,10 @@ files to other places in the mod folder (`{mod}` is its name) when `install` or 
 missing source file is an error. A top-level
 or per-entry `game` (`"3.3"`, major.minor only, never a build number) is compared with the Version in
 `<game>/.build.info` before `install` copies anything; a mismatch refuses, and an unreadable `.build.info` (Steam) only
-warns. Bump one companion per change, after a coexistence check in a test slot. `fetch` never commits anything:
+warns. `install` records the companion files it copies in `d2rloader/companions-installed.json` and deletes, on the next
+run, the recorded files the manifest no longer produces (a dropped companion); other plugins are never touched, and a
+mod folder without a record loses nothing. Players who update through the launcher or the downloader are pruned by
+them, from the previous release's file list. Bump one companion per change, after a coexistence check in a test slot. `fetch` never commits anything:
 `generated/` stays out of the repository. The [release stager](#changelog-fragments-and-the-stager) installs the same
 companions into the staged folder.
 
