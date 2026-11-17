@@ -355,7 +355,7 @@ class SlotTableTests(unittest.TestCase):
         self.conf = conf
 
     def env(self, table, project=None):
-        env = {"MODKIT_SLOTS_FILE": table}
+        env = {"MODKIT_SLOTS_FILE": table, "MODKIT_RUN": "lane"}
         if project:
             env["MODKIT_PROJECT"] = project
         return mock.patch.dict(os.environ, env)

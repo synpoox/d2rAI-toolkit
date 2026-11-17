@@ -251,6 +251,18 @@ def lock_info(cfg: tc.Config, n: int) -> LockInfo | None:
     return LockInfo(p, txt)
 
 
+def holds_lock(cfg: tc.Config, n: int, owner: str | None) -> str | None:
+    """None when `owner` holds slot n's lock, else why it does not (free, or held by someone else). Slot 1 never."""
+    if cfg.is_slot_one(n):
+        return SLOT1_MSG
+    info = lock_info(cfg, n)
+    if info is None:
+        return f"slot {n} is not locked: lock it first (game_slots.py lock {n} <owner>)"
+    if not owner or info.owner != owner:
+        return f"slot {n} is locked by {info.owner or 'an unnamed owner'}, not by {owner or 'this run (set MODKIT_RUN or --owner)'}"
+    return None
+
+
 MIN_UNLOCK_AGE = datetime.timedelta(minutes=30)
 
 
@@ -697,6 +709,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("owner", nargs="?")
     p.add_argument("--wait", type=float, default=0, help="queue: wait up to this many seconds")
     p.add_argument("--project", type=str.strip, default=sr.env_project(), help="your project, for the slot table (default MODKIT_PROJECT)")
+    p = sub.add_parser("check", help="exit 0 only when <owner> holds the slot's lock (call before writing into a slot)")
+    p.add_argument("slot", nargs="?")
+    p.add_argument("owner", nargs="?")
     p = sub.add_parser("unlock")
     p.add_argument("slot", nargs="?")
     p.add_argument("owner", nargs="?")
@@ -753,6 +768,10 @@ def _run(cfg: tc.Config, a) -> int:
         if not ok and (n == 1 or refused):
             return 2
         return 0 if ok else 1
+    if a.cmd == "check":
+        why = holds_lock(cfg, n, owner)
+        print(why or f"slot {n} is locked by {owner}")
+        return 1 if why else 0
     if a.cmd == "unlock":
         info = lock_info(cfg, n)
         if owner and info is not None and info.owner == owner and not a.force and not cfg.is_slot_one(n):

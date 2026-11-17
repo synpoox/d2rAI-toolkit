@@ -713,6 +713,12 @@ class Game:
         fit_window(hwnd, g["client_size"][0], g["client_size"][1], ox + dx * (self.slot - 1), oy + dy * (self.slot - 1))
         return True
 
+    def require_lock(self) -> None:
+        """Refuses unless this run's owner holds the slot's lock: a run whose lock failed must not drive another run's game."""
+        why = game_slots.holds_lock(self.cfg, self.slot, self.owner)
+        if why:
+            raise GameCtlError(why)
+
     def lock_owner(self) -> str | None:
         info = game_slots.lock_info(self.cfg, self.slot)
         return info.owner if info else None
@@ -795,7 +801,7 @@ def split_own_options(argv: list[str]) -> int | None:
     for i, t in enumerate(argv):
         if skip:
             skip = False
-        elif t in ("--slot", "--config"):
+        elif t in ("--slot", "--config", "--owner"):
             skip = True
         elif not t.startswith("-"):
             return i if t in ("pair", "moved") else None
@@ -806,6 +812,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     tc.add_config_arg(ap)
     ap.add_argument("--slot", type=int, help="slot number (or MODKIT_SLOT); slot 1 is refused")
+    ap.add_argument("--owner", help="the lock owner this run acts as (default MODKIT_RUN)")
     ap.add_argument("cmd", nargs="?", choices=("status", "start", "stop", "shot", "key", "click", "console", "harness",
                                                   "release", "pair", "moved"))
     ap.add_argument("args", nargs="*")
@@ -824,7 +831,10 @@ def main(argv: list[str] | None = None) -> int:
         slot = a.slot or tc.env_slot()
         if slot is None:
             raise GameCtlError("give --slot N or set MODKIT_SLOT (there is no default: slot 1 is the user's own game)")
-        g = Game(cfg, slot)
+        owner = a.owner or tc.env_run()
+        if not owner and a.cmd != "status":  # else every call gets its own run-<pid> owner and a bare start leaves an orphan lock
+            raise GameCtlError("set MODKIT_RUN=<lane> or pass --owner <lane>")
+        g = Game(cfg, slot, owner=owner)
         return _run(g, a)
     except (tc.ConfigError, GameCtlError) as e:
         print(f"error: {e}", file=sys.stderr)
@@ -833,10 +843,12 @@ def main(argv: list[str] | None = None) -> int:
 
 def _run(g: Game, a) -> int:
     c, args = a.cmd, a.args
+    if c not in ("status", "start"):
+        g.require_lock()
     if c == "status":
         print(f"slot {g.slot}: {g.cfg.slot_dir(g.slot)}; running pids {g.pids() or '-'}; "
               f"lock {(game_slots.lock_info(g.cfg, g.slot) or game_slots.LockInfo('', 'free')).describe()}")
-    elif c == "start":
+    elif c == "start":  # takes the lock itself, and refuses when another owner holds it
         g.start()
         print(f"slot {g.slot} is up (pids {g.pids()})")
     elif c == "stop":

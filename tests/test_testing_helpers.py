@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import os
 import sys
 import tempfile
 import unittest
@@ -163,7 +164,7 @@ class Cli(unittest.TestCase):
         calls = []
         fake = mock.MagicMock()
         fake.cfg = None
-        with mock.patch.object(game_ctl, "Game", return_value=fake),                 mock.patch.object(game_ctl.tc, "load", return_value=None),                 mock.patch.object(ch, "pair", side_effect=lambda g, *a, **k: calls.append((a, k)) or ("p", False)),                 mock.patch.object(ch, "moved", side_effect=lambda g, act, wait, **k: calls.append((wait,)) or (True, "ok")),                 mock.patch.object(game_ctl, "run_screens_dir", return_value="d"),                 contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        with mock.patch.dict(os.environ, {"MODKIT_RUN": "lane"}), mock.patch.object(game_ctl, "Game", return_value=fake),                 mock.patch.object(game_ctl.tc, "load", return_value=None),                 mock.patch.object(ch, "pair", side_effect=lambda g, *a, **k: calls.append((a, k)) or ("p", False)),                 mock.patch.object(ch, "moved", side_effect=lambda g, act, wait, **k: calls.append((wait,)) or (True, "ok")),                 mock.patch.object(game_ctl, "run_screens_dir", return_value="d"),                 contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             rc = game_ctl.main(argv)
         return rc, calls, fake
 
@@ -191,7 +192,7 @@ class Cli(unittest.TestCase):
     def test_moved_without_position_exits_2(self):
         err = io.StringIO()
         fake = mock.MagicMock()
-        with mock.patch.object(game_ctl, "Game", return_value=fake), mock.patch.object(game_ctl.tc, "load", return_value=None),                 mock.patch.object(ch, "moved", side_effect=game_ctl.GameUnavailable("needs position")),                 contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+        with mock.patch.dict(os.environ, {"MODKIT_RUN": "lane"}), mock.patch.object(game_ctl, "Game", return_value=fake), mock.patch.object(game_ctl.tc, "load", return_value=None),                 mock.patch.object(ch, "moved", side_effect=game_ctl.GameUnavailable("needs position")),                 contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
             rc = game_ctl.main(["--slot", "6", "moved", "key", "w"])
         self.assertEqual(rc, 2)
         self.assertIn("cannot tell", err.getvalue())
