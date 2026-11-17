@@ -208,13 +208,14 @@ Hook = Callable[[Table, Table], None]  # (merged, D2R's table): edit the merged 
 
 
 def rule(rule_file: Path, src_data: Path, d2r_data: Path, out_data: Path, tables: list[str] | None = None,
-         hooks: dict[str, Hook] | None = None) -> None:
+         hooks: dict[str, Hook] | None = None, spell: Spell = ids.spell) -> None:
     """The merge driver's rule kind for merge/tables.json: merge each table it names. `tables` are the project's
     id-listed tables (bound with functools.partial), whose renames the cells' references follow. The source's sounds
     D2R lacks are renamed to D2R's sound of the same file ("sound"); `hireling` merges last, as it names monstats
     rows by their merged number ("monster") and hiredesc codes by string key ("hiredesc"). `hooks` maps a table to a
     function run on its merged table before it is written, for the table-specific steps a project keeps (e.g. the
-    skilldesc rewrite). A monsounds row naming a sound D2R's table lacks fails the merge."""
+    skilldesc rewrite). `spell` spells every cell (ids.make_spell: function numbers D2R reuses). A monsounds row
+    naming a sound D2R's table lacks fails the merge."""
     cfg = json.loads(rule_file.read_text("utf-8"))
     ren = ids.renames({t: ids.read_list(ids.list_path(rule_file.parent, t)) for t in tables or ()})
     ren.update(extra_renames(src_data, d2r_data, out_data, False))
@@ -223,7 +224,7 @@ def rule(rule_file: Path, src_data: Path, d2r_data: Path, out_data: Path, tables
             ren.update(extra_renames(src_data, d2r_data, out_data, True))
         check_options(table, opts)
         d2r = Table(ids.excel(d2r_data) / f"{table}.txt")
-        merged = merge_table(table, Table(ids.excel(src_data) / f"{table}.txt"), d2r, ren, **opts)
+        merged = merge_table(table, Table(ids.excel(src_data) / f"{table}.txt"), d2r, ren, spell=spell, **opts)
         if table in (hooks or {}):
             hooks[table](merged, d2r)
         if table == "monsounds" and (bad := unknown_sounds(merged, d2r_data)):

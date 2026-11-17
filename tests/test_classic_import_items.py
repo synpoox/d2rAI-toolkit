@@ -60,6 +60,30 @@ class MergeTests(unittest.TestCase):
         self.assertEqual(merged.rows[1], ["Bow", "bow", "bow", "e2"], "a D2R-only row is untouched")
         self.assertEqual(merged.dropped, [])
 
+    def test_merge_args_reach_the_table_merge(self):
+        src = table("name|code|type", "Hand Axe|hax|axe", key=1)
+        d2r = table("name|code|type", "Hand Axe d2r|hax|swor", key=1)
+        merged = items.merge_keyed("weapons", src, d2r, CTX, {"weapons": 1}, " X", merge_args={"d2r_columns": ("type",)})
+        self.assertEqual(merged.rows[0][2], "swor", "d2r_columns keeps D2R's value")
+        self.assertEqual(items.merge_keyed("weapons", src, d2r, CTX, {"weapons": 1}, " X").rows[0][2], "axe")
+        shout = items.merge_keyed("weapons", src, d2r, CTX, {"weapons": 1}, " X", merge_args={
+            "spell": lambda t, c, v, ren: v.upper(), "finish": lambda h, row, s, own: row.append("f")})
+        self.assertEqual(shout.rows[0][:3], ["HAND AXE", "hax", "AXE"], "spell overrides the default")
+        cube = items.merge_cube(table("description|numinputs", "a|1"), table("description|numinputs"), CTX,
+                                merge_args={"spell": lambda t, c, v, ren: v + "!"})
+        self.assertEqual(cube.rows[0][1], "1!")
+        self.assertEqual(shout.rows[0][-1], "f", "finish runs")
+        per_table = items.merge_cube(table("description|numinputs", "a|1"), table("description|numinputs"), CTX,
+                                     merge_args=lambda t: {"spell": lambda t, c, v, ren: v + "?"})
+        self.assertEqual(per_table.rows[0][1], "1?", "merge_cube takes the per-table function too")
+
+    def test_merge_args_can_be_per_table(self):
+        src = table("name|code|type", "Hand Axe|hax|axe", key=1)
+        d2r = table("name|code|type", "Hand Axe d2r|hax|swor", key=1)
+        per = lambda t: {"d2r_columns": ("type",)} if t == "weapons" else {}
+        self.assertEqual(items.merge_keyed("weapons", src, d2r, CTX, {"weapons": 1}, " X", merge_args=per).rows[0][2], "swor")
+        self.assertEqual(items.merge_keyed("armor", src, d2r, CTX, {"armor": 1}, " X", merge_args=per).rows[0][2], "axe")
+
     def test_by_source_order_ranks_source_rows_first(self):
         src = table("Treasure Class|Picks", "B|1", "A|1")
         d2r = table("Treasure Class|Picks", "A|1", "Z|1", "B|1")
@@ -244,6 +268,26 @@ class ApplyTests(unittest.TestCase):
             self.assertEqual(tc[1].split("\t")[2:4], ["10", ""], "both weights went to NoDrop")
             written = json.loads((root / "out/hd/items/items.json").read_text("utf-8"))
             self.assertIn({"new": {"asset": "a1"}}, written, "the new code borrows the D2R picture")
+
+
+class PictureFolderTests(unittest.TestCase):
+    def test_item_pictures_use_the_given_folder_and_default_to_src(self):
+        from unittest import mock
+        for kw, folder in (({}, "src"), ({"picture_folder": "mod"}, "mod")):
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                write(root / "src/global/items/inv_a.dc6", b"x")
+                write(root / "d2r/global/palette/units/pal.dat", b"p")
+                written = []
+                with mock.patch.object(items.dc6, "palette", return_value=None),\
+                        mock.patch.object(items.dc6, "read", return_value=[None]),\
+                        mock.patch.object(items.dc6, "decode", return_value=(2, 2, b"")),\
+                        mock.patch.object(items.images, "scale", return_value="img"),\
+                        mock.patch.object(items.images, "write_sprite", lambda p, i: written.append(p)):
+                    got = items.item_pictures(lambda art, fr: {k: "big" for k in fr}, root, root / "src", root / "d2r",
+                                              root / "out", {"inv_a": {"weapons"}}, set(), **kw)
+                self.assertEqual(got, {"inv_a": f"{folder}/inv_a"})
+                self.assertEqual([p.parent.name for p in written], [folder])
 
 
 if __name__ == "__main__":
