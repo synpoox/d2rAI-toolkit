@@ -72,6 +72,10 @@ class MergeTests(unittest.TestCase):
         cube = items.merge_cube(table("description|numinputs", "a|1"), table("description|numinputs"), CTX,
                                 merge_args={"spell": lambda t, c, v, ren: v + "!"})
         self.assertEqual(cube.rows[0][1], "1!")
+        self.assertEqual(shout.rows[0][-1], "f", "finish runs")
+        per_table = items.merge_cube(table("description|numinputs", "a|1"), table("description|numinputs"), CTX,
+                                     merge_args=lambda t: {"spell": lambda t, c, v, ren: v + "?"})
+        self.assertEqual(per_table.rows[0][1], "1?", "merge_cube takes the per-table function too")
 
     def test_merge_args_can_be_per_table(self):
         src = table("name|code|type", "Hand Axe|hax|axe", key=1)
@@ -275,7 +279,11 @@ class PictureFolderTests(unittest.TestCase):
                 write(root / "src/global/items/inv_a.dc6", b"x")
                 write(root / "d2r/global/palette/units/pal.dat", b"p")
                 written = []
-                with mock.patch.object(items.dc6, "palette", return_value=None),                         mock.patch.object(items.dc6, "read", return_value=[None]),                         mock.patch.object(items.dc6, "decode", return_value=(2, 2, b"")),                         mock.patch.object(items.images, "scale", return_value="img"),                         mock.patch.object(items.images, "write_sprite", lambda p, i: written.append(p)):
+                with mock.patch.object(items.dc6, "palette", return_value=None),\
+                        mock.patch.object(items.dc6, "read", return_value=[None]),\
+                        mock.patch.object(items.dc6, "decode", return_value=(2, 2, b"")),\
+                        mock.patch.object(items.images, "scale", return_value="img"),\
+                        mock.patch.object(items.images, "write_sprite", lambda p, i: written.append(p)):
                     got = items.item_pictures(lambda art, fr: {k: "big" for k in fr}, root, root / "src", root / "d2r",
                                               root / "out", {"inv_a": {"weapons"}}, set(), **kw)
                 self.assertEqual(got, {"inv_a": f"{folder}/inv_a"})

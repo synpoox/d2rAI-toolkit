@@ -214,7 +214,8 @@ def rule(rule_file: Path, src_data: Path, d2r_data: Path, out_data: Path, tables
     D2R lacks are renamed to D2R's sound of the same file ("sound"); `hireling` merges last, as it names monstats
     rows by their merged number ("monster") and hiredesc codes by string key ("hiredesc"). `hooks` maps a table to a
     function run on its merged table before it is written, for the table-specific steps a project keeps (e.g. the
-    skilldesc rewrite). `spell` spells every cell (ids.make_spell: function numbers D2R reuses). A monsounds row naming a sound D2R's table lacks fails the merge."""
+    skilldesc rewrite). `spell` spells every cell (ids.make_spell: function numbers D2R reuses). A monsounds row
+    naming a sound D2R's table lacks fails the merge."""
     cfg = json.loads(rule_file.read_text("utf-8"))
     ren = ids.renames({t: ids.read_list(ids.list_path(rule_file.parent, t)) for t in tables or ()})
     ren.update(extra_renames(src_data, d2r_data, out_data, False))

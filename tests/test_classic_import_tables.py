@@ -216,7 +216,7 @@ class TablesTests(unittest.TestCase):
         rule.write_text(json.dumps({"levels": {}}), "utf-8")
         tables.rule(rule, self.root / "src", self.root / "d2r", self.root / "out",
                     spell=lambda t, c, v, ren: v + "!" if c == "Id" else v)
-        self.assertIn(b"Act 1	1!", (self.root / "out/global/excel/levels.txt").read_bytes())
+        self.assertIn(b"Act 1\t1!", (self.root / "out/global/excel/levels.txt").read_bytes())
 
 
 if __name__ == "__main__":
