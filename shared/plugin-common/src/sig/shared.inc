@@ -100,6 +100,7 @@ D2R_SIG(ItemSocketable, items, Rip, 1, 5, "e8 ?? ?? ?? ?? 85 c0 75 4d e8 ?? ?? ?
 D2R_SIG(SetItemSockets, items, Rip, 1, 5, "e8 ?? ?? ?? ?? e9 ?? ?? ?? ?? 48 85 ff 74 46")
 D2R_SIG(ItemHasSockets, items, Rip, 1, 5, "e8 ?? ?? ?? ?? 0f b6 c8 4c 8d 05 ?? ?? ?? ??")
 D2R_SIG(ItemIsEthereal, items, Rip, 1, 5, "e8 ?? ?? ?? ?? 85 c0 0f 85 ?? ?? ?? ?? eb 14")
+D2R_SIG(ItemsCanMerge, items, Code, 0, 0, "48 89 5c 24 08 48 89 74 24 10 55 57 41 56 48 8b ec 48 83 ec 20")
 D2R_SIG(ItemApplyEthereal, items, Rip, 1, 5, "e8 ?? ?? ?? ?? 44 8b 74 24 58 48 8b 5c 24 60")
 D2R_SIG(ItemSpellCheck, items, Code, 0, 0, "48 89 5c 24 08 48 89 6c 24 10 48 89 74 24 18 57 41 56 41 57 48 83 ec 30 48 8b ea 48 8b f1")
 D2R_SIG(ItemSpellUse, items, Code, 0, 0, "48 89 5c 24 18 48 89 6c 24 20 56 57 41 57 48 83 ec 30 48 8b ea")

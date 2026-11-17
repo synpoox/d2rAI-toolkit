@@ -11,7 +11,7 @@
 > 4. Known facts and suspicions, kept apart: say "suspicion" when you have not checked. List what was ruled out.
 > 5. Done means evidence: a check name, a command and the expected line. "Fixed" is not evidence.
 > 6. Say what *not* to do when the obvious approach is wrong.
-> 7. Reverse-engineering lanes get the build number and the address list, and must re-verify every address by bytes.
+> 7. Reverse-engineering lanes get the build number and the address list, and must re-verify every address by bytes. A new hook resolves its address by a unique byte signature (`sigscan::HookBySignature`), never a fixed RVA; a research report includes a signature that matches once in the dump.
 > 8. Git, slot and report sections stay; the lane never waits on CI and never merges.
 
 Read `AGENTS.md` and follow it exactly. You are the lane `<lane-name>` of `<MOD NAME>`.

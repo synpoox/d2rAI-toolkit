@@ -121,6 +121,10 @@ bool ok = context->InstallInlineHook(0x33b3b0, Entry, sizeof(Entry), Hook, &g_or
 | Generated data headers (row ranges, ID maps) must be checked at load against what D2R actually loaded (row counts) | Stale headers silently misbehave |
 | Register a console command that prints version, image match and each feature's install result | First thing to check in game |
 
+### Resolve addresses by signature
+
+Every new hook finds its address at load by a **unique byte signature**, never by a fixed RVA, so a later D2R build (3.4 and on) needs no new addresses. Use `sigscan::HookBySignature(context, name, pattern, offset, entryBytes, size, Hook, &original)` from `shared/plugin-common/src/sig_hook.h` (`sigscan::ScanUnique` finds the RVA alone): it searches the executable sections, installs only for exactly one match, and logs `found <name> at <rva>` or `skipped <name>: <n> matches`. The RVA stays in docs and the `rvas_93847` headers as the build-93847 reference and for crash triage. A researcher's report must give, for each function, a signature that matches once in the dump (`??` over rip-relative and call displacements).
+
 ## 7. Diagnosis switch (build it in from day one)
 
 A text file next to the plugin DLL (`<mod>/d2rloader/plugins/<plugin>-off.txt`), read at launch: words separated

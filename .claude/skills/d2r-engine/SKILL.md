@@ -41,6 +41,7 @@ lives), then build it part by part with this skill.
   instructions (REX prefixes like 40/48 included), copied from the disassembly (`Disasm.java`), ending on an
   instruction boundary. There is no 14-byte minimum: 8- to 12-byte signatures ran in game; longer is only safer
   against a false match (${CLAUDE_PLUGIN_ROOT}/knowledge/engine-re.md section 6). The SDK refuses on mismatch. Hook function pointer types must be `noexcept`.
+- **Resolve the address by a unique byte signature at load** (`sigscan::HookBySignature`, plugin-common `sig_hook.h`), never a fixed RVA; the RVA is only the build-93847 reference (${CLAUDE_PLUGIN_ROOT}/knowledge/engine-re.md, "Resolve addresses by signature").
 - **One owner per hook site**: two plugins hooking the same entry disable each other by load order. Search your
   plugins for the address first; one site, one owner (${CLAUDE_PLUGIN_ROOT}/knowledge/engine-re.md section 5).
 - **Before patching anything**, check the function entry for `FF 25` (jmp [rip+x]): D2RLoader already hooks it

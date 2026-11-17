@@ -229,6 +229,39 @@ void Resolve(Entry* const* entries, size_t count, uint64_t exeBase, const Cache*
 	}
 }
 
+auto ScanUnique(uint64_t exeBase, const char* pattern, int offset, uint64_t* rva) noexcept -> int {
+	Section exec[16];
+	int execCount = 0;
+	uint32_t imageSize = 0;
+	if (!ReadSections(exeBase, exec, 16, &execCount, &imageSize)) {
+		return -1;
+	}
+	const auto* image = reinterpret_cast<const uint8_t*>(exeBase);
+	int found = 0;
+	int64_t target = 0;
+	for (int s = 0; s < execCount && found < 64; ++s) {
+		size_t first = 0;
+		const int n = Find(image + exec[s].rva, exec[s].size, pattern, &first, 64 - found);
+		if (n < 0) {
+			return -1;
+		}
+		if (n > 0 && found == 0) {
+			target = static_cast<int64_t>(exec[s].rva + first) + offset;
+		}
+		found += n;
+	}
+	if (found != 1) {
+		return found;
+	}
+	for (int s = 0; s < execCount; ++s) {
+		if (target >= exec[s].rva && target < static_cast<int64_t>(exec[s].rva) + exec[s].size) {
+			*rva = static_cast<uint64_t>(target);
+			return 1;
+		}
+	}
+	return -1;
+}
+
 auto StateText(State state) noexcept -> const char* {
 	switch (state) {
 	case State::Ok: return "found";
