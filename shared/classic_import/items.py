@@ -29,6 +29,7 @@ from . import ids as I
 
 ITEM_TABLES = ["weapons", "armor", "misc"]
 CUBE_FIX = Callable[["I.Table"], None]  # a fix to the merged cube table, in place
+MergeArgs = dict | Callable[[str], dict] | None  # ids.merge_table keywords: one dict, or one per table name
 # a recipe's signature: the inputs and outputs. A D2R recipe with the same one as a source recipe is replaced by it
 SIGNATURE = [*(f"input {k}" for k in range(1, 8)), "output", "output b", "output c"]
 HD_PER_CLASSIC = 3.5  # D2R's 98 px inventory cell over the classic 28 px
@@ -61,17 +62,26 @@ def _finish(table: str, ctx: I.Context, finish: I.Finish | None) -> I.Finish | N
     return I.finishes(I.props_finish(ctx.ren, ctx.ids, ctx.props) if table in I.PROPS else None, finish)
 
 
+def _merge_args(table: str, ctx: I.Context, finish: I.Finish | None, merge_args: MergeArgs, **fixed) -> dict:
+    """The keyword arguments of ids.merge_table: `fixed`, then `merge_args` over them (or what merge_args(table)
+    returns); a `finish` in merge_args runs after the property fixes and the `finish` argument."""
+    extra = dict(merge_args(table) if callable(merge_args) else merge_args or {})
+    return {**fixed, "finish": _finish(table, ctx, I.finishes(finish, extra.pop("finish", None))), **extra}
+
+
 def merge_keyed(table: str, src: I.Table, d2r: I.Table, ctx: I.Context, vanilla: dict[str, int], suffix: str, *,
                 by_source_order: set[str] = frozenset(), finish: I.Finish | None = None,
-                fix_row: I.FixRow | None = None, spell: I.Spell = I.spell, source: str = "the source's"
-                ) -> I.Table:
+                fix_row: I.FixRow | None = None, spell: I.Spell = I.spell, source: str = "the source's",
+                merge_args: MergeArgs = None) -> I.Table:
     """The table merged by key around D2R's rows (`vanilla`: rows below the project's vanilla count keep their ids;
-    `suffix` names a clashing source row). A table in by_source_order is named, never numbered, and a row must come
+    `suffix` names a clashing source row; merge_args: more keyword arguments for ids.merge_table that override the
+    ones set here, such as spell, fix_row, d2r_columns, add_columns or num_refs; a `finish` in it runs after the
+    `finish` argument). A table in by_source_order is named, never numbered, and a row must come
     after the rows it names (treasure classes): the source's rows in the source's order, then D2R-only ones. The
     merged table's `dropped` is the source columns D2R has no place for."""
     lines = I.seed(table, src.names(), d2r.names(), [], vanilla.get(table, 0), suffix)
-    merged, dropped = I.merge_table(table, src, d2r, lines, ctx.ren, ctx.ids, spell=spell, fix_row=fix_row,
-                                    finish=_finish(table, ctx, finish), source=source)
+    merged, dropped = I.merge_table(table, src, d2r, lines, ctx.ren, ctx.ids, **_merge_args(
+        table, ctx, finish, merge_args, spell=spell, fix_row=fix_row, source=source))
     merged.dropped = dropped
     if table in by_source_order:
         rank = {n: k for k, (_, _, n) in enumerate(lines)}
@@ -80,19 +90,19 @@ def merge_keyed(table: str, src: I.Table, d2r: I.Table, ctx: I.Context, vanilla:
 
 
 def merge_cube(src: I.Table, d2r: I.Table, ctx: I.Context, fixes: Sequence[CUBE_FIX] = (),
-               after: Sequence[CUBE_FIX] = (), finish: I.Finish | None = None, source: str = "the source's"
-               ) -> I.Table:
+               after: Sequence[CUBE_FIX] = (), finish: I.Finish | None = None, source: str = "the source's",
+               merge_args: MergeArgs = None) -> I.Table:
     """cubemain: the source's recipes in the source's order, then D2R's recipes no source recipe has the same inputs
     and outputs as. `fixes` change the merged source recipes (before D2R's are added), `after` the whole table. The
-    merged table's `dropped` is the source columns D2R has no place for."""
+    merged table's `dropped` is the source columns D2R has no place for. merge_args: as in merge_keyed."""
     def signature(t: I.Table, row: list[str]) -> tuple[str, ...]:
         return tuple(row[t.header.index(c)].replace('"', "").lower() if c in t.header else "" for c in SIGNATURE)
     src_sigs = {signature(src, r) for r in src.rows}
     d2r_only = [r for r in d2r.rows if signature(d2r, r) not in src_sigs]
     empty = I.Table.of(d2r.header, [], d2r.newline, 0)
     lines = [(p, k, I.base(p).replace('"', "")) for k, p in enumerate(I.ident(src.names()))]
-    merged, dropped = I.merge_table("cubemain", src, empty, lines, ctx.ren, ctx.ids,
-                                    finish=_finish("cubemain", ctx, finish), source=source)
+    merged, dropped = I.merge_table("cubemain", src, empty, lines, ctx.ren, ctx.ids, **_merge_args(
+        "cubemain", ctx, finish, merge_args, source=source))
     for fix in fixes:
         fix(merged)
     merged.rows += [list(r) for r in d2r_only]
@@ -160,11 +170,11 @@ def _entries(path: Path) -> list[dict]:
 
 
 def item_pictures(upscale: Callable[[Path, dict], dict], art: Path, src_data: Path, d2r_data: Path, out_data: Path,
-                  uses: dict[str, set[str]], d2r_inv: set[str]) -> dict[str, str]:
+                  uses: dict[str, set[str]], d2r_inv: set[str], picture_folder: str = "src") -> dict[str, str]:
     """The source's own pictures, an invfile in uses (-> the item tables drawing it) that no D2R item uses and src_data
     has a DC6 for: an HD sprite upscaled from it in each table's folder, and the DC6 for legacy mode. `upscale(art,
     {name: classic frame})` returns {name: bigger image} (the project's upscaler and its art cache). Returns
-    {invfile: items.json asset}."""
+    {invfile: items.json asset}. The sprites go in a folder named `picture_folder` in each table's HD folder."""
     classic = Path("global") / "items"
     if not (src_data / classic).is_dir():  # else every source picture is silently dropped
         raise I.IdError(f"{src_data / classic}: no item pictures; run the extract again")
@@ -177,10 +187,10 @@ def item_pictures(upscale: Callable[[Path, dict], dict], art: Path, src_data: Pa
         w, h, _ = frames[n]
         sprite = images.scale(big[f"items/{n}"], round(w * HD_PER_CLASSIC), round(h * HD_PER_CLASSIC))
         for t in sorted(uses[n]):
-            images.write_sprite(out_data / "hd" / "global" / "ui" / "items" / hd.item_folder(t) / "src" / f"{n}.sprite",
+            images.write_sprite(out_data / "hd" / "global" / "ui" / "items" / hd.item_folder(t) / picture_folder / f"{n}.sprite",
                                 sprite)
         (out_data / classic / f"{n}.dc6").write_bytes((src_data / classic / f"{n}.dc6").read_bytes())
-    return {n: f"src/{n}" for n in names}
+    return {n: f"{picture_folder}/{n}" for n in names}
 
 
 def hd_items(hd_dir: Path, src: dict[str, I.Table], d2r: dict[str, I.Table],
@@ -305,18 +315,20 @@ def ground_models(hd_items_dir: Path, out: Path, pictures: dict[str, str], model
 def apply(rule: Path, src_data: Path, d2r_data: Path, out_data: Path, ctx: I.Context, vanilla: dict[str, int],
           suffix: str, upscale: Callable[[Path, dict], dict] | None = None, cube_fixes: Sequence[CUBE_FIX] = (),
           cube_after: Sequence[CUBE_FIX] = (), by_source_order: set[str] = frozenset(), source: str = "the source's",
-          neutral_model: dict[str, str] | None = None
+          neutral_model: dict[str, str] | None = None, merge_args: MergeArgs = None, picture_folder: str = "src"
           ) -> None:
     """The merge driver's rule kind for the item-tables rule file (bind the rest with functools.partial). ctx: the
     project's Context for its id-listed tables (ids.context_of). With the three item tables merged, it also writes the
     HD item files: upscale (item_pictures) is needed when the source has pictures of its own; the rule's art cache is
-    the `art/` folder beside the rule file."""
+    the `art/` folder beside the rule file. merge_args (a dict, or a function of the table name that gives each
+    table's) goes to every merge_keyed and merge_cube; picture_folder to item_pictures."""
     tables, no_drop = read_rule(rule, vanilla)
     out = {}
     for t in tables:
         s, d = I.load(src_data, t), I.load(d2r_data, t)
-        out[t] = (merge_cube(s, d, ctx, cube_fixes, cube_after, source=source) if t == "cubemain"
-                  else merge_keyed(t, s, d, ctx, vanilla, suffix, by_source_order=by_source_order, source=source))
+        out[t] = (merge_cube(s, d, ctx, cube_fixes, cube_after, source=source, merge_args=merge_args) if t == "cubemain"
+                  else merge_keyed(t, s, d, ctx, vanilla, suffix, by_source_order=by_source_order, source=source,
+                                       merge_args=merge_args))
     if no_drop:
         if not {"treasureclassex", *ITEM_TABLES} <= set(out):
             raise I.IdError(f"{rule.name}: no-drop needs treasureclassex and {', '.join(ITEM_TABLES)} merged here")
@@ -352,7 +364,8 @@ def apply(rule: Path, src_data: Path, d2r_data: Path, out_data: Path, ctx: I.Con
                 print(f"  WARNING: no upscaler given; {len(missed)} source pictures are not upscaled, so their "
                       f"items borrow D2R pictures ({', '.join(missed)})")
         else:
-            pictures = item_pictures(upscale, rule.parent / "art", src_data, d2r_data, out_data, uses, d2r_inv)
+            pictures = item_pictures(upscale, rule.parent / "art", src_data, d2r_data, out_data, uses, d2r_inv,
+                                     picture_folder)
         print(f"  item pictures: {len(pictures)} upscaled from the source's")
         models: dict[str, str] = {}
         borrowed: dict[tuple[str, str], str] = {}

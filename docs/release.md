@@ -378,7 +378,10 @@ folder. Options per entry, for what only some companions need:
 
 The project's own settings for a companion (a filter file, plugin configs) are listed in the manifest's top-level
 `config` (default `["companions/config/"]`) and replace the zip's defaults; `install` also overwrites a player's edits to
-those files in `d2rloader/config/`. `d2rloader.toml` is refused there: use `loader_settings`, which merges. A top-level
+those files in `d2rloader/config/`. `d2rloader.toml` is refused there: use `loader_settings`, which merges. The
+top-level `project_files` (`{"companions/x/settings.txt": "{mod}.mpq/data/global/excel/x/settings.txt"}`) copies project
+files to other places in the mod folder (`{mod}` is its name) when `install` or the stager overlays the companions; a
+missing source file is an error. A top-level
 or per-entry `game` (`"3.3"`, major.minor only, never a build number) is compared with the Version in
 `<game>/.build.info` before `install` copies anything; a mismatch refuses, and an unreadable `.build.info` (Steam) only
 warns. Bump one companion per change, after a coexistence check in a test slot. `fetch` never commits anything:
@@ -421,12 +424,17 @@ a release in one fail-fast run:
 py -3 release/stage.py --root path/to/mod --game <D2R folder> [--version 1.2.3] [--out dist]
 ```
 
-It folds the fragments in memory and checks the version's section exists, checks the game image (D2R.exe's PE
+It folds the fragments in memory and checks the version's section exists, checks the game image (D2RLoader.exe's PE
 timestamp against `game.image_timestamp`, when set) and the item type ids of `out/data`, lays out the installed mod
 folder (`out/data`, modinfo, loader metadata, `stage.plugins` from `stage.plugin_build_dir`, and with
 `stage.companions` the [companion plugins](#companion-plugins) and the vanilla tables they read), runs
 `package_release.py`, and writes the changelog section as the release notes. The fragments are deleted only after all of
 that succeeded. The `[stage]` and `repos.fragments` keys are in `release/release.example.toml`.
+Two optional extras for a mod that ships a plugin built elsewhere or pins the official loader. `--extra-plugin
+PATH[@SOURCE]` (repeatable) ships one more prebuilt DLL next to `stage.plugins` and adds the line
+`<dll name>: <SOURCE>, sha256 <hash>` to the release notes, so the release stays traceable to that exact file.
+`stage.loader_from_game = true` pins `<--game>/D2RLoader.exe` in `catalog.loader_files` at the `[d2rloader]` version
+(through a copy of release.toml in the staging folder; release.toml must then not set `catalog.loader_files`).
 
 The stager refuses a `mod.json` `name` that is not a single plain folder name or differs from `mod.folder`, and it
 runs `package_release.py` in the project folder, so `--root` works from any folder. It leaves only the release assets
@@ -685,7 +693,7 @@ A command-line option beats an environment variable, which beats the file, which
 | Section | Keys |
 |---|---|
 | `[mod]` | `name` (shown to players), `folder` (one plain word: the folder under `mods/` and the 7z's top folder), `save_folder` (`savepath`), `website`. |
-| `[game]` | `version`, `build`, optional `image_timestamp`. |
+| `[game]` | `version`, `build`, optional `image_timestamp` (PE TimeDateStamp of D2RLoader.exe, the image plugins check; the stager reads it from `--game`). |
 | `[d2rloader]` | `version`, `url`, `size`, `sha256`, `signerThumbprint`. Informational: the downloader never downloads the loader. |
 | `[launch]` | `default_mod`, `launch_arguments`: written into the manifest's `launch`. |
 | `[package]` | `dist`, `plugin_dir`, `plugin_forbidden_strings`, `preserve`, `forbidden` (regular expressions on the path in the mod folder), `data_dir`, `keep_identical`. |

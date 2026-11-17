@@ -122,8 +122,13 @@ jobs:
         run: |
           $v = $env:VERSION
           # the tag must be new: gh would attach a release to an existing bare tag, maybe on another commit
+          # Windows PowerShell 5.1 turns a native command's stderr into a terminating error under 'Stop' (the runner's
+          # default), and a tag that does not exist (the normal case) makes gh write "Not Found" there
+          $ErrorActionPreference = 'Continue'
           gh api "repos/$env:GITHUB_REPOSITORY/git/ref/tags/v$v" --silent 2>$null
-          if ($LASTEXITCODE -eq 0) { throw "tag v$v already exists: bump the version to publish again" }
+          $code = $LASTEXITCODE
+          $ErrorActionPreference = 'Stop'
+          if ($code -eq 0) { throw "tag v$v already exists: bump the version to publish again" }
           $sums = Get-ChildItem release-files -Recurse -Filter SHA256SUMS | Select-Object -First 1
           if (-not $sums) { throw "no SHA256SUMS in the build artifact" }
           $d = $sums.DirectoryName

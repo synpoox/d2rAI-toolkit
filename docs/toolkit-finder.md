@@ -106,6 +106,9 @@ endif()
 find_package(D2rToolkit REQUIRED)
 ```
 
+The same folder holds `ModkitPlugin.cmake`: after `add_subdirectory(<toolkit>/shared/plugin-common ...)`, `include(ModkitPlugin)` gives
+`modkit_add_plugin(<id> VERSION <v> SOURCES ...)`, one plugin DLL per call, linked to `plugin_common`.
+
 If a project cannot reach the toolkit before configuring, it can instead keep a copy of `FindD2rToolkit.cmake` in its
 own `cmake/` folder (the module needs nothing from the toolkit), at the cost of the copy drifting from the toolkit's.
 

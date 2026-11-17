@@ -106,7 +106,7 @@ git worktree add ../lanes/fix-crash-andariel -b ticket/123-fix-crash-andariel or
 
 To remove a finished lane worktree, use `tools/worktree_remove.ps1 -Path <worktree> [-DeleteBranch]`. A plain recursive
 delete walks through a junction to a shared data cache and destroys it; the script unlinks every junction first, checks
-the targets (and any `-Cache` folders) are unchanged, and refuses a locked, dirty or main-checkout target.
+the targets (and any `-Cache` folders; a relative symlink target counts from the link's folder) are unchanged, and refuses a locked, dirty or main-checkout target.
 
 Rules that keep this safe:
 

@@ -209,6 +209,15 @@ class TablesTests(unittest.TestCase):
         tables.rule(rule, self.root / "src", self.root / "d2r", self.root / "out", hooks={"levels": hook})
         self.assertIn(b"Act 1\t9", (self.root / "out/global/excel/levels.txt").read_bytes())
 
+    def test_a_project_spell_spells_every_cell(self):
+        self.write("src", "levels", table("Name | Id", "Act 1 | 1"))
+        self.write("d2r", "levels", table("Name | Id", "Act 1 | 1"))
+        rule = self.root / "tables.json"
+        rule.write_text(json.dumps({"levels": {}}), "utf-8")
+        tables.rule(rule, self.root / "src", self.root / "d2r", self.root / "out",
+                    spell=lambda t, c, v, ren: v + "!" if c == "Id" else v)
+        self.assertIn(b"Act 1\t1!", (self.root / "out/global/excel/levels.txt").read_bytes())
+
 
 if __name__ == "__main__":
     unittest.main()

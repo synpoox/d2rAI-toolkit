@@ -256,6 +256,33 @@ class CompanionTests(unittest.TestCase):
             companions.overlay(root, mod)
             self.assertEqual(toml.read_text(), "[d2rcore.other]\nitem_stat_ranges = false\n" + ITEM_RANGES)
 
+    def test_overlay_copies_project_files_into_the_mod_folder(self):
+        zipped = make_zip({"d2rloader/plugins/x.dll": b"dll", "Other.mpq/data/sfx/a.flac": b"a"})
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.project(Path(tmp), zipped)
+            companions.fetch(root, download=lambda *a: zipped)
+            manifest = json.loads((root / "companions" / "manifest.json").read_text())
+            manifest["project_files"] = {"companions/x/sig.txt": "{mod}.mpq/data/x/sig.txt"}
+            self.write_manifest(root, manifest)
+            mod = root / "game" / "mods" / "Mod"
+            with self.assertRaises(companions.CompanionError):  # the source is not there yet
+                companions.overlay(root, mod)
+            (root / "companions" / "x").mkdir()
+            (root / "companions" / "x" / "sig.txt").write_text("rows")
+            companions.overlay(root, mod)
+            self.assertEqual((mod / "Mod.mpq" / "data" / "x" / "sig.txt").read_text(), "rows")
+
+    def test_project_files_must_stay_inside_the_project_and_the_mod_folder(self):
+        zipped = make_zip({"d2rloader/plugins/x.dll": b"dll", "Other.mpq/data/sfx/a.flac": b"a"})
+        for src, dst in (("../x.txt", "a.txt"), ("a.txt", "../x.txt"), ("a.txt", "C:/x.txt"), ("/a.txt", "a.txt")):
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.project(Path(tmp), zipped)
+                manifest = json.loads((root / "companions" / "manifest.json").read_text())
+                manifest["project_files"] = {src: dst}
+                self.write_manifest(root, manifest)
+                with self.assertRaises(companions.CompanionError, msg=(src, dst)):
+                    companions.load_manifest(root)
+
     def test_no_loader_settings_leaves_the_config_alone(self):
         zipped = make_zip({"d2rloader/plugins/x.dll": b"dll", "Other.mpq/data/sfx/a.flac": b"a"})
         with tempfile.TemporaryDirectory() as tmp:
