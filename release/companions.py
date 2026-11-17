@@ -21,6 +21,9 @@ Manifest "game" (top level, and per entry to override): the D2R major.minor the 
 "3.3". `install` compares it with major.minor of the Version in <game>/.build.info (never a build number) and refuses
 on a mismatch; when the version cannot be read (the Steam install has no .build.info) it warns and goes on.
 The manifest's "config" may not list d2rloader.toml (use `loader_settings`, which merges instead of replacing).
+The manifest's "project_files" ({project file: path in the installed mod folder}) copies project files into the mod
+folder at `install` and at release staging; "{mod}" in the target is the mod folder's name. For example a settings
+file a companion reads from a data folder: {"companions/x/settings.txt": "{mod}.mpq/data/global/excel/x/settings.txt"}.
 
 Per-entry options (all optional; nothing about one mod is written into this script):
   files            zip path (or asset path) -> path in the installed mod folder; a key ending in "/" is a folder
@@ -175,6 +178,12 @@ def load_manifest(root: Path, manifest: Path | None = None) -> dict:
         _safe_rel(spec, f"config path {spec!r}")
         if _norm(spec).rsplit("/", 1)[-1].lower() == "d2rloader.toml":
             raise CompanionError(f"{spec}: d2rloader.toml cannot be a config file; use \"loader_settings\" to merge into it")
+    files = data.get("project_files", {})
+    if not isinstance(files, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in files.items()):
+        raise CompanionError(f"{path}: \"project_files\" must map project files to paths in the mod folder")
+    for src, dst in files.items():
+        _safe_rel(src, f"project_files source {src!r}")
+        _safe_rel(dst.replace("{mod}", "Mod"), f"project_files target {dst!r}", "must be a relative path inside the mod folder")
     for c in data["companions"]:
         if not isinstance(c, dict):
             raise CompanionError(f"{path}: every companion must be an object")
@@ -317,14 +326,22 @@ def apply_settings(toml: Path, settings: dict) -> None:
 
 
 def overlay(root: Path, mod_dir: Path, manifest: Path | None = None) -> None:
-    """Copy generated/companions/ over an installed mod folder and apply the entries' loader settings."""
+    """Copy generated/companions/ over an installed mod folder, then the manifest's project_files, and apply the
+    entries' loader settings."""
     root = Path(root)
     src = root / "generated" / "companions"
     if not src.is_dir():
         raise CompanionError(f"{src} missing: run companions.py fetch")
     shutil.copytree(src, mod_dir, dirs_exist_ok=True)
+    data = load_manifest(root, manifest)
+    for rel, dst in data.get("project_files", {}).items():
+        if not (root / rel).is_file():
+            raise CompanionError(f"project_files: {root / rel} is missing")
+        target = _inside(Path(mod_dir), dst.replace("{mod}", Path(mod_dir).name), f"project_files target {dst!r}")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(root / rel, target)
     merged: dict[str, dict] = {}
-    for c in load_manifest(root, manifest)["companions"]:
+    for c in data["companions"]:
         for section, keys in c.get("loader_settings", {}).items():
             merged.setdefault(section, {}).update(keys)
     if merged:

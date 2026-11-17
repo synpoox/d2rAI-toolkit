@@ -1,4 +1,5 @@
 // The parts table: engine parts stay off on another image, other parts install, reports and status lines. No game.
+#include "log.h"
 #include "parts.h"
 
 #include <cstdio>
@@ -12,6 +13,13 @@ int g_installs = 0;
 void Check(bool ok, const char* what) {
 	std::printf("%s: %s\n", ok ? "ok  " : "FAIL", what);
 	g_failures += ok ? 0 : 1;
+}
+
+char g_logged[3200] = "";
+
+void InstallLong(const D2RL::PluginContext*, char* report, size_t size) noexcept {
+	std::memset(report, 'y', 2700);
+	report[size > 2700 ? 2700 : size - 1] = '\0';
 }
 
 void InstallA(const D2RL::PluginContext*, char* report, size_t size) noexcept {
@@ -54,6 +62,29 @@ int main() {
 	char why[200];
 	Check(!parts::SkipReason(table[0], false, "test-plugin", why, sizeof(why)), "SkipReason: nothing to skip");
 	Check(parts::SkipReason(table[1], false, "test-plugin", why, sizeof(why)), "SkipReason: an engine part on another image");
+
+	// A report of one entry per installed slot is kept whole (it was cut at 511 bytes)
+	parts::Part longPart {"long", false, nullptr};
+	std::memset(longPart.report, 'x', 2500);
+	longPart.report[2500] = '\0';
+	static char big[parts::ReportSize];
+	parts::Line(longPart, big, sizeof(big));
+	Check(std::strlen(big) == 2500, "a 2500-byte report fits a part and its status line");
+
+	// The install log line carries the whole report (plog's body was 2400 bytes and cut it)
+	D2RL::PluginApi api {};
+	api.apiSize = D2RL::PluginApiSize;
+	api.logInfo = [](const D2RL::PluginContext*, const char* message) noexcept {
+		std::snprintf(g_logged, sizeof(g_logged), "%s", message);
+	};
+	D2RL::PluginContext context {};
+	context.contextSize = sizeof(context);
+	context.api = &api;
+	plog::Init(&context, "test-plugin");
+	parts::Part longLogged {"long", false, InstallLong};
+	parts::InstallAll(&longLogged, 1, &context, "test-plugin", true);
+	Check(std::strlen(longLogged.report) == 2700 && std::strlen(g_logged) == std::strlen("test-plugin: long ") + 2700,
+	      "the install log line holds a 2700-byte report whole");
 
 	std::printf("%d failure(s)\n", g_failures);
 	return g_failures == 0 ? 0 : 1;

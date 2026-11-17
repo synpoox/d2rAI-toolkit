@@ -31,6 +31,8 @@ namespace parts {
 
 using InstallFn = void (*)(const D2RL::PluginContext* context, char* report, size_t size) noexcept;
 
+inline constexpr size_t ReportSize = 2800;  // room for a part that lists one entry per slot it installed
+
 struct Part;
 // A live state line for the status command (counters, queue depth): writes into `out`. Optional.
 using StateFn = void (*)(const Part& part, char* out, size_t size) noexcept;
@@ -41,7 +43,7 @@ struct Part {
 	InstallFn install;
 	StateFn state = nullptr;
 	std::span<sigscan::Entry* const> uses {};  // the signature entries it reads (engine parts gated by them, see above)
-	char report[512] = "";  // what the install said, or why the part is off
+	char report[ReportSize] = "";  // what the install said, or why the part is off
 };
 
 // Why a part is not installed ("" when it is): left out by the off file, an entry in `uses` that did not resolve, or

@@ -36,7 +36,7 @@ DEFAULTS = {
     "game": {
         "version": "3.3.0",          # D2R's version, shown in the notes
         "build": "93847",            # the D2R build the plugin needs
-        "image_timestamp": "",       # optional: PE TimeDateStamp of D2R.exe, e.g. "0x6ab3782c"
+        "image_timestamp": "",       # optional: PE TimeDateStamp of D2RLoader.exe (the image plugins check), e.g. "0x6ab3782c"
     },
     "d2rloader": {                   # the pinned D2RLoader: informational for the downloader (it never downloads it)
         "version": "1.3.1-beta",
@@ -82,6 +82,7 @@ DEFAULTS = {
         "companions": False,          # install generated/companions/ (release/companions.py fetch) with the mod
         "companions_manifest": "",    # "" = companions/manifest.json
         "item_type_check": True,      # run plugin-template/tools/item_type_ids.py on out/data's itemtypes.txt
+        "loader_from_game": False,    # pin --game's official D2RLoader.exe in the catalog (catalog.loader_files must not be set)
     },
     "site": {
         "url": "https://files.example.com/mymod/",   # what players' downloaders read (HTTPS, ends in '/')
