@@ -1,6 +1,7 @@
 // The signature matcher and resolver (sig.h) on made-up bytes and a made-up PE image, and the per-part gate. No game.
 #include "parts.h"
 #include "sig.h"
+#include "sig_hook.h"
 
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -63,6 +64,8 @@ struct FakeImage {
 	}
 	auto base() const -> uint64_t { return reinterpret_cast<uint64_t>(bytes); }
 };
+
+[[maybe_unused]] auto* const g_hookCompiles = &sigscan::HookBySignature<void (*)() noexcept>;  // the header builds
 
 }  // namespace
 
@@ -138,6 +141,18 @@ int main() {
 	FakeImage otherBuild(0x33334444);
 	sigscan::Resolve(fixedOnly, 1, otherBuild.base(), fixedCache, 1);
 	Check(fixed.state == sigscan::State::CacheOnly && fixed.address == 0, "a fixed entry stays off on any other stamp");
+
+	// --- ScanUnique ---
+	uint64_t r = 7;
+	Check(sigscan::ScanUnique(image.base(), "48 89 5c 24 08 57", 0, &r) == 1 && r == 0x1010, "ScanUnique: one match, its RVA");
+	Check(sigscan::ScanUnique(image.base(), "48 89 5c 24 08 57", 5, &r) == 1 && r == 0x1015, "ScanUnique: offset from the match");
+	Check(sigscan::ScanUnique(image.base(), "48 8d 0d ?? ?? ?? ?? c3", 0, &r) == 1 && r == 0x1040, "ScanUnique: ?? wildcards");
+	r = 7;
+	Check(sigscan::ScanUnique(image.base(), "11 22 33 44", 0, &r) == 0 && r == 7, "ScanUnique: no match -> 0");
+	Check(sigscan::ScanUnique(image.base(), "de ad be", 0, &r) == 2 && r == 7, "ScanUnique: two matches -> 2, no RVA");
+	Check(sigscan::ScanUnique(image.base(), "48 89 5c 24 08 57", 0x2000, &r) == -1, "ScanUnique: offset out of the code -> -1");
+	Check(sigscan::ScanUnique(image.base(), "zz", 0, &r) == -1 && sigscan::ScanUnique(0, "48 89", 0, &r) == -1,
+	      "ScanUnique: bad pattern or no image -> -1");
 
 	// --- Parts gated by their entries ---
 	sigscan::Resolve(all, 7, image.base(), nullptr, 0);

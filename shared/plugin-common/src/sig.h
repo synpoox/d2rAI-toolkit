@@ -68,6 +68,12 @@ auto Target(const Entry& entry, const uint8_t* image, const uint8_t* match) noex
 // the image (in an executable section for Code).
 void Resolve(Entry* const* entries, size_t count, uint64_t exeBase, const Cache* caches, size_t cacheCount) noexcept;
 
+// One pattern, no Entry: how many times `pattern` matches in the executable sections of the image at exeBase (counted up to
+// 64), and when exactly once, its RVA + `offset` (the offset from the match to e.g. a function entry, may be negative) in
+// *rva, which must lie in an executable section. 0 = none, 1 = one match (*rva set), n > 1 = several, -1 = bad pattern,
+// no PE image, or an offset that leaves the executable code (*rva is untouched unless 1).
+auto ScanUnique(uint64_t exeBase, const char* pattern, int offset, uint64_t* rva) noexcept -> int;
+
 // "not found", "several matches", ...
 auto StateText(State state) noexcept -> const char*;
 
