@@ -195,6 +195,17 @@ class StageTests(unittest.TestCase):
                 with self.assertRaises(stage.ReleaseError):
                     stage.stage(root, Path(tmp) / "s", config(), read=lambda rel: b"v")
 
+    def test_legal_files_of_the_project_root_ship_at_the_mod_folder_root(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.project(Path(tmp) / "p")
+            self.assertEqual([p.name for p in stage.stage(root, Path(tmp) / "s0", config()).glob("[LNC]*")], [])
+            (root / "LICENSE").write_text("MIT")
+            (root / "NOTICE.md").write_text("notice")
+            mod = stage.stage(root, Path(tmp) / "s1", config())
+            self.assertEqual((mod / "LICENSE").read_text(), "MIT")
+            self.assertEqual((mod / "NOTICE.md").read_text(), "notice")
+            self.assertFalse((mod / "COPYING").exists())
+
     def test_without_companions_only_the_plugins_ship(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.project(Path(tmp) / "p")

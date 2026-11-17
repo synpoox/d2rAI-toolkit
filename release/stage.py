@@ -7,7 +7,8 @@ Run it after the project's whole build (data merged, `modkit build`, plugins bui
   2. checks the game image (D2RLoader.exe's PE timestamp against game.image_timestamp, when the config sets one) and the
      item type ids of out/data (plugin-template/tools/item_type_ids.py, unless stage.item_type_check = false),
   3. lays the mod folder out in <out>/.stage-mod/<name>/ (a folder this tool creates and removes, nothing else) as `modkit install` does: out/data, modinfo, loader metadata and
-     config, the companions (release/companions.py overlay, the vanilla tables they read from DIR) and the built plugins,
+     config, the companions (release/companions.py overlay, the vanilla tables they read from DIR), the built plugins and the
+     project's LICENSE/NOTICE/COPYING files (LEGAL_FILES, those that exist) at the mod folder's root,
   4. runs release/package_release.py with the config, and replaces its notes with the changelog section alone.
 The fragments are deleted only when the whole run succeeded; any failure leaves the changelog and fragments as they were.
 
@@ -42,6 +43,7 @@ import companions as comp  # noqa: E402
 import release_config  # noqa: E402
 
 
+LEGAL_FILES = ("LICENSE", "LICENSE.md", "LICENSE.txt", "NOTICE", "NOTICE.md", "NOTICE.txt", "COPYING")  # copied when present
 STAGE_DIR = ".stage-mod"  # under --out; never a name a project or a user uses for their own files
 
 
@@ -197,6 +199,9 @@ def stage(root: Path, out: Path, cfg: dict, read: Callable[[str], bytes] | None 
             comp.fill_tables(dest / f"{name}.mpq" / "data" / "global" / "excel", read, tables)
     for dll in [*dlls, *extra_plugins]:
         shutil.copy2(dll, d2rl / "plugins" / dll.name)
+    for f in LEGAL_FILES:  # the package's top folder is the mod folder, so these land at its root, where INSTALL.txt does
+        if (root / f).is_file():
+            shutil.copy2(root / f, dest / f)
     return dest
 
 

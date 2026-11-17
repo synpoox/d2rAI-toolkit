@@ -427,7 +427,9 @@ py -3 release/stage.py --root path/to/mod --game <D2R folder> [--version 1.2.3] 
 It folds the fragments in memory and checks the version's section exists, checks the game image (D2RLoader.exe's PE
 timestamp against `game.image_timestamp`, when set) and the item type ids of `out/data`, lays out the installed mod
 folder (`out/data`, modinfo, loader metadata, `stage.plugins` from `stage.plugin_build_dir`, and with
-`stage.companions` the [companion plugins](#companion-plugins) and the vanilla tables they read), runs
+`stage.companions` the [companion plugins](#companion-plugins) and the vanilla tables they read, plus the project's
+`LICENSE`, `LICENSE.md`, `LICENSE.txt`, `NOTICE`, `NOTICE.md`, `NOTICE.txt` and `COPYING` that exist, at the mod
+folder's root), runs
 `package_release.py`, and writes the changelog section as the release notes. The fragments are deleted only after all of
 that succeeded. The `[stage]` and `repos.fragments` keys are in `release/release.example.toml`.
 Two optional extras for a mod that ships a plugin built elsewhere or pins the official loader. `--extra-plugin
