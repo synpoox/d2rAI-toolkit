@@ -216,7 +216,8 @@ that slot's folder.
 
 ## Controlling the game
 
-`testing/game_ctl.py` drives one slot. The slot comes from `--slot N` or `MODKIT_SLOT`. Slot 1 is refused.
+`testing/game_ctl.py` drives one slot. The slot comes from `--slot N` or `MODKIT_SLOT`. Slot 1 is refused. `MODKIT_RUN`
+(or `--owner`) must be set for every command but `status`: it names the run that holds the lock.
 
 ```sh
 python testing/game_ctl.py --slot 2 status                 # folder, running pids, lock

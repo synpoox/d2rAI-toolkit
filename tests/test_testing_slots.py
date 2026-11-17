@@ -456,8 +456,9 @@ class LockGuardTests(unittest.TestCase):
         real = self.gc.Game.require_lock
         game.require_lock.side_effect = lambda: real(game)
         game.cfg, game.slot, game.owner = self.cfg, 2, owner
-        with mock.patch.object(self.gc, "Game", return_value=game), mock.patch.object(self.gc.tc, "load", return_value=self.cfg),                 contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
-            rc = self.gc.main(["--slot", "2", "--owner", owner, *argv])
+        with mock.patch.object(self.gc, "Game", return_value=game) as made,                 mock.patch.object(self.gc.tc, "load", return_value=self.cfg),                 mock.patch.dict(os.environ, {"MODKIT_RUN": ""}),                 contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+            rc = self.gc.main(["--slot", "2", *(["--owner", owner] if owner else []), *argv])
+        self.made = made
         return rc, err.getvalue(), game
 
     def test_holds_lock(self):
@@ -483,6 +484,32 @@ class LockGuardTests(unittest.TestCase):
                 self.assertIn("lane-a", err)
                 for name in ("console_text", "click", "key", "shot", "stop", "harness_switch"):
                     getattr(game, name).assert_not_called()
+        rc, err, game = self.cli("lane-a", "key", "g")
+        self.assertEqual((rc, err), (0, ""))
+        game.key.assert_called_once_with("g")
+
+    def test_no_owner_is_refused_for_every_command_but_status(self):
+        for argv in (["start"], ["stop"], ["console", "x"], ["shot"]):
+            with self.subTest(argv):
+                rc, err, _ = self.cli(None, *argv)
+                self.assertEqual(rc, 2)
+                self.assertIn("MODKIT_RUN", err)
+        rc, err, _ = self.cli(None, "status")
+        self.assertEqual((rc, err), (0, ""))
+
+    def test_main_hands_the_owner_to_game(self):
+        self.cli("lane-a", "status")
+        self.assertEqual(self.made.call_args.kwargs["owner"], "lane-a")
+
+    def test_start_is_refused_under_another_owners_lock(self):
+        gs.acquire(self.cfg, 2, "lane-a")
+        ok, msg, _ = gs.ensure_lock(self.cfg, 2, "lane-b")
+        self.assertFalse(ok)
+        self.assertIn("lane-a", msg)
+
+    def test_a_manual_pid_0_lock_passes_for_its_owner(self):
+        gs.acquire(self.cfg, 2, "lane-a", pid=0)
+        self.assertIsNone(gs.holds_lock(self.cfg, 2, "lane-a"))
         rc, err, game = self.cli("lane-a", "key", "g")
         self.assertEqual((rc, err), (0, ""))
         game.key.assert_called_once_with("g")

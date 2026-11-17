@@ -831,7 +831,10 @@ def main(argv: list[str] | None = None) -> int:
         slot = a.slot or tc.env_slot()
         if slot is None:
             raise GameCtlError("give --slot N or set MODKIT_SLOT (there is no default: slot 1 is the user's own game)")
-        g = Game(cfg, slot, owner=a.owner)
+        owner = a.owner or tc.env_run()
+        if not owner and a.cmd != "status":  # else every call gets its own run-<pid> owner and a bare start leaves an orphan lock
+            raise GameCtlError("set MODKIT_RUN=<lane> or pass --owner <lane>")
+        g = Game(cfg, slot, owner=owner)
         return _run(g, a)
     except (tc.ConfigError, GameCtlError) as e:
         print(f"error: {e}", file=sys.stderr)
