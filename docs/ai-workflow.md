@@ -351,7 +351,7 @@ Setting up a project:
 
 - [ ] Repo created, `main` protected in practice (only the orchestrator merges).
 - [ ] `docs/PLAN.md`, `docs/deviations.md`, `changelog.d/` (and `CHANGELOG.md` from its README) created from the templates.
-- [ ] `AGENTS.md` and `docs/agents/` written; private-words list created outside the repo; `tools/check_public.py` wired in.
+- [ ] `AGENTS.md` and `docs/agents/` written; private-words list created outside the repo; `tools/check_public.py` wired in (`tools/install_hooks.py --root <mod repo>`).
 - [ ] Commit identity decided (noreply address) and written into the rules.
 - [ ] Game slots set up and locked-down; the owner's real install marked untouchable.
 - [ ] Tokens and keys placed by the owner in files in their home folder.

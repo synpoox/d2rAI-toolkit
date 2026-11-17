@@ -434,8 +434,9 @@ Everything a run writes goes to `<runs.dir>/<run id>/`:
 
 `game_ctl.py shot NAME` outside a run saves under the run named by `MODKIT_RUN`, else `adhoc`.
 
-Screenshots show the game. Keep the whole `runs.dir` **outside the repository**, and never commit a screenshot of the
-game, a save or a log. Share a result by its summary text, or by describing what the picture shows.
+Screenshots show the game. Keep the whole `runs.dir` **outside the repository**, and never commit or push a screenshot
+of the game (to any branch, an issue-image branch included), a save or a log. `tools/check_public.py` refuses
+screenshot-size PNGs. Share a result by its summary text, or by describing what the picture shows.
 
 ### Screenshots that settle the question
 

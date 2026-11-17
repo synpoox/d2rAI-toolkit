@@ -10,7 +10,7 @@ text chunks of PNG images, and on the commit messages and author fields of the c
    term itself is never printed, so logs and CI output cannot leak it.
 2. Generic checks that every project benefits from: e-mail addresses (except noreply and example.* ones),
    IPv4 addresses, Windows user paths (C:\\Users\\<name>), home directories, private keys and access tokens,
-   and PNG text/EXIF metadata.
+   PNG text/EXIF metadata, and PNGs of screenshot size (600x360 or more; real art goes in check_public.allow).
 
 If no terms file exists the generic checks still run, and the report says so.
 
@@ -45,6 +45,7 @@ ALLOW_NAME = "check_public.allow"
 
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 PNG_TEXT_CHUNKS = (b"tEXt", b"zTXt", b"iTXt", b"eXIf")
+SCREENSHOT_MIN = (600, 360)    # width, height at or above which a PNG counts as a screenshot
 MAX_ZIP_DEPTH = 2
 MAX_ZIP_MEMBER = 64 * 1024 * 1024
 
@@ -251,6 +252,11 @@ class Scanner:
             self.scan_zip(path, data, depth, where)
 
     def scan_png(self, path: str, data: bytes, where: str) -> None:
+        # Mod art is item/icon sized (<= 336 px); game screenshots are window sized. shortcut: PNG only, add JPEG if one slips through.
+        w, h = struct.unpack(">II", data[16:24]) if data[12:16] == b"IHDR" else (0, 0)
+        if w >= SCREENSHOT_MIN[0] and h >= SCREENSHOT_MIN[1] and not self.allow.allows(path, "screenshot", "screenshot"):
+            self._add(Hit(where, "IHDR", "screenshot", f"{w}x{h} image looks like a game screenshot: never commit or push "
+                          "one (any branch); keep it in the run folder and report it in words"))
         for name, payload in png_text_chunks(data):
             tag = name.decode("ascii", "replace")
             if not self.allow.allows(path, tag, tag):

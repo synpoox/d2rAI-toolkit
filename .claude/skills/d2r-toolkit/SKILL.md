@@ -114,8 +114,8 @@ address, a fix), add it to `${CLAUDE_PLUGIN_ROOT}/knowledge/` in the toolkit and
    after every itemtypes change (${CLAUDE_PLUGIN_ROOT}/knowledge/porting-classic-mods.md).
 10. **Keep the repo public-clean.** No real names, e-mails, hosts, IPs or tokens; no other projects' names. Keep
     a private-words list outside the repo (`~/.d2r-modkit/private_terms.txt`, one word per line) and run
-    `py -3 ${CLAUDE_PLUGIN_ROOT}/tools/check_public.py --root <mod repo>` before every commit. Commit with a
-    noreply identity.
+    `py -3 ${CLAUDE_PLUGIN_ROOT}/tools/check_public.py --root <mod repo>` before every commit; `py -3 ${CLAUDE_PLUGIN_ROOT}/tools/install_hooks.py --root <mod repo>` makes git run it
+    on every commit (it also refuses screenshot-size PNGs). Commit with a noreply identity.
 11. **Working with agents:** one bug or feature per lane (own branch, own worktree, PR); lanes never merge; a
     separate reviewer checks each PR (at most 2 fix cycles), the orchestrator squash-merges and releases and never
     implements; duplicate issues are closed before fixing. Details:
