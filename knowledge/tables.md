@@ -121,6 +121,14 @@ validator from these files: it types every cell, checks references, key lengths 
 8. Formulas: 255 chars max, 32-byte quoted names, no bare negative literals (`(0-N)`), bracketed ternary
    branches.
 
+### New levels: `LevelEntry` and `LevelType` (build 93847)
+
+- An empty `LevelEntry` on a level with a `LevelName` shows "Missing string" in the area banner. Give every new level
+  a `LevelEntry` key that `strings` defines (D2R's own use `Entering<Name>`).
+- A `LevelType` past the last lvltypes row (id 35 in D2R, 36 rows) makes the game read a null row at startup
+  (function FUN_140a13860). A mod that ships no lvltypes.txt of its own must keep every level's `LevelType` within
+  D2R's rows (0 is "None").
+
 ## Freeze before release
 
 A character file stores rolled values, ids and bit-packed fields; the tables say how to decode them. After players

@@ -103,9 +103,10 @@ def compare(name: str, src: Table, mod: Table, ren: dict[str, dict[str, str]] | 
     position, and a repeated column is read once, as the merge reads it. The source's rows, columns and cells are read
     in the mod's spelling: columns matched as the merges match them (ids.source_columns), rows renamed by `ren`
     (ids.renames), cells spelled by `spell`, fixed by the
-    project's `fix_row` and `fix`, and the num_refs (default NUM_REFS) and ID_COLS columns in the mod's ids (`id_map`, ids.ids_of). `rows`
-    pairs a tables.json table's rows as its merge did. Excel's quote marks are not data."""
+    project's `fix_row` and `fix`, and the num_refs (default NUM_REFS) and ID_COLS columns in the mod's ids
+    (`id_map`, ids.ids_of). `rows` pairs a tables.json table's rows as its merge did. Excel's quote marks are not data."""
     res = Result(name)
+    refs = (ids.NUM_REFS if num_refs is None else num_refs).get(name, {})
     def data(i: int) -> bool:
         return not src.header[i].startswith("*") and src.header[i].lower() != "eol"
     to_src = ids.source_columns(name, src.header, mod.header)
@@ -127,7 +128,7 @@ def compare(name: str, src: Table, mod: Table, ren: dict[str, dict[str, str]] | 
         if fix:
             fix(name, mod.header, want, src.header, pr)
         for j, c in enumerate(mod.header):  # level tables' row numbers, in the mod's ids
-            t = (ids.NUM_REFS if num_refs is None else num_refs).get(name, {}).get(c) or (name if ids.ID_COLS.get(name) == c else None)
+            t = refs.get(c) or (name if ids.ID_COLS.get(name) == c else None)
             if id_map and t:
                 want[j] = id_map.get(t, {}).get(want[j], want[j])
         res.open += [(f"{name}.{row}.{c}", pr[i], mr[j]) for c, i, j in cols if not same(want[j], mr[j])]
@@ -182,14 +183,15 @@ def gate(src_excel: Path, mod_excel: Path, d2r_excel: Path, deviation_list: Path
          tables_json: dict | None = None, renames: dict[str, dict[str, str]] | None = None,
          compare_args: Callable[[str], dict] = lambda table: {}, source: str = "source",
          extract_hint: str = "run the extract", own: Callable[[str], bool] | None = None,
-         own_label: str = "merged") -> Report:
+         own_label: str = "merged", strict_whole_table: bool = False) -> Report:
     """Compare every source table `select` picks with the mod's: the merged one in mod_excel, else D2R's (not merged
     yet), else none (a deviation of the whole table). `statuses` are the project's deviation statuses, in the order
     the report counts them (no default: each project names its own). `lists` are the project's id lists, `tables_json` its
     tables.json (for each table's `rows`); `renames` are the merge's other renames (tables.extra_renames), added to
     the id lists'; compare_args(table) gives that table's extra compare() arguments (id_map,
-    by_row, list_paired, fix_row, fix, spell, num_refs). A deviation list pattern for a whole merged table (whole_table:
-    `t.*`, `t*`, `*.*.*`) fails the run.
+    by_row, list_paired, fix_row, fix, spell, num_refs). A deviation list pattern `t.*` for a merged table fails the run; with
+    `strict_whole_table` so does any other pattern for the whole table (whole_table: `t.*.*`, `t*`, `*.*.*`). A
+    project that allows `t.*.*` on purpose leaves it off (the default).
     `own(file name)` says whether the project owns (imports) a table that is in mod_excel (default: every one is);
     its result is labelled `own_label` (default "merged"). A table in mod_excel that is not owned is D2R's, committed
     to edit it: compared by name as D2R's table is, and also against D2R's own table, so an edit shows as a deviation."""
@@ -216,7 +218,9 @@ def gate(src_excel: Path, mod_excel: Path, d2r_excel: Path, deviation_list: Path
             if found[1].parent == mod_excel and (d2r_excel / p.name).is_file() and found[0] != own_label:
                 res.open += [d for d in compare(p.stem, Table(d2r_excel / p.name, key), Table(found[1], key)).open
                              if d not in res.open]
-            if found[1].parent == mod_excel and any(whole_table(q, p.stem.lower()) for q in patterns):
+            if found[1].parent == mod_excel and (
+                    any(whole_table(q, p.stem.lower()) for q in patterns) if strict_whole_table
+                    else f"{p.stem.lower()}.*" in patterns):
                 raise GateError(f"{deviation_list.name} still covers all of {p.stem}, which is merged now: replace "
                                 "it with row- or column-specific patterns")
         results.append(triage(res, patterns))

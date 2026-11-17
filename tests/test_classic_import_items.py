@@ -152,6 +152,28 @@ class HdTests(unittest.TestCase):
         self.assertEqual(model("ne3|none|mine|x", neutral={"weapons": "bow1"}), {"src/mine": "bow1"}, "neutral model")
         self.assertEqual(model("ne3|none|mine|x"), {"src/mine": "axe1"}, "no neutral model: the table's first")
 
+    def two_tables(self, head_src: str):
+        write(self.hd / "items.json", json.dumps([{"hax": {"asset": "axe1"}}, {"bow": {"asset": "bow1"}},
+                                                  {"cap": {"asset": "cap1"}}, {"axe": {"asset": "armaxe"}}]))
+        d2r = {"weapons": self.d2r["weapons"],
+               "armor": table("code|type|invfile", "cap|helm|inv_cap", "axe|shld|inv_axe")}
+        borrowed: dict[tuple[str, str], str] = {}
+        files = items.hd_items(self.hd, self.src(head_src), d2r, [], [], None, None, borrowed)
+        return {k: v["asset"] for e in files["items.json"] for k, v in e.items()}, borrowed
+
+    def test_a_picture_from_another_table_is_borrowed(self):
+        assets, borrowed = self.two_tables("ne1|axe|inv_cap")
+        self.assertEqual((assets["ne1"], borrowed), ("cap1", {("weapons", "cap1"): "armor"}))
+
+    def test_an_invfile_in_the_same_table_wins_over_another_tables(self):
+        assets, borrowed = self.two_tables("ne1|axe|inv_axe")  # armor has inv_axe too, with its own picture
+        self.assertEqual((assets["ne1"], borrowed), ("axe1", {}))
+
+    def test_a_new_code_with_no_picture_of_its_own_takes_the_neutral_model(self):
+        files = items.hd_items(self.hd, self.src("ne1|none|inv_unknown"), self.d2r, [], [], None, None, None,
+                               {"weapons": "bow1"})
+        self.assertEqual(files["items.json"][-1], {"ne1": {"asset": "bow1"}})
+
     def test_a_four_letter_code_needs_bit_0x20_in_its_last_letter(self):
         with self.assertRaisesRegex(I.IdError, "bit 0x20"):
             items.hd_items(self.hd, self.src("abcD|axe|inv_axe"), self.d2r, [], [])
