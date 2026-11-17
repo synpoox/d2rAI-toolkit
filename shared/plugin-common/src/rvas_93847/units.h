@@ -95,9 +95,6 @@ inline constexpr uint64_t UnitDistance = 0x324fc0;  // (a, b) -> distance in sub
 inline constexpr uint64_t UnitSize = 0x34b580;  // (unit) -> collision size: a missile's row Size, 2 for a player
 // (room, x, y, mask) -> the mask's bits set at subtile x/y (0x27 with no room there), 1.13c's single-point test
 inline constexpr uint64_t CollisionAt = 0x366250;
-// (unit, x, y, mask) -> non-zero when the unit, at its size, collides at x/y; D2R's Teleport (srvdo 27, 0x554c40)
-// refuses on it with mask 0x804 for levels whose Teleport column is 2
-inline constexpr uint64_t UnitCollidesAt = 0x350a20;
 // int32[64] x and y offsets of D2's 64 directions (radius 30), the ones Nova's srvhit 5 (0x45fd20) aims at
 inline constexpr uint64_t DirectionX = 0x1d1b650;
 inline constexpr uint64_t DirectionY = 0x1d1b750;
