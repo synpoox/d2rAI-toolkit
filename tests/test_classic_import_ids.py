@@ -41,6 +41,8 @@ class CheckTests(unittest.TestCase):
         ids.check("t", [("A", 0, "A"), ("+0 x=1", 2, "B"), ("+0 x=1", 3, "C")], ["A"], ["A", "X"])
         with self.assertRaisesRegex(ids.IdError, "listed twice"):
             ids.check("t", [("A", 0, "A"), ("A", 2, "B")], ["A"], ["A", "X"])
+        with self.assertRaisesRegex(ids.IdError, "an id is listed twice"):
+            ids.check("t", [("A", 0, "A"), ("+0 x=1", 2, "B"), ("+0 y=1", 2, "C")], ["A"], ["A", "X"])
 
     def test_refusals(self):
         for lines, src, msg in [
