@@ -95,7 +95,7 @@ badge on the character select banner), and `cheat expansion 2` does not convert 
 2. **Read `${CLAUDE_PLUGIN_ROOT}/knowledge/cheat-commands.md` first,** then use the console, not clicks and walking: the cheats spawn the item,
    the monster, the level and the stats. Clicks and movement are hard to get right; use them only for what the console
    cannot do.
-3. **Ten minutes without significant progress on what the check checks: stop.** Stop the game, unlock the slot, and file
+3. **Five minutes without significant progress on what the check checks: stop.** Stop the game, unlock the slot, and file
    an issue labelled `ready-for-human` (or the project's equivalent; the label may not exist in a mod repo, so create it
    first with `gh label create ready-for-human`) with the steps left and what you already verified.
 4. **Hold one lock from install to cleanup.** Take the slot once, install, test, stop, unlock. Do not release and retake
