@@ -37,6 +37,11 @@ class CheckTests(unittest.TestCase):
         ids.check("t", [("A", 0, "A"), ("B", 2, "B")], ["A", "B"], ["A", "X"])
         ids.check("magicprefix", [("A", 0, "A"), ("B", 2, "B"), ("+0 x=1", 3, "A")], ["A", "B"], ["A", "X"])
 
+    def test_port_rows_may_share_text_but_not_ids(self):
+        ids.check("t", [("A", 0, "A"), ("+0 x=1", 2, "B"), ("+0 x=1", 3, "C")], ["A"], ["A", "X"])
+        with self.assertRaisesRegex(ids.IdError, "listed twice"):
+            ids.check("t", [("A", 0, "A"), ("A", 2, "B")], ["A"], ["A", "X"])
+
     def test_refusals(self):
         for lines, src, msg in [
                 ([("A", 0, "A")], ["A", "B"], "rows with no id \\(B\\): seed the list$"),
@@ -132,6 +137,17 @@ class MergeTableTests(unittest.TestCase):
                                        ["New", "ring", "", ""], ["Devil's", "tors", "", "3"]])
         with self.assertRaisesRegex(ids.IdError, "no column 'itype9'"):
             ids.merge_table("magicprefix", src, d2r, [*lines[:2], ("+1 itype9=x", 3, "Devil's")], {})
+
+    def test_port_row_quoted_columns_and_copy_of_a_port_row(self):
+        self.assertEqual(ids.port_row("+3 a=1 \"Send Bits=11\" b=it's c="), (3, {"a": "1", "Send Bits": "11", "b": "it's", "c": ""}))
+        self.assertEqual(ids.port_row(r"+2 x=a\b"), (2, {"x": r"a\b"}))
+        with self.assertRaisesRegex(ids.IdError, "unclosed"):
+            ids.port_row('+1 "a=1')
+        d2r = table("name|Send Bits|Add\r\nA|1|0\r\n")
+        src = table("name|Send Bits|Add\r\nA|1|0\r\n")
+        lines = [("A", 0, "A"), ('+0 "Send Bits=11" Add=5', 1, "B"), ('+1 "Send Bits=12"', 2, "C")]
+        merged = ids.merge_table("t", src, d2r, lines, {})[0]
+        self.assertEqual(merged.rows, [["A", "1", "0"], ["B", "11", "5"], ["C", "12", "5"]])
 
     def test_add_columns_d2r_loads_but_its_file_lacks(self):
         d2r = table("name|code\r\nArrows|aqv\r\nKey|key\r\n")

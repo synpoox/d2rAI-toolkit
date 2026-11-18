@@ -8,7 +8,8 @@ the third column then says why. An id at or below D2R's last row merges the sour
 D2R's name, so D2R's own files that name it stay valid (DISPLAY_KEYS tables keep the source's: there the key is the
 text the player sees); a higher id appends the row. Lines are only ever added (seed), never renumbered.
 A line whose source name starts with `+` is a row the port adds (port_row): `+<id> col=value ...` appends a copy of
-the mod's row `<id>` (an earlier one) with those columns set, at the line's id after D2R's rows.
+the mod's row `<id>` (a D2R row or an earlier port row) with those columns set (quote a token whose column name has
+a space: `"Send Bits=11"`), at the line's id after D2R's rows.
 
 Seeding a new source row picks, in order:
   1. the same id, below `vanilla` (the project's count of rows both games keep from vanilla 1.13c), often renamed on
@@ -30,6 +31,7 @@ property_kinds). context_of gathers the lists, renames, ids (monstats_ids too) a
 from __future__ import annotations
 
 import re
+import shlex
 from pathlib import Path
 from typing import Callable, NamedTuple
 
@@ -131,7 +133,12 @@ def port_row(source_name: str) -> tuple[int, dict[str, str]] | None:
     """A port-added line's (row it copies, columns it sets), or None for a source row's line."""
     if not source_name.startswith("+"):
         return None
-    like, *sets = source_name[1:].split(" ")  # shortcut: a value can't hold a space; quote values if one ever must
+    lex = shlex.shlex(source_name[1:], posix=True)  # "Send Bits=11" holds a space; ' and \ stay plain characters
+    lex.whitespace_split, lex.quotes, lex.escape, lex.commenters = True, '"', "", ""
+    try:
+        like, *sets = list(lex)
+    except ValueError:
+        raise IdError(f"port row '{source_name}': unclosed quote") from None
     if not like.isdigit() or not all("=" in kv for kv in sets):
         raise IdError(f"port row '{source_name}': want '+<id> column=value ...'")
     return int(like), dict(kv.split("=", 1) for kv in sets)
@@ -196,10 +203,10 @@ def check(table: str, lines: list[Line], src: list[str], d2r: list[str], source:
     src_names = {n.lower() for n in src}
     seen: dict[str, str] = {}
     for p, i, n in lines:
-        if p.lower() in seen:
+        port = port_row(p)
+        if not port and p.lower() in seen:  # a port row is keyed by its id (checked below), not its text
             raise IdError(f"{f}: {source} row '{p}' listed twice")
         seen[p.lower()] = n
-        port = port_row(p)
         if port:
             if i < len(d2r):
                 raise IdError(f"{f}: port row '{p}' must take an id after D2R's rows")
