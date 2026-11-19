@@ -541,19 +541,26 @@ def copy_install(cfg: tc.Config, n: int, link: bool | None = None, dry_run: bool
 def restore_plugin_dlls(cfg: tc.Config, n: int, out=print) -> list[str]:
     """Slot sync never copies d2rloader/plugins and a mod install does not bring the test harness, so a slot can
     lack a plugin DLL game checks need (#306). Copy each missing mod.plugin_dlls from the newest build found in
-    mod.plugin_sources; raise SlotError when none exists. A DLL already in the slot is never replaced."""
+    mod.plugin_sources. Without plugin_sources only warn; raise SlotError when sources are set and none holds the
+    DLL, or the copy fails. A DLL already in the slot is never replaced."""
     got = []
     for dll in cfg["mod"]["plugin_dlls"]:
         dst = os.path.join(cfg.plugins_dir(n), dll)
         if os.path.isfile(dst):
             continue
+        if not cfg["mod"]["plugin_sources"]:
+            out(f"warning: slot {n} has no {dll}; set mod.plugin_sources so lock can restore it")
+            continue
         found = [p for d in cfg["mod"]["plugin_sources"] if os.path.isfile(p := os.path.join(os.path.expanduser(d), dll))]
         if not found:
             raise SlotError(f"slot {n} has no {dll} and no build was found: set mod.plugin_sources to the folder(s) "
-                            f"holding a build (looked in {cfg['mod']['plugin_sources'] or 'nothing: the list is empty'})")
+                            f"holding a build (looked in {cfg['mod']['plugin_sources']})")
         src = max(found, key=os.path.getmtime)
-        os.makedirs(os.path.dirname(dst), exist_ok=True)
-        shutil.copy2(src, dst)
+        try:
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copy2(src, dst)
+        except OSError as e:
+            raise SlotError(f"slot {n}: cannot copy {src} to {dst}: {e}") from e
         out(f"slot {n}: restored {dll} from {src}")
         got.append(dll)
     return got

@@ -147,7 +147,7 @@ them with their defaults. The ones you will change:
 | `game.copy_mode`, `link_dirs`, `exclude`, `mods_policy` | How `setup` copies (see above). `exclude` defaults to `["Logs"]`. |
 | `game.client_size`, `window_origin`, `window_step` | The game window's size and position. |
 | `mod.name`, `mod.folder` | Your mod, and its folder under `<game>/mods/`. |
-| `mod.plugins_subdir`, `plugin_dlls`, `plugin_sources`, `modinfo_files` | Where your plugin DLLs are, and the files that get a `savepath`. `lock` copies a `plugin_dlls` file the slot lacks (the test harness: `setup` never copies plugins, installs do not bring it) from the newest build in the `plugin_sources` folders, and exits 3 (lock held) when there is none. |
+| `mod.plugins_subdir`, `plugin_dlls`, `plugin_sources`, `modinfo_files` | Where your plugin DLLs are, and the files that get a `savepath`. `lock` copies a `plugin_dlls` file the slot lacks (the test harness: `setup` never copies plugins, installs do not bring it) from the newest build in the `plugin_sources` folders, and exits 3 when `plugin_sources` is set but none holds the file (you still hold the lock: unlock it). With `plugin_sources` empty, `lock` only warns. |
 | `saves.root`, `slot1_name`, `slot_name` | Where saves live, and the per-slot folder name (`{folder}-s{slot}`). |
 | `loader.config_file`, `section`, `default_mod_key`, `args_key` | The loader's own config file, inside each slot. |
 | `logs.loader_log`, `startup_line`, `crash_dir`, `plugin_log` | Logs the tools read. The game counts as started when `startup_line` appears in `loader_log`. |

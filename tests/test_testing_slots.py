@@ -696,6 +696,14 @@ class StatusAndCliTests(unittest.TestCase):
         gs.restore_plugin_dlls(cfg, 2, out=lambda m: None)
         self.assertEqual(Path(cfg.plugins_dir(2), "h.dll").read_bytes(), b"mine")
 
+    def test_lock_without_plugin_sources_only_warns(self):  # #306
+        conf = json.loads(Path(self.conf).read_text())
+        conf["mod"] = {"folder": "MyMod", "plugin_dlls": ["h.dll"]}
+        Path(self.conf).write_text(json.dumps(conf), encoding="utf-8")
+        rc, out, _ = self.cli("lock", "2", "lane-a")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("warning", out)
+
     def test_status_and_list(self):
         gs.acquire(self.cfg, 2, "lane-a", pid=0)
         rc, out, _ = self.cli("status")
