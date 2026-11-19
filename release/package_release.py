@@ -21,7 +21,8 @@ downloader-manifest.json, schemaVersion 2 (the publisher adds objectsBase and la
   schemaVersion  2                         name         mod.name              version   as given
   pluginVersion  --plugin-version (opt.)   released     date, SOURCE_DATE_EPOCH honoured
   complete       false for --incomplete    modFolder    mod.folder            saveFolder mod.save_folder
-  d2r            {build, version[, imageTimestamp]}      the game build the release was made for
+  d2r            {build, version[, imageTimestamp][, versions]}  the game build the release was made for; versions: every
+                 accepted major.minor (only with several --game-exe)
   d2rloader      {version, url, size, sha256, signerThumbprint}   the pinned loader (informational: never downloaded)
   launch         {default_mod, launch_arguments}         what the downloader writes into the loader config
   preserve       files a player edits; never overwritten after the first install (package.preserve)
@@ -212,7 +213,7 @@ def released() -> str:
     return day.isoformat()
 
 
-def manifest(cfg: dict, version: str, files: list, archive_path: Path, complete: bool, dirs=(), plugin_version="") -> dict:
+def manifest(cfg: dict, version: str, files: list, archive_path: Path, complete: bool, dirs=(), plugin_version="", game_builds=()) -> dict:
     """The release manifest, schemaVersion 2. archive_path: the .7z. The downloader installs from the objects
     (docs/release.md), the 7z is the manual download. publish_release.py adds objectsBase and launcher; the server's
     ingest adds archive.path and replaces archive by the 7z it builds."""
@@ -220,6 +221,8 @@ def manifest(cfg: dict, version: str, files: list, archive_path: Path, complete:
     d2r = {"build": str(game["build"]), "version": game["version"]}
     if game.get("image_timestamp"):
         d2r["imageTimestamp"] = game["image_timestamp"]
+    if len(game_builds) > 1:  # several exes: every accepted major.minor; `version` stays for older downloaders
+        d2r["versions"] = list(dict.fromkeys(".".join(b["build"].split(".")[:2]) for b in game_builds))
     man = {
         "schemaVersion": SCHEMA,
         "name": mod["name"],
@@ -1100,7 +1103,7 @@ def main(argv=None) -> int:
             return 1
         sums.append(nexus_path)
     man_path = out / DOWNLOADER_MANIFEST
-    man_path.write_text(json.dumps(manifest(cfg, version, files, seven_path, complete, dirs, a.plugin_version),
+    man_path.write_text(json.dumps(manifest(cfg, version, files, seven_path, complete, dirs, a.plugin_version, builds),
                                    indent=1) + "\n", encoding="utf-8", newline="\n")
     notes = out / f"RELEASE_NOTES-{version}.md"
     notes.write_text(release_notes(notes_cfg(cfg, builds), version, seven_path.name), encoding="utf-8", newline="\n")

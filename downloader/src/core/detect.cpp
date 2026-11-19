@@ -208,4 +208,23 @@ BuildCheck CheckBuild(const std::string& infoVersion, const std::string& exeVers
 	return c;
 }
 
+BuildCheck CheckBuildAny(const std::string& infoVersion, const std::string& exeVersion, const std::vector<std::string>& accepted) {
+	if (accepted.empty())
+		return CheckBuild(infoVersion, exeVersion);
+	std::string lo = accepted[0], hi = accepted[0];
+	for (const std::string& a : accepted) {
+		if (CompareGameVersions(a, lo) < 0) lo = a;
+		if (CompareGameVersions(a, hi) > 0) hi = a;
+	}
+	BuildCheck c = CheckBuild(infoVersion, exeVersion, hi);
+	if (c.verdict == BuildVerdict::Older || c.verdict == BuildVerdict::Newer) {
+		for (const std::string& a : accepted)
+			if (CompareGameVersions(c.version, a) == 0)
+				return CheckBuild(infoVersion, exeVersion, a);
+		if (CompareGameVersions(c.version, lo) < 0)
+			return CheckBuild(infoVersion, exeVersion, lo);
+	}
+	return c;
+}
+
 }  // namespace dl

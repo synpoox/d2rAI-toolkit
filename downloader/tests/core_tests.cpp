@@ -268,6 +268,13 @@ void TestDetect() {
 	Check(dl::CheckBuild("", "").verdict == dl::BuildVerdict::Unknown, "unknown version");
 	Check(dl::CheckBuild("", "3.3.93847").verdict == dl::BuildVerdict::Ok, "exe version alone");
 
+	const std::vector<std::string> both = {"3.3", "3.4"};
+	Check(dl::CheckBuildAny("3.3.93847", "", both).verdict == dl::BuildVerdict::Ok, "two accepted: 3.3 passes");
+	Check(dl::CheckBuildAny("3.4.95032", "", both).verdict == dl::BuildVerdict::Ok, "two accepted: 3.4 passes");
+	Check(dl::CheckBuildAny("3.5.96000", "", both).verdict == dl::BuildVerdict::Newer, "two accepted: 3.5 is newer");
+	Check(dl::CheckBuildAny("3.2.91000", "", both).verdict == dl::BuildVerdict::Older, "two accepted: 3.2 is older");
+	Check(dl::CheckBuildAny("3.3.1", "", {}).verdict == dl::BuildVerdict::Ok, "none listed: the built-in version");
+
 	std::string vdf = R"("libraryfolders"
 {
 	"0"

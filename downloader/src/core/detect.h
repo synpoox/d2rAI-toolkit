@@ -47,4 +47,8 @@ struct BuildCheck {
 BuildCheck CheckBuild(const std::string& infoVersion, const std::string& exeVersion,
                       const std::string& required = RequiredGameVersion);
 
+// A release that accepts several game versions: Ok when the game matches any of `accepted` (major.minor); else the
+// verdict against the nearest one (older than all: the lowest, otherwise the highest).
+BuildCheck CheckBuildAny(const std::string& infoVersion, const std::string& exeVersion, const std::vector<std::string>& accepted);
+
 }  // namespace dl

@@ -501,7 +501,7 @@ the server adds `archive.path` and replaces `archive` with the 7z it builds.
 | `schemaVersion` | `2`. The tools refuse another number. |
 | `name`, `version`, `released` | Shown to players; `released` is the packaging date (`SOURCE_DATE_EPOCH` is honoured). |
 | `complete` | `false` for an `--incomplete` CI package. Such a package never reaches `stable`. |
-| `d2r` | `build`, `version` the plugin needs; optional `imageTimestamp`. |
+| `d2r` | `build`, `version` the plugin needs; optional `imageTimestamp`. With several `--game-exe`, also `versions`: every accepted major.minor (`["3.3", "3.4"]`); the downloader accepts a game on any of them, `version` stays for older downloaders. |
 | `d2rloader` | The pinned loader: `version`, `url`, informational `size` and `sha256`, `signerThumbprint`. The downloader compares the version and links to the site. It never downloads the loader. |
 | `launch` | What the player's loader config needs so the mod starts by itself (`default_mod`, `launch_arguments`). |
 | `modFolder`, `saveFolder` | Folder under `<D2R>/mods/`, and the `savepath` for characters. All `files` paths are relative to `mods/<modFolder>/`. |
