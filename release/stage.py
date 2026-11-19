@@ -321,7 +321,7 @@ def package(a, root, out, config_path, cfg, work, version, section, text, fragme
             if exe.is_file():
                 cmd += ["--game-exe", str(exe)]  # [catalog] (schema 3) pins the game build from it
                 for x in a.extra_game_exe:
-                    cmd += ["--game-exe", str(x)]
+                    cmd += ["--game-exe", str(Path(x).resolve())]  # package_release runs in the project folder
             code = subprocess.run(cmd, cwd=root).returncode  # its relative paths (changelog, dist) are the project's
             if not code:
                 finish_notes(out, version, section)
