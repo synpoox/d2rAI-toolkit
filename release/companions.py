@@ -32,7 +32,7 @@ Per-entry options (all optional; nothing about one mod is written into this scri
   files            zip path (or asset path) -> path in the installed mod folder; a key ending in "/" is a folder
   filter_tables    vanilla tables the plugin reads from <mod>.mpq/data/global/excel/ (it logs a missing directory
                    without them); the union over all entries is copied from the game when the build lacks them
-  loader_settings  {"section.name": {"key": value}} written into d2rloader.toml unless the key is set already
+  loader_settings  {"section.name": {"key": value}} (a list becomes a TOML array) written into d2rloader.toml unless the key is set already
                    (by the project or by the player); for example {"d2rcore.items": {"item_stat_ranges": true}}
 
 Python 3.12+, standard library only (install also needs modkit, from this toolkit).
@@ -295,6 +295,8 @@ def _toml_value(v) -> str:
         return "true" if v else "false"
     if isinstance(v, (int, float)):
         return repr(v)
+    if isinstance(v, (list, tuple)):
+        return "[" + ", ".join(_toml_value(x) for x in v) + "]"  # a TOML array, e.g. load_order
     return json.dumps(str(v))
 
 

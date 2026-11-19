@@ -256,6 +256,17 @@ class CompanionTests(unittest.TestCase):
             companions.overlay(root, mod)
             self.assertEqual(toml.read_text(), "[d2rcore.other]\nitem_stat_ranges = false\n" + ITEM_RANGES)
 
+    def test_apply_settings_writes_a_list_as_a_toml_array(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            toml = Path(tmp) / "d2rloader.toml"
+            order = {"d2rloader.plugins": {"load_order": ["a", "*", "b"]}}
+            toml.write_text('[d2rloader.plugins]\n# load_order = ["x", "*"]\n')  # the loader's template
+            companions.apply_settings(toml, order)
+            self.assertEqual(toml.read_text(), '[d2rloader.plugins]\nload_order = ["a", "*", "b"]\n# load_order = ["x", "*"]\n')
+            toml.write_text('[d2rloader.plugins]\nload_order = ["mine"]\n')  # a player's own order stays
+            companions.apply_settings(toml, order)
+            self.assertEqual(toml.read_text(), '[d2rloader.plugins]\nload_order = ["mine"]\n')
+
     def test_install_removes_only_dropped_companion_files(self):
         zipped = make_zip({"d2rloader/plugins/x.dll": b"dll", "Other.mpq/data/sfx/a.flac": b"a"})
         with tempfile.TemporaryDirectory() as tmp:
