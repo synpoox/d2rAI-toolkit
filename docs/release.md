@@ -435,7 +435,7 @@ folder (`out/data`, modinfo, loader metadata, `stage.plugins` from `stage.plugin
 folder's root), runs
 `package_release.py`, and writes the changelog section as the release notes. The fragments are deleted only after all of
 that succeeded. The `[stage]` and `repos.fragments` keys are in `release/release.example.toml`.
-`--notes FILE` (or `stage.notes = "docs/release-notes/{version}.md"` in release.toml, `{version}` filled in, relative to
+`--notes FILE` (or `stage.notes = "docs/release-notes/{version}.md"` in release.toml, `{version}` filled in, `--notes` relative to the current folder, `stage.notes` relative to
 the project) ships a condensed player notes file instead of the changelog section: it is passed to `package_release.py
 --notes` (so it is the catalog manifest's `release_notes`) and is the release notes file. The changelog section must
 still exist. Without either, nothing changes.

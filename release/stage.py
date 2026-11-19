@@ -260,7 +260,7 @@ def run(a, root: Path, out: Path, config_path: Path, cfg: dict) -> int:
     extra = [parse_extra_plugin(spec) for spec in a.extra_plugin]
     text, fragments = cl.pending(root, version, cfg["repos"]["changelog"], frag)
     section = cl.notes_section(text, version)  # checked before anything is written or deleted
-    a.notes_file = a.notes or (root / cfg["stage"]["notes"].format(version=version) if cfg["stage"]["notes"] else None)
+    a.notes_file = a.notes or (root / cfg["stage"]["notes"].replace("{version}", version) if cfg["stage"]["notes"] else None)
     if a.notes_file:
         if not Path(a.notes_file).is_file():
             raise ReleaseError(f"notes file {a.notes_file} missing")
