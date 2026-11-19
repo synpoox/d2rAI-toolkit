@@ -226,6 +226,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--version", help="release version (default: mod.json's)")
     ap.add_argument("--out", type=Path, help="output folder (default: <root>/<package.dist>)")
     ap.add_argument("--config", type=Path, help="release.toml (default: <root>/release.toml)")
+    ap.add_argument("--extra-game-exe", type=Path, action="append", default=[], metavar="D2R.exe",
+                    help="another game build's D2R.exe the release accepts (repeatable; each labelled from its .build.info)")
     ap.add_argument("--extra-plugin", action="append", default=[], metavar="PATH[@SOURCE]",
                     help="ship one more prebuilt plugin DLL and record its SHA-256 (and SOURCE) in the notes; repeatable")
     ap.add_argument("--notes", type=Path, metavar="FILE",
@@ -318,6 +320,8 @@ def package(a, root, out, config_path, cfg, work, version, section, text, fragme
                 cmd += ["--notes", str(Path(a.notes_file).resolve())]  # package_release runs in the project folder
             if exe.is_file():
                 cmd += ["--game-exe", str(exe)]  # [catalog] (schema 3) pins the game build from it
+                for x in a.extra_game_exe:
+                    cmd += ["--game-exe", str(x)]
             code = subprocess.run(cmd, cwd=root).returncode  # its relative paths (changelog, dist) are the project's
             if not code:
                 finish_notes(out, version, section)

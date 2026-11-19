@@ -56,7 +56,7 @@ Releases, Nexus Mods, or a mix) is in `${CLAUDE_PLUGIN_ROOT}/docs/distribution.m
 ## Releases for the Resurrected launcher (GitHub assets)
 When the project sets `[catalog]` in `release.toml`, players install through the Resurrected launcher, which reads
 release assets on GitHub. The steps are in `${CLAUDE_PLUGIN_ROOT}/docs/release.md` "Launcher release (schema 3)":
-`${CLAUDE_PLUGIN_ROOT}/release/package_release.py --game-exe <real D2R.exe> --notes <notes>`, then `${CLAUDE_PLUGIN_ROOT}/release/github_release.py <v> --assets dist --dry-run`,
+`${CLAUDE_PLUGIN_ROOT}/release/package_release.py --game-exe <real D2R.exe> --notes <notes>` (repeat `--game-exe` per game folder to accept several builds; see docs/release.md), then `${CLAUDE_PLUGIN_ROOT}/release/github_release.py <v> --assets dist --dry-run`,
 then without `--dry-run`, with `RESURRECTED_VALIDATE_RELEASE` pointing at the launcher's `validate-release`. It publishes a draft first and makes it public only after the uploaded files are checked.
 Ask the owner before the run without `--dry-run`. A failure leaves a private draft; never edit or replace a public
 release (a fix is a new version).

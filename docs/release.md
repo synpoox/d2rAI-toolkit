@@ -257,6 +257,12 @@ products share one feed ([Shared catalog feed](#shared-catalog-feed)).
    python release/package_release.py --mod-dir path/to/MyMod --version 0.2.0-alpha --game-exe "<D2R folder>/D2R.exe" --notes notes.md
    ```
    It prints every problem and writes nothing if the launcher would refuse the release.
+   **One release for several game builds** (for example 3.4 and 3.3): repeat `--game-exe`, once per game folder
+   (`stage.py`: the `--game` folder's exe plus `--extra-game-exe D2R.exe`, repeatable). `compatibility.game_builds` then
+   holds one entry per exe, and the launcher accepts a D2R.exe that matches any of them. With several exes each entry's
+   `build` label is the `Version` in the `.build.info` beside that exe (an exe without one is refused), not `[game]`;
+   the notes and README name every build ("build 95032 or 93847"). One exe works as before, labelled from `[game]`.
+   The folders are only read.
 3. Build the launcher's validator once (and again after launcher updates), in a checkout of the launcher:
    ```sh
    cd resurrected-launcher/src-tauri
