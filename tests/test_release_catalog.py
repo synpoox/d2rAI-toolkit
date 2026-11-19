@@ -245,6 +245,39 @@ class RefusalTests(CatalogBase):
                      "pinned twice")
         self.refused(lambda m: m["compatibility"]["loader_versions"].append("1.4.0"), "has no pinned build")
 
+    def game_folder(self, name, version, body):
+        d = self.tmp / name
+        d.mkdir()
+        (d / "D2R.exe").write_bytes(body)
+        (d / ".build.info").write_text(f"Branch!STRING:0|Active!DEC:1|Version!STRING:0\nus|1|{version}\n", encoding="utf-8")
+        return d / "D2R.exe"
+
+    def test_several_game_exes_make_several_builds(self):
+        a = self.game_folder("g34", "3.4.95032", b"MZ new")
+        b = self.game_folder("g33", "3.3.93847", b"MZ older")
+        notes = self.tmp / "notes.md"
+        notes.write_text("Patch notes.", encoding="utf-8")
+        builds, _, problems = pr.catalog_inputs(self.cfg, "1.2.3-alpha", [a, b], notes)
+        self.assertEqual(problems, [])
+        self.assertEqual([x["build"] for x in builds], ["3.4.95032", "3.3.93847"])
+        self.assertEqual([x["size"] for x in builds], [6, 8])
+        self.assertEqual(builds[0], {**pr.game_build(self.cfg, a, True)})
+        text = pr.release_notes(pr.notes_cfg(self.cfg, builds), "1.2.3-alpha", "x.7z")
+        self.assertIn("**build 95032 or 93847** (D2R 3.4 or 3.3)", text)
+
+    def test_one_game_exe_is_unchanged(self):
+        notes = self.tmp / "notes.md"
+        notes.write_text("Patch notes.", encoding="utf-8")
+        builds, _, problems = pr.catalog_inputs(self.cfg, "1.2.3-alpha", [self.exe], notes)
+        self.assertEqual((builds, problems), ([pr.game_build(self.cfg, self.exe)], []))
+        self.assertIs(pr.notes_cfg(self.cfg, builds), self.cfg)
+
+    def test_several_exes_need_a_build_info(self):
+        notes = self.tmp / "notes.md"
+        notes.write_text("Patch notes.", encoding="utf-8")
+        _, _, problems = pr.catalog_inputs(self.cfg, "1.2.3-alpha", [self.exe, self.exe], notes)
+        self.assertTrue(any(".build.info" in p for p in problems))
+
     def test_loader_files_are_required(self):
         self.cfg["catalog"]["loader_files"] = []
         notes = self.tmp / "notes.md"

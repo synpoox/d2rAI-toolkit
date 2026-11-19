@@ -262,10 +262,20 @@ def release_status(version: str) -> str:
     return "alpha" if "alpha" in pre else "beta" if pre else "release"
 
 
-def game_build(cfg: dict, exe: Path) -> dict:
-    """compatibility.game_builds entry from the real D2R.exe: its bytes identify the build, not the version label."""
+def game_build(cfg: dict, exe: Path, from_build_info=False) -> dict:
+    """compatibility.game_builds entry from the real D2R.exe: its bytes identify the build, not the version label.
+    from_build_info (several exes in one release): the label is the Version in the .build.info beside the exe."""
     major_minor = ".".join(str(cfg["game"]["version"]).split(".")[:2])
-    return {"build": f"{major_minor}.{cfg['game']['build']}", "platform": "windows_x64", "executable": exe.name,
+    label = f"{major_minor}.{cfg['game']['build']}"
+    if from_build_info:
+        from companions import build_info_version
+        try:
+            label = build_info_version((exe.parent / ".build.info").read_text("utf-8-sig")) or ""
+        except OSError:
+            label = ""
+        if not re.fullmatch(r"\d+\.\d+\.\d+", label):
+            raise ValueError(f"{exe}: no major.minor.build Version in {exe.parent / '.build.info'}, needed to label it")
+    return {"build": label, "platform": "windows_x64", "executable": exe.name,
             "size": exe.stat().st_size, "sha256": sha256(exe)}
 
 
@@ -813,11 +823,14 @@ def catalog_inputs(cfg: dict, version: str, game_exe=None, notes_file=None) -> t
     repo = str(cfg["repos"]["github"])
     if "your-name" in repo or not re.fullmatch(r"[\w.-]+/[\w.-]+", repo):
         problems.append(f"repos.github {repo!r} is not the GitHub repository the release goes to")
-    exe = Path(game_exe or cat["game_exe"] or "-")
-    if not exe.is_file():
+    exes = [Path(e) for e in (game_exe if isinstance(game_exe, (list, tuple)) else [game_exe]) if e]         or [Path(cat["game_exe"] or "-")]
+    if not all(e.is_file() for e in exes):
         problems.append("schema 3 needs the real D2R.exe the release was tested with: --game-exe or catalog.game_exe")
     else:
-        builds = [game_build(cfg, exe)]
+        try:  # more than one exe: one release accepts several game builds, each labelled from its own folder
+            builds = [game_build(cfg, e, len(exes) > 1) for e in exes]
+        except ValueError as e:
+            problems.append(str(e))
     if cat.get("header_image") and header_image_problem(cat["header_image"]):
         problems.append(f"catalog.header_image: {header_image_problem(cat['header_image'])}")
     loaders = cat["loader_files"]
@@ -878,6 +891,15 @@ By hand (offline), into a D2R folder at build {build} that has D2RLoader {loader
 
 See SHA256SUMS.
 """
+
+
+def notes_cfg(cfg: dict, builds: list) -> dict:
+    """cfg whose [game] names every accepted build (for the notes and README text) when the release lists several."""
+    if len(builds) < 2:
+        return cfg
+    parts = [b["build"].rpartition(".") for b in builds]
+    uniq = lambda xs: " or ".join(dict.fromkeys(xs))  # noqa: E731
+    return {**cfg, "game": {**cfg["game"], "version": uniq(p[0] for p in parts), "build": uniq(p[2] for p in parts)}}
 
 
 def release_notes(cfg: dict, version: str, archive_name_: str) -> str:
@@ -967,7 +989,9 @@ def main(argv=None) -> int:
     ap.add_argument("--incomplete", action="store_true", help="a package without game data (CI): complete=false, not for players")
     ap.add_argument("--nexus", action="store_true", help="also write <Folder>-<version>-nexus.7z with INSTALL.txt (Nexus Mods)")
     ap.add_argument("--out", type=Path, help=f"output folder (default package.dist = {cfg['package']['dist']})")
-    ap.add_argument("--game-exe", type=Path, help="schema 3: the real D2R.exe the release was tested with (catalog.game_exe)")
+    ap.add_argument("--game-exe", type=Path, action="append",
+                    help="schema 3: the real D2R.exe the release was tested with (catalog.game_exe); repeat it to accept "
+                         "several game builds (each labelled from the .build.info beside it)")
     ap.add_argument("--notes", type=Path, help="schema 3: the patch notes text (default: the version's changelog section)")
     ap.add_argument("--previous-manifest", action="append", default=[], metavar="SRC",
                     help="schema 3: an earlier published release-manifest.json (file or https:// URL), repeatable; its "
@@ -1000,6 +1024,7 @@ def main(argv=None) -> int:
             print("\n".join(problems))
             return 1
     catalog = bool(cfg["catalog"]["product_id"]) and not a.incomplete  # an --incomplete build is never recommended
+    builds = []
     if catalog:
         builds, catalog_notes, problems = catalog_inputs(cfg, version, a.game_exe, a.notes)
         current = None
@@ -1068,7 +1093,7 @@ def main(argv=None) -> int:
     if a.nexus:
         nexus_path = out / nexus_archive_name(cfg, version)
         try:
-            write_nexus_7z(mod, nexus_path, cfg, version, pkg["plugin_dir"], sevenzip)
+            write_nexus_7z(mod, nexus_path, notes_cfg(cfg, builds), version, pkg["plugin_dir"], sevenzip)
         except RuntimeError as e:
             print(f"error: {e}")
             shutil.rmtree(out / "stage", ignore_errors=True)
@@ -1078,7 +1103,7 @@ def main(argv=None) -> int:
     man_path.write_text(json.dumps(manifest(cfg, version, files, seven_path, complete, dirs, a.plugin_version),
                                    indent=1) + "\n", encoding="utf-8", newline="\n")
     notes = out / f"RELEASE_NOTES-{version}.md"
-    notes.write_text(release_notes(cfg, version, seven_path.name), encoding="utf-8", newline="\n")
+    notes.write_text(release_notes(notes_cfg(cfg, builds), version, seven_path.name), encoding="utf-8", newline="\n")
     # with [catalog], SHA256SUMS covers exactly the GitHub release assets (github_release.py --assets uploads those);
     # a shared feed (catalog.feed_url) is not one of them: it lives on its own release and changes with every product
     assets = [seven_path, *written[:1]] if shared_feed(cfg) else [seven_path, *written]
