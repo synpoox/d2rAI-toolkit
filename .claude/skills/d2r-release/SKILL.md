@@ -32,7 +32,8 @@ Releases, Nexus Mods, or a mix) is in `${CLAUDE_PLUGIN_ROOT}/docs/distribution.m
    numbers, and a bold note first if players must restart or update something. Check the fragments read well
    (the README there has the format); a missing one is a fix to the PR, not a hand edit. Rename
    `### Unreleased` to the version heading in the release commit, and `${CLAUDE_PLUGIN_ROOT}/release/stage.py` folds the
-   fragments in when it packages (and deletes them only if the run succeeded).
+   fragments in when it packages (and deletes them only if the run succeeded). To ship condensed player notes instead of
+   the full section, write the file and set `stage.notes` in release.toml (or pass `stage.py --notes FILE`).
 3. **Commit** the bump and changelog (noreply identity). Generated headers that differ only in line endings are not
    a real change; a real content change must be committed first.
 4. **Run the release as one script** with `set -euo pipefail`. The script should:

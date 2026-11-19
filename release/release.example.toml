@@ -56,6 +56,7 @@ plugin_build_dir = "plugin/build/Release"  # where they are built, relative to t
 companions = false                         # true: also install generated/companions/ (release/companions.py fetch)
 companions_manifest = ""                   # "" = companions/manifest.json
 item_type_check = true                     # check out/data's itemtypes.txt keeps D2R's item type ids
+notes = ""                                 # e.g. "docs/release-notes/{version}.md": condensed player notes shipped instead of the changelog section
 loader_from_game = false                   # true: pin the official D2RLoader.exe in --game (catalog.loader_files must not be set)
 
 [downloader]

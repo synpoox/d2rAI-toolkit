@@ -9,7 +9,7 @@ Run it after the project's whole build (data merged, `modkit build`, plugins bui
   3. lays the mod folder out in <out>/.stage-mod/<name>/ (a folder this tool creates and removes, nothing else) as `modkit install` does: out/data, modinfo, loader metadata and
      config, the companions (release/companions.py overlay, the vanilla tables they read from DIR), the built plugins and the
      project's LICENSE/NOTICE/COPYING files (LEGAL_FILES, those that exist) at the mod folder's root,
-  4. runs release/package_release.py with the config, and replaces its notes with the changelog section alone.
+  4. runs release/package_release.py with the config, and replaces its notes with the changelog section alone (or the --notes / stage.notes file, which also goes into the catalog manifest).
 The fragments are deleted only when the whole run succeeded; any failure leaves the changelog and fragments as they were.
 
 Everything a mod decides is in release.toml (see release.example.toml, [stage]): which plugins to ship, where they are
@@ -228,6 +228,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--config", type=Path, help="release.toml (default: <root>/release.toml)")
     ap.add_argument("--extra-plugin", action="append", default=[], metavar="PATH[@SOURCE]",
                     help="ship one more prebuilt plugin DLL and record its SHA-256 (and SOURCE) in the notes; repeatable")
+    ap.add_argument("--notes", type=Path, metavar="FILE",
+                    help="ship this player notes file instead of the changelog section (default: stage.notes, {version} filled in)")
     a = ap.parse_args(argv)
     a.game = a.game.resolve()  # package_release.py runs in the project folder: a relative path would point elsewhere
     root = a.root.resolve()
@@ -258,6 +260,11 @@ def run(a, root: Path, out: Path, config_path: Path, cfg: dict) -> int:
     extra = [parse_extra_plugin(spec) for spec in a.extra_plugin]
     text, fragments = cl.pending(root, version, cfg["repos"]["changelog"], frag)
     section = cl.notes_section(text, version)  # checked before anything is written or deleted
+    a.notes_file = a.notes or (root / cfg["stage"]["notes"].format(version=version) if cfg["stage"]["notes"] else None)
+    if a.notes_file:
+        if not Path(a.notes_file).is_file():
+            raise ReleaseError(f"notes file {a.notes_file} missing")
+        section = Path(a.notes_file).read_text("utf-8")  # the section above was still checked to exist
     for dll, source in extra:
         section += "\n\n" + extra_plugin_note(dll, source)
     if loader.is_file():
@@ -307,6 +314,8 @@ def package(a, root, out, config_path, cfg, work, version, section, text, fragme
                 config_path = pinned
             cmd = [sys.executable, str(HERE / "package_release.py"), "--mod-dir", str(mod), "--version", version,
                    "--config", str(config_path), "--out", str(out)]
+            if a.notes_file:
+                cmd += ["--notes", str(Path(a.notes_file).resolve())]  # package_release runs in the project folder
             if exe.is_file():
                 cmd += ["--game-exe", str(exe)]  # [catalog] (schema 3) pins the game build from it
             code = subprocess.run(cmd, cwd=root).returncode  # its relative paths (changelog, dist) are the project's
