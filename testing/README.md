@@ -145,7 +145,7 @@ Env vars: `MODKIT_SLOT`, `MODKIT_RUN`, `MODKIT_TESTING_CONFIG`.
 | Section | Keys |
 |---|---|
 | `[game]` | `install_dir` (slot 1), `slots_dir`, `slot_dir_template`, `slot_dirs`, `slot_count`, `loader_exe`, `game_exe`, `window_title_prefix`, `client_size`, `window_origin`, `window_step`, `copy_mode`, `link_dirs`, `exclude`, `mods_policy` |
-| `[mod]` | `name`, `folder`, `plugins_subdir`, `plugin_dlls`, `modinfo_files` |
+| `[mod]` | `name`, `folder`, `plugins_subdir`, `plugin_dlls`, `plugin_sources`, `modinfo_files` |
 | `[saves]` | `root`, `slot1_name`, `slot_name` |
 | `[loader]` | `config_file`, `section`, `default_mod_key`, `args_key`, `set_default_mod` |
 | `[logs]` | `loader_log`, `plugin_log`, `crash_dir`, `startup_line` |

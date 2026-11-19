@@ -675,6 +675,27 @@ class StatusAndCliTests(unittest.TestCase):
             rc = gs.main(["--config", self.conf, *argv])
         return rc, out.getvalue(), err.getvalue()
 
+    def test_lock_restores_a_missing_plugin_dll_or_fails_loudly(self):  # #306
+        t = Path(self.tmp.name)
+        conf = json.loads(Path(self.conf).read_text())
+        conf["mod"] = {"folder": "MyMod", "plugin_dlls": ["h.dll"], "plugin_sources": [str(t / "a"), str(t / "b")]}
+        Path(self.conf).write_text(json.dumps(conf), encoding="utf-8")
+        cfg = tc.load(self.conf)
+        rc, _, err = self.cli("lock", "2", "lane-a")
+        self.assertEqual(rc, 3)
+        self.assertIn("h.dll", err)
+        self.assertIsNotNone(gs.lock_info(cfg, 2))  # the lock stays: unlock it
+        for d, body, when in (("a", b"old", 1000), ("b", b"new", 2000)):
+            (t / d).mkdir()
+            (t / d / "h.dll").write_bytes(body)
+            os.utime(t / d / "h.dll", (when, when))
+        rc, out, _ = self.cli("lock", "2", "lane-a")
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(Path(cfg.plugins_dir(2), "h.dll").read_bytes(), b"new")
+        Path(cfg.plugins_dir(2), "h.dll").write_bytes(b"mine")  # an existing DLL is kept
+        gs.restore_plugin_dlls(cfg, 2, out=lambda m: None)
+        self.assertEqual(Path(cfg.plugins_dir(2), "h.dll").read_bytes(), b"mine")
+
     def test_status_and_list(self):
         gs.acquire(self.cfg, 2, "lane-a", pid=0)
         rc, out, _ = self.cli("status")

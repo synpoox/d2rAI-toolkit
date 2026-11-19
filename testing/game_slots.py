@@ -538,6 +538,27 @@ def copy_install(cfg: tc.Config, n: int, link: bool | None = None, dry_run: bool
     return stats
 
 
+def restore_plugin_dlls(cfg: tc.Config, n: int, out=print) -> list[str]:
+    """Slot sync never copies d2rloader/plugins and a mod install does not bring the test harness, so a slot can
+    lack a plugin DLL game checks need (#306). Copy each missing mod.plugin_dlls from the newest build found in
+    mod.plugin_sources; raise SlotError when none exists. A DLL already in the slot is never replaced."""
+    got = []
+    for dll in cfg["mod"]["plugin_dlls"]:
+        dst = os.path.join(cfg.plugins_dir(n), dll)
+        if os.path.isfile(dst):
+            continue
+        found = [p for d in cfg["mod"]["plugin_sources"] if os.path.isfile(p := os.path.join(os.path.expanduser(d), dll))]
+        if not found:
+            raise SlotError(f"slot {n} has no {dll} and no build was found: set mod.plugin_sources to the folder(s) "
+                            f"holding a build (looked in {cfg['mod']['plugin_sources'] or 'nothing: the list is empty'})")
+        src = max(found, key=os.path.getmtime)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        shutil.copy2(src, dst)
+        out(f"slot {n}: restored {dll} from {src}")
+        got.append(dll)
+    return got
+
+
 def set_savepath(cfg: tc.Config, n: int) -> list[str]:
     """Point the mod's modinfo.json file(s) at this slot's own save folder. Only existing files are updated
     (other keys are kept); a missing file is made when its folder exists. Returns the files written."""
@@ -767,6 +788,12 @@ def _run(cfg: tc.Config, a) -> int:
         print(msg)
         if not ok and (n == 1 or refused):
             return 2
+        if ok:
+            try:
+                restore_plugin_dlls(cfg, n)
+            except SlotError as e:
+                print(f"error: {e} (the lock is still held: unlock it)", file=sys.stderr)
+                return 3
         return 0 if ok else 1
     if a.cmd == "check":
         why = holds_lock(cfg, n, owner)
