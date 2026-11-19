@@ -261,7 +261,16 @@ Launcher::View Launcher::Inspect() {
 	v.d2rDir = d2rDir_;
 	v.d2rSource = d2rSource_;
 	D2RInstall d = InspectD2R(d2rDir_, d2rSource_);
-	v.build = CheckBuild(d.infoVersion, d.exeVersion, v.requiredVersion);
+	std::vector<std::string> accepted;
+	for (const std::string& a : feed_.d2rVersions)
+		if (!GameVersion(a).empty())
+			accepted.push_back(GameVersion(a));
+	if (accepted.empty())
+		accepted.push_back(v.requiredVersion);
+	v.build = CheckBuildAny(d.infoVersion, d.exeVersion, accepted);
+	v.requiredVersion.clear();  // shown in the status line: "3.3" or "3.3 or 3.4"
+	for (const std::string& a : accepted)
+		v.requiredVersion += (v.requiredVersion.empty() ? "" : " or ") + a;
 	std::wstring loader = JoinPath(d2rDir_, L"D2RLoader.exe");
 	if (FileExists(loader))
 		v.loaderFound = ExeFileVersion(loader);

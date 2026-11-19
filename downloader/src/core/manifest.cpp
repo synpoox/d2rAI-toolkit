@@ -79,6 +79,8 @@ bool ParseManifest(const std::string& text, Manifest& out, std::string& error) {
 	const Json& d2r = j["d2r"];
 	m.d2rBuild = d2r["build"].IsString() ? std::atoi(d2r["build"].Str().c_str()) : int(d2r["build"].Int());
 	m.d2rVersion = d2r["version"].Str();
+	for (const Json& v : d2r["versions"].items())
+		m.d2rVersions.push_back(v.Str());
 	std::string ts = d2r["imageTimestamp"].Str();
 	if (!ts.empty())
 		m.imageTimestamp = uint32_t(std::strtoul(ts.c_str(), nullptr, 0));

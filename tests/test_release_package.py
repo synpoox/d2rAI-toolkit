@@ -63,6 +63,14 @@ class PackageTests(unittest.TestCase):
         self.assertTrue(m["complete"])
         self.assertNotIn("launcherMin", m)
 
+    def test_manifest_lists_every_accepted_game_version(self):
+        one = [{"build": "3.3.93847"}]
+        two = [{"build": "3.3.93847"}, {"build": "3.4.95032"}]
+        m1 = pr.manifest(self.cfg, "1.2.3", [], self.fake_7z(), True, game_builds=one)
+        self.assertEqual(m1["d2r"], {"build": "93847", "version": "3.3.0"}, "one exe: unchanged")
+        m2 = pr.manifest(self.cfg, "1.2.3", [], self.fake_7z(), True, game_builds=two)
+        self.assertEqual(m2["d2r"], {"build": "93847", "version": "3.3.0", "versions": ["3.3", "3.4"]})
+
     def test_manifest_optional_fields_and_archive_entry(self):
         self.cfg["game"]["image_timestamp"] = "0x1234abcd"
         self.cfg["downloader"]["min_version"] = "3.0.0"

@@ -16,7 +16,7 @@ downloader are in [distribution.md](./distribution.md). Note that Nexus Mods doe
 | Job | How |
 |---|---|
 | Find the game | Battle.net and Steam install records, then the default folders. The player can also pick the folder. |
-| Check the game version | The mod needs one D2R **major.minor** (for example `3.3`). Any hotfix build of 3.3 is fine. A newer 3.4 is reported as needing a new mod release. |
+| Check the game version | The mod needs one D2R **major.minor** (for example `3.3`). Any hotfix build of 3.3 is fine. With several `--game-exe` the manifest's `d2r.versions` lists every accepted major.minor and a game on any of them passes. A newer version than all of them is reported as needing a new mod release. |
 | Check D2RLoader | Compares the file version of `D2RLoader.exe` with the version the release asks for. A button opens the D2RLoader site. It never installs D2RLoader. |
 | Install and update | Reads the channel file, then the release manifest, then fetches only the files that changed. A fresh install uses the release `.7z`. |
 | Repair | Hashes every file and fetches the ones that do not match. |
