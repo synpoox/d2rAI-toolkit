@@ -48,7 +48,8 @@ DEFAULTS: dict[str, Any] = {
         "name": "My Mod",
         "folder": "MyMod",              # folder name under <game>/mods/
         "plugins_subdir": "d2rloader/plugins",   # inside the mod folder
-        "plugin_dlls": [],              # file names in plugins_subdir
+        "plugin_dlls": [],              # file names in plugins_subdir; `lock` restores a missing one from plugin_sources (if set)
+        "plugin_sources": [],           # folders holding builds of plugin_dlls (newest wins); empty: lock only warns
         "modinfo_files": ["{folder}.mpq/modinfo.json", "modinfo.json"],   # inside the mod folder
     },
     "saves": {
