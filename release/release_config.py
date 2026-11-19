@@ -82,6 +82,7 @@ DEFAULTS = {
         "companions": False,          # install generated/companions/ (release/companions.py fetch) with the mod
         "companions_manifest": "",    # "" = companions/manifest.json
         "item_type_check": True,      # run plugin-template/tools/item_type_ids.py on out/data's itemtypes.txt
+        "notes": "",                  # player notes file shipped instead of the changelog section, {version} filled in
         "loader_from_game": False,    # pin --game's official D2RLoader.exe in the catalog (catalog.loader_files must not be set)
     },
     "site": {

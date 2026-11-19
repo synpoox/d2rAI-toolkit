@@ -390,6 +390,28 @@ class MainTests(unittest.TestCase):
         self.assertIn("D2RLoader.exe", seen["config"])
         self.assertEqual([str(p.name) for p in self.staged.call_args.args[-1]], ["x.dll"])
 
+    def test_a_notes_file_reaches_package_release_by_flag_or_config(self):
+        seen = []
+        side = tempfile.TemporaryDirectory()
+        self.addCleanup(side.cleanup)
+        flag = Path(side.name) / "n.md"
+        flag.write_text("short\n", "utf-8")
+
+        def run(cmd, **k):
+            seen.append(cmd)
+            return mock.Mock(returncode=3)
+
+        def prepare(root):
+            (root / "0.2.0.md").write_text("cfg\n", "utf-8")
+            (root / "release.toml").write_text(
+                '[mod]\nfolder = "M"\n[stage]\nitem_type_check = false\nnotes = "{version}.md"\n', "utf-8")
+        self.run_main(run, prepare=prepare)
+        self.assertEqual(Path(seen[-1][seen[-1].index("--notes") + 1]).name, "0.2.0.md")
+        self.run_main(run, prepare=prepare, args=["--notes", str(flag)])
+        self.assertEqual(Path(seen[-1][seen[-1].index("--notes") + 1]).name, "n.md")
+        self.run_main(run)
+        self.assertNotIn("--notes", seen[-1])
+
     def test_the_extra_plugin_note_reaches_the_release_notes(self):
         side = tempfile.TemporaryDirectory()
         self.addCleanup(side.cleanup)
