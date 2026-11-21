@@ -108,6 +108,18 @@ def wait_log(path: str, needle: str, timeout: float = 90, offset: int = 0, sleep
 # ---------------------------------------------------------------- images (pure Python)
 
 
+RED_MIN = 90  # red channel floor of a held-item cell tint (calibrated in game)
+HELD_FRACTION = 0.01  # share of the inventory half that must be red to call the cursor holding an item
+
+
+def cursor_report(img: "Image") -> str:
+    """One line for every shot: is the cursor holding an item? Only readable with the inventory open."""
+    f = img.red_cell_fraction(img.box(0.5, 0.0, 1.0, 1.0))
+    if f >= HELD_FRACTION:
+        return f"cursor: ITEM HELD (red cells {f:.1%} of the right half): put it down or use it before the next click"
+    return f"cursor: empty (no red cells; if the inventory is closed this cannot tell, open it with I)"
+
+
 class Image:
     """An RGB picture: width, height and w*h*3 bytes. Enough to save a PNG and compare screens."""
 
@@ -167,6 +179,19 @@ class Image:
                 cell = [grey[y * w + x] for y in range(y0, y1) for x in range(x0, x1)]
                 out.append(sum(cell) // len(cell))
         return bytes(out)
+
+    def red_cell_fraction(self, box: tuple[int, int, int, int] | None = None) -> float:
+        """Share of pixels in a region that are strongly red. D2R tints the inventory cells red while the cursor
+        holds an item, and PrintWindow shots never draw the cursor item itself, so this is the only signal in a shot."""
+        l, t, r, b = box or (0, 0, self.width, self.height)
+        n = red = 0
+        for y in range(t, b):
+            seg = self.rgb[(y * self.width + l) * 3:(y * self.width + r) * 3]
+            for i in range(0, len(seg), 3):
+                n += 1
+                if seg[i] >= RED_MIN and seg[i] > 2 * seg[i + 1] and seg[i] > 2 * seg[i + 2]:
+                    red += 1
+        return red / n if n else 0.0
 
     def png(self) -> bytes:
         def chunk(kind: bytes, payload: bytes) -> bytes:
@@ -856,7 +881,9 @@ def _run(g: Game, a) -> int:
         print(f"slot {g.slot} stopped")
     elif c == "shot":
         name = args[0] if args else "shot"
-        print(g.shot(os.path.join(run_screens_dir(g.cfg), name)))
+        img = g.screenshot()
+        print(img.save(os.path.join(run_screens_dir(g.cfg), name + ("" if name.lower().endswith(".png") else ".png"))))
+        print(cursor_report(img))
     elif c == "key":
         for k in args:
             g.key(k)
