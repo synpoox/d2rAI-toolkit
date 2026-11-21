@@ -3,9 +3,10 @@
 
   python testing/game_ctl.py --slot N status
   python testing/game_ctl.py --slot N start | stop
-  python testing/game_ctl.py --slot N shot NAME            PNG of the game's drawing area
+  python testing/game_ctl.py --slot N shot NAME            PNG of the game's drawing area, plus a cursor line
+  python testing/game_ctl.py --slot N cursor               is an item held on the cursor? (inventory open)
   python testing/game_ctl.py --slot N key esc enter ctrl+s  keys, as window messages
-  python testing/game_ctl.py --slot N click 0.5 0.5 [right]  click at a fraction of the client area
+  python testing/game_ctl.py --slot N click 0.5 0.5 [right] [shift|ctrl]  click at a fraction of the client area
   python testing/game_ctl.py --slot N console "some command"  a console line, run through the plugin harness
   python testing/game_ctl.py --slot N pair NAME LEVEL,X,Y  warp, light up, save a side-by-side HD|legacy (g) PNG
   python testing/game_ctl.py --slot N moved click FX FY | key KEY..   did the character move? (exit 1 = no)
@@ -108,16 +109,43 @@ def wait_log(path: str, needle: str, timeout: float = 90, offset: int = 0, sleep
 # ---------------------------------------------------------------- images (pure Python)
 
 
-RED_MIN = 90  # red channel floor of a held-item cell tint (calibrated in game)
-HELD_FRACTION = 0.01  # share of the inventory half that must be red to call the cursor holding an item
+# D2R HD draws the held item as a placement preview under the cursor: the item art on a dark green cell block when
+# it fits where the cursor is (measured on a PD2R slot, 1920x1080, 2026-11-21: cell fill about 17,48,15). On an occupied
+# cell the fill is grey-brown, so only green is a safe test, and only over an EMPTY cell: a hovered item (cursor empty)
+# gets the same green fill. The shot line therefore cannot settle it; `game_ctl cursor` probes an empty cell.
+GRID = (0.66, 0.42, 0.92, 0.79)  # the inventory grid, fractions of the window
+GRID_FULL = (0.6604, 0.424, 0.9156, 0.787)  # exactly the 10 x 8 cells
+HIGHLIGHT_MIN = 0.004  # share of the grid that must be green (one cell is about 1.2%)
+
+
+def empty_block(img: "Image", cols: int = 2, rows: int = 4) -> tuple[float, float] | None:
+    """Centre (fractions of the window) of a free cols x rows block of inventory cells, found by their near-black
+    fill, or None. The probe of `game_ctl cursor` needs room for any held item (a staff is 2 x 4), and the grid
+    changes with every swap. Scans from the bottom-right."""
+    l, t, r, b = img.box(*GRID_FULL)
+    cw, ch = (r - l) / 10, (b - t) / 8
+    free = []
+    for row in range(8):
+        line = []
+        for col in range(10):
+            x0, y0 = int(l + col * cw + cw * 0.2), int(t + row * ch + ch * 0.2)
+            m, sd = img.stats((x0, y0, int(x0 + cw * 0.6), int(y0 + ch * 0.6)))
+            line.append(m < 25 and sd < 12)
+        free.append(line)
+    for row in range(8 - rows, -1, -1):
+        for col in range(10 - cols, -1, -1):
+            if all(free[row + j][col + i] for j in range(rows) for i in range(cols)):
+                return (l + (col + cols / 2) * cw) / img.width, (t + (row + rows / 2) * ch) / img.height
+    return None
 
 
 def cursor_report(img: "Image") -> str:
-    """One line for every shot: is the cursor holding an item? Only readable with the inventory open."""
-    f = img.red_cell_fraction(img.box(0.5, 0.0, 1.0, 1.0))
-    if f >= HELD_FRACTION:
-        return f"cursor: ITEM HELD (red cells {f:.1%} of the right half): put it down or use it before the next click"
-    return f"cursor: empty (no red cells; if the inventory is closed this cannot tell, open it with I)"
+    """One line for every shot."""
+    g = img.green_fraction(img.box(*GRID))
+    if g < HIGHLIGHT_MIN:
+        return "cursor: no green cell in the inventory grid (empty, or inventory closed, or held item over occupied cells)"
+    return (f"cursor: green cell in the inventory grid ({g:.1%}): an item is held, or an item is hovered with its "
+            "tooltip showing. Run `game_ctl cursor` to settle it")
 
 
 class Image:
@@ -180,18 +208,16 @@ class Image:
                 out.append(sum(cell) // len(cell))
         return bytes(out)
 
-    def red_cell_fraction(self, box: tuple[int, int, int, int] | None = None) -> float:
-        """Share of pixels in a region that are strongly red. D2R tints the inventory cells red while the cursor
-        holds an item, and PrintWindow shots never draw the cursor item itself, so this is the only signal in a shot."""
-        l, t, r, b = box or (0, 0, self.width, self.height)
-        n = red = 0
+    def green_fraction(self, box: tuple[int, int, int, int]) -> float:
+        """Share of the pixels in a region that are dark placement-preview green."""
+        l, t, r, b = box
+        n = g = 0
         for y in range(t, b):
             seg = self.rgb[(y * self.width + l) * 3:(y * self.width + r) * 3]
             for i in range(0, len(seg), 3):
                 n += 1
-                if seg[i] >= RED_MIN and seg[i] > 2 * seg[i + 1] and seg[i] > 2 * seg[i + 2]:
-                    red += 1
-        return red / n if n else 0.0
+                g += seg[i + 1] >= 25 and seg[i + 1] > 1.5 * seg[i] and seg[i + 1] > 1.5 * seg[i + 2]
+        return g / n if n else 0.0
 
     def png(self) -> bytes:
         def chunk(kind: bytes, payload: bytes) -> bytes:
@@ -621,7 +647,7 @@ class Game:
             post(hwnd, WM_CHAR, ord(ch), 1)
             time.sleep(0.03)
 
-    def click(self, fx: float, fy: float, button: str = "left", move_only: bool = False) -> None:
+    def click(self, fx: float, fy: float, button: str = "left", move_only: bool = False, mods=()) -> None:
         """Click at a fraction (0..1) of the client area. The game reads the position and buttons from the harness
         block, so the real cursor never moves; window messages are posted as well."""
         hwnd = self.need_window()
@@ -643,10 +669,12 @@ class Game:
             return
         down, up = (WM_LBUTTONDOWN, WM_LBUTTONUP) if button == "left" else (WM_RBUTTONDOWN, WM_RBUTTONUP)
         bit = BUTTON_BITS[button]
+        hn.set_mods(mods)  # shift-click equips an inventory item, ctrl-click drops it
         hn.buttons(bit)
         post(hwnd, down, bit, lp(x, y))
         time.sleep(0.08)
         hn.buttons(0)
+        hn.set_mods(())
         post(hwnd, up, 0, lp(x, y))
         time.sleep(0.4)
 
@@ -839,7 +867,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--slot", type=int, help="slot number (or MODKIT_SLOT); slot 1 is refused")
     ap.add_argument("--owner", help="the lock owner this run acts as (default MODKIT_RUN)")
     ap.add_argument("cmd", nargs="?", choices=("status", "start", "stop", "shot", "key", "click", "console", "harness",
-                                                  "release", "pair", "moved"))
+                                                  "release", "pair", "moved", "cursor"))
     ap.add_argument("args", nargs="*")
     argv = sys.argv[1:] if argv is None else list(argv)
     own = split_own_options(argv)  # pair and moved parse their own options, in any position: hand them the rest raw
@@ -884,13 +912,26 @@ def _run(g: Game, a) -> int:
         img = g.screenshot()
         print(img.save(os.path.join(run_screens_dir(g.cfg), name + ("" if name.lower().endswith(".png") else ".png"))))
         print(cursor_report(img))
+    elif c == "cursor":
+        # Probe: park the cursor on a free 2 x 4 block of inventory cells and shoot. Only a held item draws a highlight there.
+        cell = empty_block(g.screenshot())
+        if cell is None:
+            raise GameCtlError("no free 2 x 4 block of inventory cells to probe: open the inventory (I), or free some room")
+        g.click(*cell, move_only=True)
+        img = g.screenshot()
+        print(img.save(os.path.join(run_screens_dir(g.cfg), "cursor-probe.png")))
+        held = img.green_fraction(img.box(*GRID)) >= HIGHLIGHT_MIN
+        print("cursor: ITEM HELD (put it down: click an empty cell)" if held else
+              "cursor: empty (inventory must be open)")
     elif c == "key":
         for k in args:
             g.key(k)
     elif c == "click":
         if len(args) < 2:
             raise GameCtlError("click needs FX FY (fractions of the client area)")
-        g.click(float(args[0]), float(args[1]), args[2] if len(args) > 2 else "left")
+        rest = args[2:]
+        g.click(float(args[0]), float(args[1]), "right" if "right" in rest else "left",
+                mods=[m for m in rest if m in MOD_BITS])
     elif c == "console":
         text = g.console_text(" ".join(args))
         print(text.rstrip() or "(no output captured)")

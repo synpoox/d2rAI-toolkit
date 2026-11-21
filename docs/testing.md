@@ -596,8 +596,8 @@ What went wrong in real test runs.
 - **Zero durability after a reload.** Items spawned by the console read `Durability: 0` after the game is saved and
   loaded again, and a 0-durability item has its stats switched off. Spawn fresh items after every load and hover them
   before the test. This also means a reload test of spawned gear tests nothing.
-- **A held cursor item** (a red cell behind every inventory item) blocks tooltips and the next click. Look at each
-  screenshot for it. An unidentified item cannot be equipped: `cheat idall`.
+- **A held cursor item** (tinted inventory cells) blocks tooltips and the next click. Run `game_ctl cursor` (inventory
+  open) before each click; `shot` prints a hint line too. An unidentified item cannot be equipped: `cheat idall`.
 - **`cheat item` and `cheat gold` do not work** as the item or gold source. Use `cheat spawn <code>,inv 0` and
   `cheat uniques <row>`, with codes and rows from the installed mod's built tables
   ([cheat-commands.md](../knowledge/cheat-commands.md)). Turn cheats on with `debug_mode` first.
