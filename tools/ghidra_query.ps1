@@ -18,12 +18,18 @@
 #          means the home folder; any other relative path is taken relative to -Work.
 #          -Program picks the program inside the project (default: the entry's "program";
 #          for D2R the newest dump). Names are case-insensitive.
-# Full Ghidra output: <Work>\query.log. The project must not be open in the Ghidra GUI (it is locked then).
+# -Log:    the full Ghidra output file (default <Work>\query-logs\<script>-<time>-<pid>.log, one per run, so agents
+#          querying at the same time never overwrite each other's output; logs older than a day are deleted).
+# Ghidra lets one process open a project at a time: a query that finds it locked waits and retries (up to
+# -LockWaitSeconds, default 600), so concurrent queries run one after another instead of failing.
+# The project must not be open in the Ghidra GUI (it is locked then).
 param([Parameter(Mandatory = $true, Position = 0)][string]$Script,
       [string]$Ghidra = "",
       [string]$Work = "",
       [string]$Project = "D2R",
       [string]$Program = "",
+      [string]$Log = "",
+      [int]$LockWaitSeconds = 600,
       [Parameter(ValueFromRemainingArguments = $true)][string[]]$ScriptArgs)
 $ErrorActionPreference = 'Stop'
 if (-not $Ghidra) { $Ghidra = if ($env:MODKIT_GHIDRA) { $env:MODKIT_GHIDRA } else { (@(Get-ChildItem "C:\ghidra*", "C:\ghidra\ghidra*" -Directory -ErrorAction SilentlyContinue | Where-Object { Test-Path (Join-Path $_.FullName "support\analyzeHeadless.bat") } | Sort-Object Name -Descending | ForEach-Object FullName) + "C:\ghidra")[0] } }
@@ -59,12 +65,25 @@ if ($Project -ne "D2R") {
         $Program = $dump.Name
     }
 }
-$log = Join-Path $Work "query.log"
+$log = $Log
+if (-not $log) {
+    $logDir = Join-Path $Work "query-logs"
+    New-Item -ItemType Directory -Force $logDir | Out-Null
+    Get-ChildItem $logDir -File -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-1) } |
+        Remove-Item -Force -ErrorAction SilentlyContinue
+    $log = Join-Path $logDir ("{0}-{1:yyyyMMdd-HHmmss}-{2}.log" -f [IO.Path]::GetFileNameWithoutExtension($Script), (Get-Date), $PID)
+}
 $env:GHIDRA_HEADLESS_MAXMEM = "6G"
 $argLine = @("`"$projDir`"", "`"$projName`"", "-process", "`"$Program`"", "-noanalysis", "-readOnly",
              "-scriptPath", "`"$(Join-Path $PSScriptRoot 'ghidra_scripts')`"", "-postScript", $Script) + $ScriptArgs
-$p = Start-Process -FilePath $headless -ArgumentList $argLine -NoNewWindow `
-    -Wait -PassThru -RedirectStandardOutput $log -RedirectStandardError "$log.err"
+$deadline = (Get-Date).AddSeconds($LockWaitSeconds)
+while ($true) {
+    $p = Start-Process -FilePath $headless -ArgumentList $argLine -NoNewWindow `
+        -Wait -PassThru -RedirectStandardOutput $log -RedirectStandardError "$log.err"
+    if (-not (Select-String -Path $log -Pattern "Unable to lock project" -Quiet) -or (Get-Date) -gt $deadline) { break }
+    Write-Host "ghidra_query: project locked by another query, retrying in 5 s"
+    Start-Sleep -Seconds 5
+}
 Get-Content $log | Where-Object { $_ -match "\.java> " } | ForEach-Object { $_ -replace '^.*?\.java> ', '' -replace '\s+\(GhidraScript\)\s*$', '' }
 Get-Content $log | Where-Object { $_ -match "ERROR|Exception" } | Select-Object -First 5
 exit $p.ExitCode
