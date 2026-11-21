@@ -120,7 +120,7 @@ HIGHLIGHT_MIN = 0.004  # share of the grid that must be green (one cell is about
 
 def empty_block(img: "Image", cols: int = 2, rows: int = 4) -> tuple[float, float] | None:
     """Centre (fractions of the window) of a free cols x rows block of inventory cells, found by their near-black
-    fill, or None. The probe of `game_ctl cursor` needs room for any held item (a staff is 2 x 4), and the grid
+    fill and their grid lines, or None (inventory closed, or no room). The probe of `game_ctl cursor` needs room for any held item (a staff is 2 x 4), and the grid
     changes with every swap. Scans from the bottom-right."""
     l, t, r, b = img.box(*GRID_FULL)
     cw, ch = (r - l) / 10, (b - t) / 8
@@ -130,7 +130,8 @@ def empty_block(img: "Image", cols: int = 2, rows: int = 4) -> tuple[float, floa
         for col in range(10):
             x0, y0 = int(l + col * cw + cw * 0.2), int(t + row * ch + ch * 0.2)
             m, sd = img.stats((x0, y0, int(x0 + cw * 0.6), int(y0 + ch * 0.6)))
-            line.append(m < 25 and sd < 12)
+            edge = max(img.grey_values((int(l + col * cw), y0, int(l + col * cw) + 4, y0 + int(ch * 0.6))))
+            line.append(m < 25 and sd < 12 and edge > 40)  # the cell's left grid line proves the inventory is open
         free.append(line)
     for row in range(8 - rows, -1, -1):
         for col in range(10 - cols, -1, -1):
@@ -140,12 +141,18 @@ def empty_block(img: "Image", cols: int = 2, rows: int = 4) -> tuple[float, floa
 
 
 def cursor_report(img: "Image") -> str:
-    """One line for every shot."""
+    """One line for every shot. A shot cannot show an empty cursor: it never proves one."""
     g = img.green_fraction(img.box(*GRID))
     if g < HIGHLIGHT_MIN:
-        return "cursor: no green cell in the inventory grid (empty, or inventory closed, or held item over occupied cells)"
-    return (f"cursor: green cell in the inventory grid ({g:.1%}): an item is held, or an item is hovered with its "
-            "tooltip showing. Run `game_ctl cursor` to settle it")
+        return "cursor: unknown (a shot cannot tell; open the inventory with I and run `game_ctl cursor`)"
+    return (f"cursor: unknown, possibly held (green cell in the inventory grid, {g:.1%}: a held item or a hovered one "
+            "with its tooltip). Run `game_ctl cursor` to settle it")
+
+
+def probe_cursor(img: "Image") -> bool | None:
+    """True when a held item's placement preview shows on a free 2 x 4 block (the cursor must already be parked
+    there), None when `img` has no such block with the grid lines, so nothing can be said."""
+    return img.green_fraction(img.box(*GRID)) >= HIGHLIGHT_MIN
 
 
 class Image:
@@ -584,7 +591,9 @@ class Game:
     def shot(self, path: str) -> str:
         if not path.lower().endswith(".png"):
             path += ".png"
-        return self.screenshot().save(path)
+        img = self.screenshot()
+        self.log(cursor_report(img))
+        return img.save(path)
 
     def harness(self) -> Harness | None:
         """The plugin's harness for the current game process, or None when it is off or not found."""
@@ -908,21 +917,20 @@ def _run(g: Game, a) -> int:
         g.stop()
         print(f"slot {g.slot} stopped")
     elif c == "shot":
-        name = args[0] if args else "shot"
-        img = g.screenshot()
-        print(img.save(os.path.join(run_screens_dir(g.cfg), name + ("" if name.lower().endswith(".png") else ".png"))))
-        print(cursor_report(img))
+        print(g.shot(os.path.join(run_screens_dir(g.cfg), args[0] if args else "shot")))
     elif c == "cursor":
-        # Probe: park the cursor on a free 2 x 4 block of inventory cells and shoot. Only a held item draws a highlight there.
+        # Probe: park the cursor on a free 2 x 4 block of inventory cells and shoot. Only a held item draws a
+        # green placement preview there. No signal is read from the game itself (see docs/testing.md).
         cell = empty_block(g.screenshot())
         if cell is None:
-            raise GameCtlError("no free 2 x 4 block of inventory cells to probe: open the inventory (I), or free some room")
+            print("cursor: unknown (no free 2 x 4 block of grid cells found: the inventory is closed, or full; "
+                  "open it with I or free some room)")
+            return 0
         g.click(*cell, move_only=True)
         img = g.screenshot()
         print(img.save(os.path.join(run_screens_dir(g.cfg), "cursor-probe.png")))
-        held = img.green_fraction(img.box(*GRID)) >= HIGHLIGHT_MIN
-        print("cursor: ITEM HELD (put it down: click an empty cell)" if held else
-              "cursor: empty (inventory must be open)")
+        print("cursor: ITEM HELD (put it down: click an empty cell)" if probe_cursor(img) else
+              "cursor: empty (no placement preview on a free block of the open inventory)")
     elif c == "key":
         for k in args:
             g.key(k)

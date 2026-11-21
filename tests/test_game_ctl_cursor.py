@@ -1,4 +1,4 @@
-"""game_ctl cursor_report: the grid highlight is the shot's only sign of a held item."""
+"""game_ctl cursor probe: a synthetic 1920x1080 inventory (dark cells 19, grid lines 60, as measured in game)."""
 from __future__ import annotations
 
 import sys
@@ -10,39 +10,57 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "testing"))
 import game_ctl  # noqa: E402
 from game_ctl import Image  # noqa: E402
 
+W, H = 1920, 1080
+L, T, R, B = Image(W, H, bytes(3 * W * H)).box(*game_ctl.GRID_FULL)
+CW, CH = (R - L) / 10, (B - T) / 8
 
-def flat(rgb):
-    return Image(100, 100, bytes(rgb) * 10000)
+
+def inventory(items=(), ghost=None, open_=True):
+    """items: (col,row,cols,rows) filled with item art; ghost: same shape, drawn as the green placement preview."""
+    px = bytearray(bytes((30, 40, 30)) * (W * H))  # the world behind
+    if open_:
+        for y in range(T, B):
+            for x in range(L, R):
+                line = int((x - L) % CW) < 2 or int((y - T) % CH) < 2
+                px[(y * W + x) * 3:(y * W + x) * 3 + 3] = bytes((60,) * 3 if line else (19,) * 3)
+
+    def fill(c, r, cols, rows, rgb):
+        for y in range(int(T + r * CH) + 3, int(T + (r + rows) * CH)):
+            for x in range(int(L + c * CW) + 3, int(L + (c + cols) * CW)):
+                px[(y * W + x) * 3:(y * W + x) * 3 + 3] = bytes(rgb)
+    for it in items:
+        fill(*it, (200, 160, 60))
+    if ghost:
+        fill(*ghost, (17, 48, 15))
+    return Image(W, H, bytes(px))
 
 
-class CursorReport(unittest.TestCase):
-    def test_grey_has_no_highlight(self):
-        self.assertIn("no green", game_ctl.cursor_report(flat((60, 60, 60))))
+class Probe(unittest.TestCase):
+    def test_free_block_found_in_open_inventory(self):
+        self.assertIsNotNone(game_ctl.empty_block(inventory(items=[(0, 0, 3, 3)])))
 
-    def test_green_is_a_highlight(self):
-        self.assertIn("green cell", game_ctl.cursor_report(flat((10, 90, 10))))
+    def test_closed_inventory_has_no_block(self):
+        self.assertIsNone(game_ctl.empty_block(inventory(open_=False)))
 
-    def test_red_is_not_tested(self):
-        self.assertIn("no green", game_ctl.cursor_report(flat((100, 10, 10))))
+    def test_full_inventory_has_no_block(self):
+        self.assertIsNone(game_ctl.empty_block(inventory(items=[(c, 0, 1, 8) for c in range(0, 10, 1)])))
 
-    def test_gold_item_art_is_not_a_highlight(self):
-        self.assertIn("no green", game_ctl.cursor_report(flat((200, 160, 60))))
+    def test_empty_cursor_shows_no_ghost(self):
+        self.assertFalse(game_ctl.probe_cursor(inventory(items=[(0, 0, 2, 4)])))
 
-class EmptyBlock(unittest.TestCase):
-    def test_finds_the_free_block_and_skips_items(self):
-        w = h = 1000
-        px = bytearray(bytes((200, 160, 60)) * (w * h))  # everything is "item art"
-        l, t, r, b = Image(w, h, bytes(3 * w * h)).box(*game_ctl.GRID_FULL)
-        cw, ch = (r - l) // 10, (b - t) // 8
-        for y in range(t + 2 * ch, t + 6 * ch):  # rows 2-5, cols 4-5 are free
-            for x in range(l + 4 * cw, l + 6 * cw):
-                px[(y * w + x) * 3:(y * w + x) * 3 + 3] = bytes((5, 5, 5))
-        fx, fy = game_ctl.empty_block(Image(w, h, bytes(px)))
-        self.assertAlmostEqual(fx * w, l + 5 * cw, delta=5)
-        self.assertAlmostEqual(fy * h, t + 4 * ch, delta=5)
+    def test_held_item_shows_green_ghost_on_the_probe_block(self):
+        img = inventory(items=[(0, 0, 2, 4)])
+        fx, fy = game_ctl.empty_block(img)
+        c, r = int(fx * W - L) / CW - 1, int(fy * H - T) / CH - 2
+        held = inventory(items=[(0, 0, 2, 4)], ghost=(int(c), int(r), 2, 4))
+        self.assertTrue(game_ctl.probe_cursor(held))
 
-    def test_none_when_full(self):
-        self.assertIsNone(game_ctl.empty_block(flat((200, 160, 60))))
+    def test_shot_line_never_claims_empty(self):
+        self.assertNotIn("empty", game_ctl.cursor_report(inventory()))
+        self.assertIn("possibly held", game_ctl.cursor_report(inventory(ghost=(5, 3, 2, 4))))
+
+    def test_gold_item_art_is_not_green(self):
+        self.assertFalse(game_ctl.probe_cursor(inventory(items=[(2, 2, 2, 4)])))
 
 
 if __name__ == "__main__":
