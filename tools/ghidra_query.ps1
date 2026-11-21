@@ -77,11 +77,15 @@ $env:GHIDRA_HEADLESS_MAXMEM = "6G"
 $argLine = @("`"$projDir`"", "`"$projName`"", "-process", "`"$Program`"", "-noanalysis", "-readOnly",
              "-scriptPath", "`"$(Join-Path $PSScriptRoot 'ghidra_scripts')`"", "-postScript", $Script) + $ScriptArgs
 $deadline = (Get-Date).AddSeconds($LockWaitSeconds)
+$told = $false
 while ($true) {
     $p = Start-Process -FilePath $headless -ArgumentList $argLine -NoNewWindow `
         -Wait -PassThru -RedirectStandardOutput $log -RedirectStandardError "$log.err"
-    if (-not (Select-String -Path $log -Pattern "Unable to lock project" -Quiet) -or (Get-Date) -gt $deadline) { break }
-    Write-Host "ghidra_query: project locked by another query, retrying in 5 s"
+    if (-not (Select-String -Path $log, "$log.err" -Pattern "Unable to lock project" -Quiet) -or (Get-Date) -gt $deadline) { break }
+    if (-not $told) {
+        Write-Host "ghidra_query: project locked (another query, or the Ghidra GUI has it open); retrying every 5 s for up to $LockWaitSeconds s"
+        $told = $true
+    }
     Start-Sleep -Seconds 5
 }
 Get-Content $log | Where-Object { $_ -match "\.java> " } | ForEach-Object { $_ -replace '^.*?\.java> ', '' -replace '\s+\(GhidraScript\)\s*$', '' }
