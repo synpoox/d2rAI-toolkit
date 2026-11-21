@@ -41,6 +41,9 @@ slot table (`~/.d2r-modkit/slots.toml`), also set `MODKIT_PROJECT=<project>` (it
    `${CLAUDE_PLUGIN_ROOT}/testing/warps.py` makes the lines for a level's reference spots.
 7. **Shoot** with `game_ctl.py --slot <N> shot <name>`, or `game_ctl.py --slot <N> pair <name> <level,x,y>` for an
    HD | legacy pair. Look at every picture before the next click (a held cursor item hides tooltips).
+   **Before each inventory click open the inventory (I) and run `game_ctl.py --slot <N> cursor`**: `ITEM HELD` means your
+   next click puts it down or swaps; `unknown` means it could not tell (inventory closed). A shot never proves an empty
+   cursor. Pick up and put down are plain clicks, `click FX FY left shift` equips (cheat-commands.md, "The cursor item").
 8. **Keep the evidence outside the repository.** Pictures land in `<runs.dir>/<lane>/screenshots/`. Never commit or push a
    screenshot (no branch is an exception, orphan or assets branches included), a save or a log (docs/testing.md, "Screenshots and results"). Report what each picture shows in words; if the
    owner needs to see one, say where it is on disk.

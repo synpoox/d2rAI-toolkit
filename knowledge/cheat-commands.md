@@ -20,7 +20,15 @@ the game").
   reads `Durability: 0` after the game is saved and loaded again, and a 0-durability item has its stats switched off.
   Spawn fresh items after each load, and hover them before a test.
 - `cheat gold <n>` did not add gold, although D2RLoader's list below says it does.
-- A red cell behind every inventory item means the cursor holds an item; tooltips don't show until you put it down.
+- **The cursor item (verified in game, #316).** A click on an inventory item picks it up; a second click puts it down
+  (an occupied target swaps). `shift`+click equips it (`game_ctl click FX FY left shift`; right-click did nothing,
+  `ctrl`+click drops it). The held item hides tooltips and is drawn as a ghost under the cursor, on a dark green cell
+  block (about 17,48,15) where it fits. Tinted cells show only while the inventory is open, so a shot with the
+  inventory closed shows nothing of a held item, and a hovered item (cursor empty) gets the same green cell, with its
+  tooltip. **A shot never proves an empty cursor.** Before each click open the inventory (I) and run
+  `game_ctl cursor`: it parks the cursor on a free 2 x 4 block and prints `ITEM HELD`, `empty`, or `unknown` (inventory
+  closed or no free block). It cannot name the held item: there is no console or harness read of the cursor item
+  (the SDK's `getCursorItem` needs a plugin; not built). A held item turning cells tinted is not a mod bug.
 - To pick up a ground item, hold Alt so the item labels show, then click the label.
 - Escape twice saves and exits to the character screen.
 - **Warp to an exact spot:** `cheat goto <levelId>,<x>,<y>` takes absolute world subtile coordinates, not
