@@ -108,6 +108,26 @@ class GenerationTests(CatalogBase):
         man, b, feed = self.generate()
         self.assertTrue(any("incompatibility_notice" in p for p in pr.catalog_problems(man, feed, b)))
 
+    def test_save_format_version_and_unnumbered_releases(self):
+        """launcher #213 / #290: the number rides in saves, the unnumbered versions as release ids, and both need a
+        launcher that parses them."""
+        self.cfg["catalog"].update(save_format_version=1, unnumbered_compatible_versions=["0.2.5-alpha", "0.2.6-alpha"],
+                                   min_launcher_version=pr.LAUNCHER_SAVE_FORMAT)
+        man, b, feed = self.generate()
+        self.assertEqual(man["saves"]["save_format_version"], 1)
+        self.assertEqual(man["saves"]["unnumbered_compatible_releases"], ["mymod-0.2.5-alpha", "mymod-0.2.6-alpha"])
+        self.assertEqual(pr.catalog_problems(man, feed, b), [])
+        self.cfg["catalog"]["min_launcher_version"] = "0.1.8"
+        man, b, feed = self.generate()
+        self.assertTrue(any("min_launcher_version" in p for p in pr.catalog_problems(man, feed, b)))
+        self.cfg["catalog"].update(save_format_version=0, min_launcher_version=pr.LAUNCHER_SAVE_FORMAT)
+        man, b, feed = self.generate()
+        self.assertNotIn("save_format_version", man["saves"])
+        self.assertTrue(any("unnumbered_compatible_releases" in p for p in pr.catalog_problems(man, feed, b)))
+        self.cfg["catalog"]["unnumbered_compatible_versions"] = []
+        man, b, feed = self.generate()
+        self.assertNotIn("unnumbered_compatible_releases", man["saves"])
+        self.assertEqual(pr.catalog_problems(man, feed, b), [])
 
 class PreviousDefaultTests(CatalogBase):
     """launcher #134: shipped defaults list the hashes earlier releases shipped, so the launcher's clean install tells an

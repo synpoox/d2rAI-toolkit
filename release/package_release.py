@@ -87,6 +87,8 @@ CATALOG_MANIFEST = "release-manifest.json"  # schema 3, the launcher's asset nam
 FEED = "feed.json"
 CATALOG_SCHEMA = 3
 EMPTY_SHA256 = hashlib.sha256(b"").hexdigest()
+# The first launcher that parses saves.save_format_version and saves.unnumbered_compatible_releases (launcher #290)
+LAUNCHER_SAVE_FORMAT = "0.1.9"
 LOADER_PAGE = "https://d2rloader.net/download.html"  # the launcher links here; schema 3 carries no installer pin
 
 FORBIDDEN = re.compile("|".join(f"(?:{p})" for p in release_config.DEFAULT_FORBIDDEN), re.I)
@@ -329,6 +331,12 @@ def catalog_manifest(cfg: dict, version: str, files: list, archive_path: Path, d
     breaking = bool(cat["save_breaking"])
     saves = {"folder": str(mod["save_folder"]).strip("/"), "save_breaking": breaking,
              "incompatibility_notice": (cat["incompatibility_notice"] or "") if breaking else None}
+    if cat.get("save_format_version"):
+        saves["save_format_version"] = int(cat["save_format_version"])
+    if cat.get("unnumbered_compatible_versions"):
+        if not isinstance(cat["unnumbered_compatible_versions"], list):
+            raise ValueError("[catalog] unnumbered_compatible_versions must be a list of versions")
+        saves["unnumbered_compatible_releases"] = [f"{cat['product_id']}-{v}" for v in cat["unnumbered_compatible_versions"]]
     if cat.get("loader_save_format"):
         saves["loader_save_format"] = setting(cat["loader_save_format"])
     return {
@@ -790,8 +798,19 @@ def catalog_problems(man: dict, feed: dict = None, man_bytes: bytes = None, arch
 
     sv = man.get("saves") or {}
     if not {"folder", "save_breaking", "incompatibility_notice"} <= set(sv) <= \
-            {"folder", "save_breaking", "incompatibility_notice", "loader_save_format"}:
+            {"folder", "save_breaking", "incompatibility_notice", "save_format_version",
+             "unnumbered_compatible_releases", "loader_save_format"}:
         add(f"saves keys {sorted(sv)}")
+    fmt, same = sv.get("save_format_version"), sv.get("unnumbered_compatible_releases")
+    if fmt is not None and (type(fmt) is not int or not 1 <= fmt <= 0xFFFFFFFF):
+        add(f"saves.save_format_version {fmt!r} must be an integer from 1 to 4294967295")
+    if same is not None and (fmt is None or not isinstance(same, list) or not same or
+                             any(not isinstance(i, str) or not IDENT_RE.fullmatch(i) for i in same)):
+        add("saves.unnumbered_compatible_releases must be release ids, and only with save_format_version")
+    minimum = str(man.get("min_launcher_version", ""))
+    if (fmt is not None or same is not None) and VERSION_RE.fullmatch(minimum) and (
+            tuple(map(int, minimum.split("."))) < tuple(map(int, LAUNCHER_SAVE_FORMAT.split(".")))):
+        add(f"saves.save_format_version needs min_launcher_version {LAUNCHER_SAVE_FORMAT} or later (older launchers reject it)")
     if path_problem(sv.get("folder")) or "/" in str(sv.get("folder")):
         add(f"saves.folder {sv.get('folder')!r} must be one folder name")
     notice = sv.get("incompatibility_notice")
