@@ -334,6 +334,8 @@ def catalog_manifest(cfg: dict, version: str, files: list, archive_path: Path, d
     if cat.get("save_format_version"):
         saves["save_format_version"] = int(cat["save_format_version"])
     if cat.get("unnumbered_compatible_versions"):
+        if not isinstance(cat["unnumbered_compatible_versions"], list):
+            raise ValueError("[catalog] unnumbered_compatible_versions must be a list of versions")
         saves["unnumbered_compatible_releases"] = [f"{cat['product_id']}-{v}" for v in cat["unnumbered_compatible_versions"]]
     if cat.get("loader_save_format"):
         saves["loader_save_format"] = setting(cat["loader_save_format"])
@@ -800,10 +802,10 @@ def catalog_problems(man: dict, feed: dict = None, man_bytes: bytes = None, arch
              "unnumbered_compatible_releases", "loader_save_format"}:
         add(f"saves keys {sorted(sv)}")
     fmt, same = sv.get("save_format_version"), sv.get("unnumbered_compatible_releases")
-    if fmt is not None and (type(fmt) is not int or fmt < 1):
-        add(f"saves.save_format_version {fmt!r} must be an integer >= 1")
+    if fmt is not None and (type(fmt) is not int or not 1 <= fmt <= 0xFFFFFFFF):
+        add(f"saves.save_format_version {fmt!r} must be an integer from 1 to 4294967295")
     if same is not None and (fmt is None or not isinstance(same, list) or not same or
-                             any(not IDENT_RE.fullmatch(str(i)) for i in same)):
+                             any(not isinstance(i, str) or not IDENT_RE.fullmatch(i) for i in same)):
         add("saves.unnumbered_compatible_releases must be release ids, and only with save_format_version")
     minimum = str(man.get("min_launcher_version", ""))
     if (fmt is not None or same is not None) and VERSION_RE.fullmatch(minimum) and (
