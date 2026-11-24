@@ -117,6 +117,12 @@ loader_files = []                          # the official loader files to pin by
 required_settings = []                     # e.g. [{file = "d2rloader/config/d2rloader.toml", key = "d2rcore.save_format.mode", value = "extended"}]
 save_breaking = false                      # true when characters of the previous release may not load ...
 incompatibility_notice = ""                # ... and then this text, shown before updating
+# The save format (launcher #213, #290): the launcher prompts when the installed release's number differs, so an update
+# that skips a save-breaking release still warns. Start at 1 and raise it in each save-breaking release. Needs
+# min_launcher_version 0.1.9 or later (older launchers reject the key). The first numbered release lists the earlier
+# unnumbered versions whose saves it reads (those since the last save break); an install of any other unnumbered one prompts.
+save_format_version = 0                    # 0 = not emitted
+unnumbered_compatible_versions = []        # e.g. ["0.2.5-alpha", "0.2.6-alpha"]
 upcoming = []                              # other product IDs the feed lists as upcoming, e.g. ["project-09"]
 header_image = ""                          # optional Patch Notes banner, e.g. "https://github.com/<repos.github>/releases/download/v<version>/header.png"; "" = the product's hero art
 game_exe = ""                              # the real D2R.exe the release was tested with (or --game-exe)

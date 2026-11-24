@@ -69,6 +69,8 @@ DEFAULTS = {
         "loader_save_format": {},     # optional {file, key, value}, same rule
         "save_breaking": False,       # true: characters of the previous release may not load ...
         "incompatibility_notice": "",  # ... and this text says so (required exactly then)
+        "save_format_version": 0,     # >= 1: the save format this release reads, raised with each save break; 0 = not emitted
+        "unnumbered_compatible_versions": [],  # versions from before numbering whose saves this release reads (launcher #290)
         "upcoming": [],               # other product IDs feed.json lists as upcoming
         "header_image": "",           # optional Patch Notes banner: an https URL on github.com or objects.githubusercontent.com
         "game_exe": "",               # the real D2R.exe the release was tested with (--game-exe beats it)
