@@ -383,7 +383,7 @@ folder. Options per entry, for what only some companions need:
 | `loader_settings` | `{"section": {"key": value}}` written into `d2rloader/config/d2rloader.toml` unless the key is set already, for example `{"d2rcore.items": {"item_stat_ranges": true}}`. |
 
 The project's own settings for a companion (a filter file, plugin configs) are listed in the manifest's top-level
-`config` (default `["companions/config/"]`) and replace the zip's defaults; `install` also overwrites a player's edits to
+`config` (default `["companions/config/"]`; a folder entry copies its subfolders too, e.g. `config/filter/*.json`) and replace the zip's defaults; `install` also overwrites a player's edits to
 those files in `d2rloader/config/`. `d2rloader.toml` is refused there: use `loader_settings`, which merges. The
 top-level `project_files` (`{"companions/x/settings.txt": "{mod}.mpq/data/global/excel/x/settings.txt"}`) copies project
 files to other places in the mod folder (`{mod}` is its name) when `install` or the stager overlays the companions; a
