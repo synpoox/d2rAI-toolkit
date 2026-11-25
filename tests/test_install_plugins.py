@@ -11,7 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "tools" / "install_plugins.ps1"
-POWERSHELL = shutil.which("powershell") or shutil.which("pwsh")
+POWERSHELL = (shutil.which("powershell") or shutil.which("pwsh")) if os.name == "nt" else None  # the script is Windows-only: py -3, backslash paths
 sys.path[:0] = [str(ROOT), str(ROOT / "testing")]
 import game_slots as gs  # noqa: E402
 import testing_config as tc  # noqa: E402
@@ -24,7 +24,7 @@ def exe_with_version(major, minor, build=0):
             + struct.pack("<III", 0x10000, ms, ls))
 
 
-@unittest.skipUnless(POWERSHELL, "no PowerShell on this machine")
+@unittest.skipUnless(POWERSHELL, "install_plugins.ps1 is Windows-only (py -3 launcher, backslash paths) and needs PowerShell")
 class InstallPluginsTests(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
