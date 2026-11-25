@@ -11,7 +11,7 @@ overhaul released to players. Plugin API details: [engine-re.md](engine-re.md) a
 |---|---|
 | `D2RLoader.exe` with no arguments reads `<game>\d2rloader\config\d2rloader.toml`, section `[d2rloader]` | It starts D2R with `<launch_arguments> -mod <default_mod>`. `-mod` is not allowed inside `launch_arguments`. The log shows the command line |
 | `default_mod` is set in D2RLoader's own options | Gear on the character screen, Default Mod, Apply. It writes the game-wide file |
-| A mod's own `mods\<Mod>\d2rloader\config\d2rloader.toml` | Overrides only the `[d2rcore.*]` settings (save format, stash tabs, ...). It **cannot choose the mod** |
+| A mod's own `mods\<Mod>\d2rloader\config\d2rloader.toml` | Overrides the `[d2rcore.*]` settings (save format, stash tabs, ...) and `[d2rloader.plugins] load_order`. It **cannot choose the mod** |
 | `-txt` is not needed with 1.3.1 | D2RLoader compiles the mod's `.txt` tables itself ("Compiled N tables from TXT"). Shipping a `.bin` switches it to a "custom BIN set" that must be complete |
 
 **Trap: `default_mod` names another mod.** A player with an old or renamed mod folder in `default_mod` runs that
@@ -193,6 +193,30 @@ never force that match. A way to cut a mod's engine code into plugins:
   `PanelManager:OpenPanel:<plugin-id>/<name>`, then read `event->text` in a UI message listener and consume it.
 - Retail saves allow one custom player page: a second `registerPlayerPage` returns `Conflict`. Items on a page are saved
   with the character and stay there when the panel closes.
+
+## TCP/IP multiplayer through D2RLoader (1.3.x)
+
+Blizzard's game has no TCP/IP; D2RLoader adds it (its TCP/IP page, https://d2rloader.net/tcp-ip.html, and changelog).
+Read from those pages, not run here: **unconfirmed** marks what no page states.
+
+- Turn on *Show TCP/IP Button* (Settings, General), pick an **offline character**, then *Multiplayer* beside *Play*.
+  Battle.net characters are not used. A mod is started with `-mod <name>` (`-txt` is not needed with 1.3.1).
+- Since 1.2.0-beta a Multiplayer screen offers *Browse Games* and *Host Game*, with three host modes: **Public**
+  (listed in the browser by heartbeat, filter by mod, difficulty, Terrorized), **Unlisted/Direct** (join by Game ID or
+  address) and **LAN Only** (Direct Join). The game itself runs on the host's PC.
+- Default **TCP port 4000** (`game_port`). The loader tries automatic router setup (NAT-PMP since 1.2.1) and shows a
+  *Hosting status*; some routers still need a manual forward. IPv4 only (1.2.1-beta).
+- What the host checks before a client enters: loader version, active mod, Shared plugins, the `ItemStatCost` schema
+  (1.1.0), memory patches, map layout, movement, collision and animation timing data (1.2.1) and the save format
+  (1.3.0). It does not make different mods compatible. Clients older than 1.2.1-beta cannot join a 1.2.1 host.
+- Plugin roles and matching are in [d2rloader-capabilities.md](d2rloader-capabilities.md), *Multiplayer implications*:
+  `Shared` plugins must match by id, version, ABI, scope and flags; `[d2rl] match` lists up to 64 config paths that must
+  be equal; only the local game or the host changes items (a client sends a plugin message of 224 bytes at most), and a
+  TCP/IP client has no game thread.
+- Saves are each player's own local characters, so nothing stops an edited character joining (no page claims
+  otherwise). Server and Shared plugins go into the character's plugin history.
+- Player count per game: **unconfirmed**. VPN tools are not mentioned by D2RLoader; a virtual LAN with LAN Only or
+  Direct Join should work the same way, **unconfirmed**. The loader is Windows only; consoles have no route.
 
 ## Loader gaps (D2RLoader 1.3.1-beta, build 93847)
 
