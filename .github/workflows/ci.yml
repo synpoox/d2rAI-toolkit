@@ -19,4 +19,4 @@ jobs:
       - name: Unit tests
         run: python -m unittest discover tests
       - name: Public-release scan (e-mails, IPs, user paths, keys, PNG metadata)
-        run: python tools/check_public.py
+        run: python tools/check_public.py --history

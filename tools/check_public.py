@@ -19,7 +19,8 @@ allow-listed: rewrite the text instead.
 
 Exit status: 0 clean, 1 hits found, 2 usage error.
 
-    python tools/check_public.py                 scan the whole tracked tree and the branch history
+    python tools/check_public.py                 scan the whole tracked tree and the commits not yet on origin's default branch
+    python tools/check_public.py --history       also scan every older commit (author/committer e-mails, messages)
     python tools/check_public.py --staged        scan only what is staged (used by the pre-commit hook)
     python tools/check_public.py --message-file F  scan one commit message (used by the commit-msg hook)
     python tools/check_public.py --strip-png     remove text/EXIF chunks from tracked PNG files, in place
@@ -393,10 +394,20 @@ def staged_files(root: Path) -> list[str]:
     return [p for p in raw.decode("utf-8", errors="surrogateescape").split("\0") if p]
 
 
-def commits(root: Path, limit: int | None = None):
-    """(sha, {author, committer, message}) for every commit reachable from HEAD."""
+def default_base(root: Path) -> str | None:
+    """The published branch (origin/HEAD, origin/main or origin/master), if the repo has one."""
+    for ref in ("origin/HEAD", "origin/main", "origin/master"):
+        if git(root, "rev-parse", "--verify", "--quiet", f"refs/remotes/{ref}", check=False).strip():
+            return ref
+    return None
+
+
+def commits(root: Path, limit: int | None = None, base: str | None = None):
+    """(sha, {author, committer, message}) for every commit reachable from HEAD (minus those reachable from base)."""
     fmt = "%H%x1f%an <%ae>%x1f%cn <%ce>%x1f%B%x1e"
     args = ["log", f"--format={fmt}"]
+    if base:
+        args += ["HEAD", f"^{base}"]
     if limit:
         args.append(f"-n{limit}")
     res = subprocess.run(["git", "-C", str(root), *args], capture_output=True)
@@ -451,10 +462,15 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--root", default=".", help="repository to scan (default: current directory)")
     ap.add_argument("--staged", action="store_true", help="scan staged content only, no history")
     ap.add_argument("--no-history", action="store_true", help="do not scan commit messages and author fields")
+    ap.add_argument("--history", action="store_true",
+                    help="scan every commit; by default only commits not on origin's default branch (all, if there is none)")
     ap.add_argument("--message-file", help="scan this commit message file only (commit-msg hook)")
     ap.add_argument("--strip-png", action="store_true", help="strip text/EXIF chunks from tracked PNG files, then exit")
     ap.add_argument("--quiet", action="store_true", help="print hits only")
     args = ap.parse_args(argv)
+    for stream in (sys.stdout, sys.stderr):   # a long report must not die on console encoding
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
 
     tpath = terms_path(args.terms)
     terms = load_terms(tpath)
@@ -488,7 +504,7 @@ def main(argv: list[str] | None = None) -> int:
     nfiles = scan_tree(sc, root, args.staged)
     ncommits = 0
     if not args.staged and not args.no_history:
-        for sha, fields in commits(root):
+        for sha, fields in commits(root, base=None if args.history else default_base(root)):
             sc.scan_commit(sha, fields)
             ncommits += 1
     what = f"{nfiles} file(s)" + (f" and {ncommits} commit(s)" if ncommits else "")

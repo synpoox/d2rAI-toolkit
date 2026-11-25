@@ -371,7 +371,8 @@ Mods are often built in private and published later. The toolkit helps keep priv
 
 ```powershell
 py -3 tools\install_hooks.py            # pre-commit + commit-msg hooks run the scan for you
-py -3 tools\check_public.py             # scan files, PNG metadata, commit messages and authors
+py -3 tools\check_public.py             # scan files, PNG metadata and your new commits (not yet on origin/main)
+py -3 tools\check_public.py --history   # also every older commit (messages, author e-mails)
 py -3 tools\check_public.py --no-history  # files only
 ```
 
