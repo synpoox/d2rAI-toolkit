@@ -398,7 +398,7 @@ def default_base(root: Path) -> str | None:
     """The published branch (origin/HEAD, origin/main or origin/master), if the repo has one."""
     for ref in ("origin/HEAD", "origin/main", "origin/master"):
         if git(root, "rev-parse", "--verify", "--quiet", f"refs/remotes/{ref}", check=False).strip():
-            return ref
+            return f"refs/remotes/{ref}"
     return None
 
 
