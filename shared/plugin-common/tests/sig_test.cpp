@@ -61,6 +61,11 @@ struct FakeImage {
 		std::memcpy(code + 0x90, twice, 3);
 		const uint8_t jmpFar[] = {0xe9, 0x00, 0x00, 0x00, 0x40, 0xcd};  // jmp +0x40000000
 		std::memcpy(code + 0xa0, jmpFar, sizeof(jmpFar));
+		// .pdata at 0x2800: one function, starting at 0x1010
+		nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION] = {0x2800, sizeof(RUNTIME_FUNCTION)};
+		auto* pdata = reinterpret_cast<RUNTIME_FUNCTION*>(bytes + 0x2800);
+		pdata->BeginAddress = 0x1010;
+		pdata->EndAddress = 0x101a;
 	}
 	auto base() const -> uint64_t { return reinterpret_cast<uint64_t>(bytes); }
 };
@@ -111,8 +116,9 @@ int main() {
 	sigscan::Entry bad {"Bad", "t", sigscan::Kind::Rip, 2, 6, "e9 ?? ??"};  // the field runs past the pattern
 	sigscan::Entry past {"Past", "t", sigscan::Kind::Code, -5, 0, "57 48 83 ec 20"};  // starts 5 bytes past the entry at 0x1010
 	sigscan::Entry before {"Before", "t", sigscan::Kind::Code, -0x2000, 0, "57 48 83 ec 20"};
-	sigscan::Entry* all[] = {&code, &rip, &abs, &none, &twice, &outside, &bad, &past, &before};
-	sigscan::Resolve(all, 9, image.base(), nullptr, 0);
+	sigscan::Entry midway {"Midway", "t", sigscan::Kind::Code, -4, 0, "57 48 83 ec 20"};  // 0x1011: not a function start
+	sigscan::Entry* all[] = {&code, &rip, &abs, &none, &twice, &outside, &bad, &past, &before, &midway};
+	sigscan::Resolve(all, 10, image.base(), nullptr, 0);
 	Check(code.state == sigscan::State::Ok && code.rva == 0x1015 && code.address == image.base() + 0x1015 && !code.cached,
 	      "Resolve Code: match + at");
 	Check(rip.state == sigscan::State::Ok && rip.rva == 0x2000, "Resolve Rip: follows the rip-relative operand");
@@ -123,16 +129,17 @@ int main() {
 	Check(bad.state == sigscan::State::BadPattern, "Resolve: an operand past the pattern's end is refused");
 	Check(past.state == sigscan::State::Ok && past.rva == 0x1010, "Resolve Code: a negative at steps back to the entry");
 	Check(before.state == sigscan::State::OutOfImage, "Resolve Code: a negative at before the code is refused");
+	Check(midway.state == sigscan::State::OutOfImage, "Resolve Code: a negative at must land on a .pdata function start");
 
 	const sigscan::CacheRow rows[] = {{&none, 0x1234}};
 	const sigscan::Cache caches[] = {{0x99999999, rows, 1}, {0x11112222, rows, 1}};
-	sigscan::Resolve(all, 9, image.base(), caches, 2);
+	sigscan::Resolve(all, 10, image.base(), caches, 2);
 	Check(none.state == sigscan::State::Ok && none.cached && none.rva == 0x1234, "Resolve: a known stamp takes the cache");
 	Check(code.state == sigscan::State::Ok && !code.cached, "Resolve: entries the cache lacks are still scanned");
 	const sigscan::Cache other[] = {{0x99999999, rows, 1}};
-	sigscan::Resolve(all, 9, image.base(), other, 1);
+	sigscan::Resolve(all, 10, image.base(), other, 1);
 	Check(none.state == sigscan::State::NotFound && !none.cached, "Resolve: another build's cache is not used");
-	sigscan::Resolve(all, 9, 0, caches, 2);
+	sigscan::Resolve(all, 10, 0, caches, 2);
 	Check(code.state == sigscan::State::NotFound && code.address == 0, "Resolve: no image resolves nothing");
 
 	// A fixed RVA valid only on one stamp: pattern "" and a row in that build's cache
@@ -155,11 +162,13 @@ int main() {
 	Check(sigscan::ScanUnique(image.base(), "11 22 33 44", 0, &r) == 0 && r == 7, "ScanUnique: no match -> 0");
 	Check(sigscan::ScanUnique(image.base(), "de ad be", 0, &r) == 2 && r == 7, "ScanUnique: two matches -> 2, no RVA");
 	Check(sigscan::ScanUnique(image.base(), "48 89 5c 24 08 57", 0x2000, &r) == -1, "ScanUnique: offset out of the code -> -1");
+	Check(sigscan::ScanUnique(image.base(), "57 48 83 ec 20", -5, &r) == 1 && r == 0x1010, "ScanUnique: a negative offset steps back to the entry");
+	Check(sigscan::ScanUnique(image.base(), "57 48 83 ec 20", -4, &r) == -1, "ScanUnique: a negative offset off a .pdata start -> -1");
 	Check(sigscan::ScanUnique(image.base(), "zz", 0, &r) == -1 && sigscan::ScanUnique(0, "48 89", 0, &r) == -1,
 	      "ScanUnique: bad pattern or no image -> -1");
 
 	// --- Parts gated by their entries ---
-	sigscan::Resolve(all, 9, image.base(), nullptr, 0);
+	sigscan::Resolve(all, 10, image.base(), nullptr, 0);
 	sigscan::Entry* const goodUses[] = {&code, &rip};
 	sigscan::Entry* const badUses[] = {&code, &twice};
 	parts::Part table[] = {
