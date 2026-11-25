@@ -19,6 +19,9 @@ runs. Everything that needs Windows is behind a function, so the scripts also im
 | `testing/stock_checks.py` | Stock checks that hold for any mod (`slot-savepath`). Turn on with `modules = ["stock_checks"]`. |
 | `testing/testing.example.toml` | The config. Copy it to `modkit-testing.toml`. |
 
+**Agents running a check:** do not read this file whole. Read [Slots, locks](#slots-locks-and-the-queue), [Controlling the game](#controlling-the-game) and
+[Practical hazards](#practical-hazards); grep the rest (Troubleshooting by error text) when needed.
+
 Contents: [Quick start](#quick-start) · [Why slots](#why-slots) · [The config file](#the-config-file) ·
 [Slots, locks and the queue](#slots-locks-and-the-queue) · [Controlling the game](#controlling-the-game) ·
 [The harness protocol](#the-harness-protocol) · [Writing and running checks](#writing-and-running-checks) ·
