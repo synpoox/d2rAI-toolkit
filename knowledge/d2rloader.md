@@ -11,7 +11,7 @@ overhaul released to players. Plugin API details: [engine-re.md](engine-re.md) a
 |---|---|
 | `D2RLoader.exe` with no arguments reads `<game>\d2rloader\config\d2rloader.toml`, section `[d2rloader]` | It starts D2R with `<launch_arguments> -mod <default_mod>`. `-mod` is not allowed inside `launch_arguments`. The log shows the command line |
 | `default_mod` is set in D2RLoader's own options | Gear on the character screen, Default Mod, Apply. It writes the game-wide file |
-| A mod's own `mods\<Mod>\d2rloader\config\d2rloader.toml` | Overrides only the `[d2rcore.*]` settings (save format, stash tabs, ...). It **cannot choose the mod** |
+| A mod's own `mods\<Mod>\d2rloader\config\d2rloader.toml` | Overrides the `[d2rcore.*]` settings (save format, stash tabs, ...) and `[d2rloader.plugins] load_order`. It **cannot choose the mod** |
 | `-txt` is not needed with 1.3.1 | D2RLoader compiles the mod's `.txt` tables itself ("Compiled N tables from TXT"). Shipping a `.bin` switches it to a "custom BIN set" that must be complete |
 
 **Trap: `default_mod` names another mod.** A player with an old or renamed mod folder in `default_mod` runs that
@@ -200,7 +200,7 @@ Blizzard's game has no TCP/IP; D2RLoader adds it (its TCP/IP page, https://d2rlo
 Read from those pages, not run here: **unconfirmed** marks what no page states.
 
 - Turn on *Show TCP/IP Button* (Settings, General), pick an **offline character**, then *Multiplayer* beside *Play*.
-  Battle.net characters are not used. A mod is started as `-mod <name> -txt`.
+  Battle.net characters are not used. A mod is started with `-mod <name>` (`-txt` is not needed with 1.3.1).
 - Since 1.2.0-beta a Multiplayer screen offers *Browse Games* and *Host Game*, with three host modes: **Public**
   (listed in the browser by heartbeat, filter by mod, difficulty, Terrorized), **Unlisted/Direct** (join by Game ID or
   address) and **LAN Only** (Direct Join). The game itself runs on the host's PC.
