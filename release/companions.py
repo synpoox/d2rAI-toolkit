@@ -281,12 +281,14 @@ def _fetch_into(dest: Path, root: Path, data: dict, download: Callable[..., byte
     # the project's settings for the companions, over any default a zip put there
     for spec in data.get("config", DEFAULT_CONFIG):
         p = root / spec
-        files = sorted(f for f in p.glob("*") if f.is_file()) if spec.endswith("/") else ([p] if p.is_file() else [])
+        files = sorted(f for f in p.rglob("*") if f.is_file()) if spec.endswith("/") else ([p] if p.is_file() else [])
         for f in files:
-            if f.name.lower() == "d2rloader.toml":
+            if f.name.lower() == "d2rloader.toml" and (f.parent == p or not spec.endswith("/")):
                 raise CompanionError(f"{spec}: d2rloader.toml cannot be a config file; use \"loader_settings\" to merge into it")
-            shutil.copy2(f, config / f.name)
-            written.append(f"d2rloader/config/{f.name}")
+            rel = f.relative_to(p).as_posix() if spec.endswith("/") else f.name  # a folder keeps its subfolders
+            (config / rel).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(f, config / rel)
+            written.append(f"d2rloader/config/{rel}")
     return list(dict.fromkeys(written))
 
 

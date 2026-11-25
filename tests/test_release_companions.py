@@ -77,6 +77,16 @@ class CompanionTests(unittest.TestCase):
             self.assertEqual((root / "generated/companions/d2rloader/config/x.toml").read_text(), "ours")
             self.assertEqual(written.count("d2rloader/config/x.toml"), 1)
 
+    def test_config_folder_keeps_subfolders(self):
+        zipped = make_zip({"d2rloader/plugins/x.dll": b"dll", "Other.mpq/data/sfx/a": b""})
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.project(Path(tmp), zipped)
+            (root / "companions" / "config" / "filter").mkdir(parents=True)
+            (root / "companions" / "config" / "filter" / "a.json").write_text("{}")
+            written = companions.fetch(root, download=lambda *a: zipped)
+            self.assertIn("d2rloader/config/filter/a.json", written)
+            self.assertTrue((root / "generated/companions/d2rloader/config/filter/a.json").is_file())
+
     def test_bare_release_asset_is_one_file(self):
         mpq = b"bare mpq"
         with tempfile.TemporaryDirectory() as tmp:
