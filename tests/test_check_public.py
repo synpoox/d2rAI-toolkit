@@ -304,6 +304,19 @@ class RepoTests(unittest.TestCase):
         self.assertIn(":author: [email]", out)
         self.assertNotIn("real.person", out)
 
+    def test_old_published_commits_skipped_unless_history(self):
+        git(self.repo, "config", "user.email", "real.person@gmail.com")
+        self.commit(files={"a.md": "ok\n"})
+        git(self.repo, "update-ref", "refs/remotes/origin/main", "HEAD")      # pretend it is published
+        git(self.repo, "config", "user.email", "noreply@example.com")
+        self.commit(msg="new", files={"b.md": "x\n"})
+        rc, out, _ = self.scan()
+        self.assertEqual(rc, 0)
+        self.assertNotIn("[email]", out)
+        rc, out, _ = self.scan("--history")
+        self.assertEqual(rc, 1)
+        self.assertIn(":author: [email]", out)
+
     def test_missing_terms_file_runs_generic_checks(self):
         self.commit(files={"a.md": "mail me at someone@gmail.com\n"})
         rc, out, err = run_main("--root", str(self.repo), "--terms", str(self.terms) + ".missing")
