@@ -55,6 +55,29 @@ auto ReadSections(uint64_t base, Section* out, int cap, int* count, uint32_t* im
 	return true;
 }
 
+// True when rva is a function start in the image's .pdata (RUNTIME_FUNCTION.BeginAddress); false without one. A
+// pattern past the entry (negative at) must step back onto one: a new build with another prologue then stays off.
+auto IsFunctionStart(uint64_t base, int64_t rva) noexcept -> bool {
+	const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(base);
+	const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(base + static_cast<uint64_t>(dos->e_lfanew));
+	const IMAGE_DATA_DIRECTORY& dir = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION];
+	const auto* table = reinterpret_cast<const RUNTIME_FUNCTION*>(base + dir.VirtualAddress);
+	size_t lo = 0, hi = dir.VirtualAddress == 0 ? 0 : dir.Size / sizeof(RUNTIME_FUNCTION);
+	while (lo < hi) {  // .pdata is sorted by BeginAddress
+		const size_t mid = lo + (hi - lo) / 2;
+		const auto begin = static_cast<int64_t>(table[mid].BeginAddress);
+		if (begin == rva) {
+			return true;
+		}
+		if (begin < rva) {
+			lo = mid + 1;
+		} else {
+			hi = mid;
+		}
+	}
+	return false;
+}
+
 }  // namespace
 
 auto Parse(const char* pattern, uint8_t* bytes, bool* fixed) noexcept -> int {
@@ -185,7 +208,7 @@ void Resolve(Entry* const* entries, size_t count, uint64_t exeBase, const Cache*
 		uint8_t bytes[MaxPattern];
 		bool fixed[MaxPattern];
 		const int len = Parse(e.pattern, bytes, fixed);
-		if (len < 0 || e.at < 0 || (e.kind == Kind::Code ? e.at >= len : e.at + 4 > len)) {
+		if (len < 0 || (e.kind == Kind::Code ? e.at >= len : e.at < 0 || e.at + 4 > len)) {  // Code: at < 0 is a pattern past the entry
 			e.state = State::BadPattern;
 			continue;
 		}
@@ -219,6 +242,7 @@ void Resolve(Entry* const* entries, size_t count, uint64_t exeBase, const Cache*
 				inside = inside || (target >= exec[s].rva && target < static_cast<int64_t>(exec[s].rva) + exec[s].size);
 			}
 		}
+		inside = inside && (e.kind != Kind::Code || e.at >= 0 || IsFunctionStart(exeBase, target));
 		if (!inside) {
 			e.state = State::OutOfImage;
 			continue;
@@ -252,6 +276,9 @@ auto ScanUnique(uint64_t exeBase, const char* pattern, int offset, uint64_t* rva
 	}
 	if (found != 1) {
 		return found;
+	}
+	if (offset < 0 && !IsFunctionStart(exeBase, target)) {
+		return -1;  // a pattern past the entry must step back onto a .pdata function start
 	}
 	for (int s = 0; s < execCount; ++s) {
 		if (target >= exec[s].rva && target < static_cast<int64_t>(exec[s].rva) + exec[s].size) {

@@ -43,6 +43,7 @@ SIG = SRC / "sig"
 WORK = Path(os.environ.get("MODKIT_GHIDRA_WORK") or r"C:\ghidra-work")
 DECL = re.compile(r"(?:inline\s+)?constexpr\s+uint64_t\s+(\w+)(\s*\[\s*\])?\s*=\s*(\{[^}]*\}|[^;]*);", re.S)
 LINE = re.compile(r'^D2R_SIG\((\w+), (\w+), (Code|Rip|Abs), (-?\d+), (\d+), "([^"]*)"\)$')
+HOOK_BYTES = 14  # D2RLoader's inline hook jump: a function-entry pattern starts past it (another plugin may hook the entry)
 MAX_BYTES = 96  # longest pattern made; a longer one is a sign the code is not unique, use a reference
 
 
@@ -164,6 +165,12 @@ def grow(img, start, end, at, kind, nxt=0):
     return None
 
 
+def is_entry(img, rva):
+    """True when rva starts a .pdata function: an entry-anchored pattern there is remade past the entry."""
+    fn = img.function(rva)
+    return fn is not None and fn[0] == rva
+
+
 def by_code(img, rva):
     fn = img.function(rva)
     if fn is None:
@@ -175,6 +182,11 @@ def by_code(img, rva):
     first = insns[idx]
     if rva == fn[0] and (first.mnemonic == "jmp" or (first.bytes[:2] == b"\x48\xb8")):
         return None  # hooked entry: its bytes are the hook's
+    if rva == fn[0]:  # past the bytes a hook overwrites, so another plugin's hook on this entry does not hide it
+        past = next((x.address for x in insns if x.address >= rva + HOOK_BYTES), None)
+        found = past is not None and grow(img, past, fn[1], rva - past, "Code")
+        if found:
+            return found
     for back in range(0, 6):  # start a few instructions earlier when the tail alone is not unique
         if idx - back < 0:
             break
@@ -244,7 +256,7 @@ def parse(s):
 def resolve(img, kind, at, nxt, pat):
     """The RVA the entry finds, or None when it does not match exactly once."""
     found = img.matches(pat)
-    if len(found) != 1 or at < 0 or (at >= len(pat) if kind == "Code" else at + 4 > len(pat)):
+    if len(found) != 1 or (at >= len(pat) if kind == "Code" else at < 0 or at + 4 > len(pat)):
         return None
     m = found[0]
     if kind == "Code":
@@ -272,6 +284,10 @@ def main():
         entry = old.get(name)
         if entry is not None and not entry[3]:
             pass  # pattern "" by hand: cache only (an address no code points at, e.g. D2RLoader's own slots)
+        elif (not args.check and entry is not None and entry[0] == "Code" and entry[1] == 0 and is_entry(img, rva)
+              and resolve(img, *entry) == rva and (past := by_code(img, rva)) and past[1] < 0 and resolve(img, *past) == rva):
+            entry = past  # an entry-anchored pattern is remade past the entry when one is unique
+            print(f"made {name} {rva:#x}: past the entry, {text(entry[3])}", flush=True)
         elif entry is None or resolve(img, *entry) != rva:
             if args.check:
                 failed.append(f"{name} {rva:#x}: {'no entry' if entry is None else 'does not find it'}")

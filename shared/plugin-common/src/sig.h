@@ -5,6 +5,8 @@
 // An entry is a pattern ("48 8b 05 ?? ?? ?? ?? 48 85 c0", `??` = any byte) that must match exactly once in the image's
 // executable sections, and how to get the address from the match:
 //   Code  address = match + at                                (a function entry, or a patch site inside one)
+//                                                              at < 0: the pattern starts past a function entry that
+//                                                              another plugin may hook (knowledge/engine-re.md)
 //   Rip   address = match + next + int32 at (match + at)      (a call / jump / rip-relative operand pointing at it:
 //                                                              `next` is where that instruction ends)
 //   Abs   address = image + uint32 at (match + at) + next     (a disp32 that is the RVA itself, MSVC's

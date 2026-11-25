@@ -125,6 +125,14 @@ bool ok = context->InstallInlineHook(0x33b3b0, Entry, sizeof(Entry), Hook, &g_or
 
 Every new hook finds its address at load by a **unique byte signature**, never by a fixed RVA, so a later D2R build (3.4 and on) needs no new addresses. Use `sigscan::HookBySignature(context, name, pattern, offset, entryBytes, size, Hook, &original)` from `shared/plugin-common/src/sig_hook.h` (`sigscan::ScanUnique` finds the RVA alone): it searches the executable sections, installs only for exactly one match, and logs `found <name> at <rva>` or `skipped <name>: <n> matches`. The RVA stays in docs and the `rvas_93847` headers as the build-93847 reference and for crash triage. A researcher's report must give, for each function, a signature that matches once in the dump (`??` over rip-relative and call displacements).
 
+**Start a function's signature past its entry.** Another plugin may hook any function (D2RLoader writes a 14-byte jump
+over the entry), and a signature anchored at the entry then matches nowhere: the part goes off with no crash and no
+obvious symptom (seen four times: a class getter, a UI text setter, a sprite draw and the monster spawn, where a mod's
+bosses silently stopped spawning). So start at the first instruction 14 or more bytes in and
+step back: `ScanUnique` / `HookBySignature` take a negative `offset`, a `sigscan::Entry` a negative `at`, and
+`tools/make_signatures.py` makes them this way. For a function you hook, the SDK still checks the entry bytes, so if
+another plugin hooks it too, hook a call site instead (or chain through D2RLoader's thunk, `FF 25`).
+
 ## 7. Diagnosis switch (build it in from day one)
 
 A text file next to the plugin DLL (`<mod>/d2rloader/plugins/<plugin>-off.txt`), read at launch: words separated
