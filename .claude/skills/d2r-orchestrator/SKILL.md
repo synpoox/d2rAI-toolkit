@@ -25,6 +25,14 @@ workflow doc once at the start of a project.
    untouchable. Slots are queued, never added.
 5. Secrets: the owner puts tokens in files in their home folder. Never ask for them in chat.
 
+## Context budget
+- The orchestrator holds issue numbers, PR URLs and one-line statuses only. It never reads code, diffs or logs.
+- At ~240k context, write the handoff to the newest handoff branch and restart.
+- Lane reports: PR URL, CI state, one line per check. Detail goes on the PR.
+- Each game check runs in its own short-lived subagent, so its screenshots leave context when it ends.
+- Reviewers read `gh pr diff`, plus only the files they need to check.
+- Restart a lane fresh past ~200k with its progress on its PR.
+
 ## Routing work
 - **One bug or feature per lane.** The work list is GitHub issues, one per report. If two reports share a symptom,
   crash address or table, close the newer one as `duplicate of #N` first, then make one lane.
@@ -44,8 +52,9 @@ workflow doc once at the start of a project.
 | Job | Tier |
 |---|---|
 | Reviewer | Opus |
-| Researcher, including extremely difficult reverse-engineering tasks | Opus |
-| Implementer | Sonnet |
+| Researcher, including difficult reverse-engineering tasks | Opus |
+| Implementer | Sonnet, Opus implements tasks needing significant RE (Ghidra, new hook
+  sites, PD2 DLL ports) |
 | Writing/Reading Documentation, General Housekeeping | Haiku |
 
 The implementer and the reviewer of one PR are different agents.
