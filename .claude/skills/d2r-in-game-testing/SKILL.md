@@ -20,7 +20,7 @@ Set once per shell: `MODKIT_RUN=<lane>` and, when the machine has a slot table (
 Name the slot in every command (`--slot <N>`). Tools: `python ${CLAUDE_PLUGIN_ROOT}/testing/<tool>.py`.
 
 1. **Lock** a free slot that is yours: `game_slots.py status`, then `game_slots.py lock <N> <lane>` (`--wait <s>` to queue). None free: hand the steps over.
-2. **Install** with the game closed, after building in this worktree: `slot_install.py --slot <N> <project>` (plugins: `${CLAUDE_PLUGIN_ROOT}/tools/install_plugins.ps1 -Game <N> -Project <mod> -Plugins <name>`; release: `release_install.py install --slot <N>`).
+2. **Install** with the game closed, after building in this worktree: `slot_install.py --slot <N> <project>` (plugins: `powershell -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}/tools/install_plugins.ps1 -Game <N> -Project <mod> -Plugins <name>`; release: `release_install.py install --slot <N>`).
    Then `game_checks.py --module stock_checks run slot-savepath --slot <N>` (`--module` before `run`): the slot's `modinfo.json` must name the slot's own save folder.
 3. **DS1 pin** (only when the level has several variants and the project pins): `force_ds1.py --slot <N> "<Level>=<File>.ds1"`, game closed; `--reset` undoes it.
 4. **Start**: `game_ctl.py --slot <N> start`, on a test character (below).
@@ -33,7 +33,7 @@ Name the slot in every command (`--slot <N>`). Tools: `python ${CLAUDE_PLUGIN_RO
 ## The test character
 
 Level 99, experience 3520485254, 490 stat points, 98 skill points, **Reign of the Warlock** (Classic/LoD characters play vanilla base tables, not the mod's; `cheat expansion 2` crashed the game). Hell open.
-**Reuse an existing level 99 save in the slot's save folder first.** Only if none exists, with the game closed:
+**Reuse an existing level 99 Reign of the Warlock save with Hell open in the slot's save folder first.** Only if none exists, with the game closed:
 1. Create it in the slot's game (RotW is the default), save and exit, `game_ctl.py --slot <N> stop`.
 2. `python -m modkit save-set <save.d2s> level=99 experience=3520485254 statpts=490 newskills=98` (backs the folder up; add `--extended` when `mod.json` has `"extendedSaves": true`, `--project <mod>` when the mod changes itemstatcost `CSvBits`; `save-info` shows the result; look at the level in game once).
 3. Open Hell: `python -c "import sys; sys.path.insert(0, r'${CLAUDE_PLUGIN_ROOT}/testing'); from save_edit import unlock_difficulties; unlock_difficulties(r'<save.d2s>')"`.
@@ -41,7 +41,7 @@ Level 99, experience 3520485254, 490 stat points, 98 skill points, **Reign of th
 ## Rules
 
 1. Hell difficulty (monsters live long enough to show a skill).
-2. Console first, clicks last: cheats spawn the item, monster, level and stats; use clicks only for what the console cannot do.
+2. Console first, clicks last: cheats spawn the item, monster, level and stats; use clicks only for what the console cannot do. Before an inventory click: `I`, then `game_ctl.py --slot <N> cursor` (a shot never proves the cursor is empty; see cheat-commands.md, "The cursor item").
 3. **Stop only after 5 minutes with no progress (stuck or idle).** Not a time limit: while the check progresses, keep going. Then stop the game, unlock, and file an issue labelled `ready-for-human` (create the label with `gh label create ready-for-human` if missing; a mod repo's own rule may name another label) with the steps left and what you verified.
 4. One lock from install to cleanup; never release and retake it between steps.
 5. Never `lock any`: name the slot.

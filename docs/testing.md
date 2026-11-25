@@ -206,7 +206,7 @@ the age and owner; a manual `owner-*` lock is released by its owner with `MODKIT
 ### The pattern for several agents
 
 1. Do all offline work first: edit, build, run unit tests. No slot needed.
-2. `python testing/game_slots.py lock any <lane> --wait 0` (one attempt, no waiting). Note the slot number it prints.
+2. `python testing/game_slots.py lock <N> <lane> --wait 0` (one attempt, no waiting; name a free slot from `status`).
    No slot free: stop, file a `ready-for-agent` issue holding the run's steps, and report.
 3. Install, run, look. Put the slot and the run id on **every** command:
    `MODKIT_RUN=<lane> python testing/game_checks.py run --slot 2`.

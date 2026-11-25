@@ -19,7 +19,7 @@ the game").
 - **Durability after a reload.** Spawned items come with normal durability and keep it while you play, but every item
   reads `Durability: 0` after the game is saved and loaded again, and a 0-durability item has its stats switched off.
   Spawn fresh items after each load, and hover them before a test.
-- `cheat gold <n>` did not add gold, although D2RLoader's list below says it does.
+- `cheat gold <n>` did not add gold, although D2RLoader's list (`cheat-commands-all.md`) says it does.
 - **The cursor item (verified in game, #316).** A click on an inventory item picks it up; a second click puts it down
   (an occupied target swaps). `shift`+click equips it (`game_ctl click FX FY left shift`; right-click did nothing,
   `ctrl`+click drops it). The held item hides tooltips and is drawn as a ghost under the cursor, on a dark green cell
