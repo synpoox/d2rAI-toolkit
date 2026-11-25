@@ -24,6 +24,7 @@ Name the slot in every command (`--slot <N>`). Tools: `python ${CLAUDE_PLUGIN_RO
    Then `game_checks.py --module stock_checks run slot-savepath --slot <N>` (`--module` before `run`): the slot's `modinfo.json` must name the slot's own save folder.
 3. **DS1 pin** (only when the level has several variants and the project pins): `force_ds1.py --slot <N> "<Level>=<File>.ds1"`, game closed; `--reset` undoes it.
 4. **Start**: `game_ctl.py --slot <N> start`, on a test character (below).
+4a. **Startup scan**, once the menu is up: every part the plugins left off, with the project's full plugin set installed: `grep -E -i -h "matches nowhere|skipped [^:]+: ([0-9]+ matches|bad pattern)|off: engine address|not found on this game image" <slot>/mods/<mod>/d2rloader/logs/*.log <slot>/d2rloader/logs/*.log`. A hit a plugin did not log before is a finding even when the check passes: often another plugin hooked that function (`${CLAUDE_PLUGIN_ROOT}/knowledge/engine-re.md`, "Start a function's signature past its entry").
 5. **Cheats**, one console line each: `debug_mode`, then e.g. `cheat god 1`, `cheat nogethit 1`, `cheat speedup 300` (`game_ctl.py --slot <N> console "<line>"`).
    God mode kills any unit the character hits in one hit: never judge a boss's life or stages from hits; lower life with the plugin's test commands.
 6. **Evidence stays outside the repo** (`<runs.dir>/<lane>/screenshots/`). Never commit or push a screenshot, save or log, on any branch. Report pictures in words.

@@ -185,7 +185,7 @@ void Resolve(Entry* const* entries, size_t count, uint64_t exeBase, const Cache*
 		uint8_t bytes[MaxPattern];
 		bool fixed[MaxPattern];
 		const int len = Parse(e.pattern, bytes, fixed);
-		if (len < 0 || e.at < 0 || (e.kind == Kind::Code ? e.at >= len : e.at + 4 > len)) {
+		if (len < 0 || (e.kind == Kind::Code ? e.at >= len : e.at < 0 || e.at + 4 > len)) {  // Code: at < 0 is a pattern past the entry
 			e.state = State::BadPattern;
 			continue;
 		}

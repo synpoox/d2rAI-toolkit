@@ -109,8 +109,10 @@ int main() {
 	sigscan::Entry twice {"Twice", "t", sigscan::Kind::Code, 0, 0, "de ad be"};
 	sigscan::Entry outside {"Outside", "t", sigscan::Kind::Rip, 1, 5, "e9 ?? ?? ?? ?? cd"};
 	sigscan::Entry bad {"Bad", "t", sigscan::Kind::Rip, 2, 6, "e9 ?? ??"};  // the field runs past the pattern
-	sigscan::Entry* all[] = {&code, &rip, &abs, &none, &twice, &outside, &bad};
-	sigscan::Resolve(all, 7, image.base(), nullptr, 0);
+	sigscan::Entry past {"Past", "t", sigscan::Kind::Code, -5, 0, "57 48 83 ec 20"};  // starts 5 bytes past the entry at 0x1010
+	sigscan::Entry before {"Before", "t", sigscan::Kind::Code, -0x2000, 0, "57 48 83 ec 20"};
+	sigscan::Entry* all[] = {&code, &rip, &abs, &none, &twice, &outside, &bad, &past, &before};
+	sigscan::Resolve(all, 9, image.base(), nullptr, 0);
 	Check(code.state == sigscan::State::Ok && code.rva == 0x1015 && code.address == image.base() + 0x1015 && !code.cached,
 	      "Resolve Code: match + at");
 	Check(rip.state == sigscan::State::Ok && rip.rva == 0x2000, "Resolve Rip: follows the rip-relative operand");
@@ -119,16 +121,18 @@ int main() {
 	Check(twice.state == sigscan::State::Ambiguous && twice.address == 0, "Resolve: two matches -> Ambiguous");
 	Check(outside.state == sigscan::State::OutOfImage, "Resolve: an address outside the image is refused");
 	Check(bad.state == sigscan::State::BadPattern, "Resolve: an operand past the pattern's end is refused");
+	Check(past.state == sigscan::State::Ok && past.rva == 0x1010, "Resolve Code: a negative at steps back to the entry");
+	Check(before.state == sigscan::State::OutOfImage, "Resolve Code: a negative at before the code is refused");
 
 	const sigscan::CacheRow rows[] = {{&none, 0x1234}};
 	const sigscan::Cache caches[] = {{0x99999999, rows, 1}, {0x11112222, rows, 1}};
-	sigscan::Resolve(all, 7, image.base(), caches, 2);
+	sigscan::Resolve(all, 9, image.base(), caches, 2);
 	Check(none.state == sigscan::State::Ok && none.cached && none.rva == 0x1234, "Resolve: a known stamp takes the cache");
 	Check(code.state == sigscan::State::Ok && !code.cached, "Resolve: entries the cache lacks are still scanned");
 	const sigscan::Cache other[] = {{0x99999999, rows, 1}};
-	sigscan::Resolve(all, 7, image.base(), other, 1);
+	sigscan::Resolve(all, 9, image.base(), other, 1);
 	Check(none.state == sigscan::State::NotFound && !none.cached, "Resolve: another build's cache is not used");
-	sigscan::Resolve(all, 7, 0, caches, 2);
+	sigscan::Resolve(all, 9, 0, caches, 2);
 	Check(code.state == sigscan::State::NotFound && code.address == 0, "Resolve: no image resolves nothing");
 
 	// A fixed RVA valid only on one stamp: pattern "" and a row in that build's cache
@@ -155,7 +159,7 @@ int main() {
 	      "ScanUnique: bad pattern or no image -> -1");
 
 	// --- Parts gated by their entries ---
-	sigscan::Resolve(all, 7, image.base(), nullptr, 0);
+	sigscan::Resolve(all, 9, image.base(), nullptr, 0);
 	sigscan::Entry* const goodUses[] = {&code, &rip};
 	sigscan::Entry* const badUses[] = {&code, &twice};
 	parts::Part table[] = {
