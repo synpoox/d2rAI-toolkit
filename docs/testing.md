@@ -19,6 +19,9 @@ runs. Everything that needs Windows is behind a function, so the scripts also im
 | `testing/stock_checks.py` | Stock checks that hold for any mod (`slot-savepath`). Turn on with `modules = ["stock_checks"]`. |
 | `testing/testing.example.toml` | The config. Copy it to `modkit-testing.toml`. |
 
+**Agents running a check:** do not read this file whole. Read [Slots, locks](#slots-locks-and-the-queue), [Controlling the game](#controlling-the-game) and
+[Practical hazards](#practical-hazards); grep the rest (Troubleshooting by error text) when needed.
+
 Contents: [Quick start](#quick-start) · [Why slots](#why-slots) · [The config file](#the-config-file) ·
 [Slots, locks and the queue](#slots-locks-and-the-queue) · [Controlling the game](#controlling-the-game) ·
 [The harness protocol](#the-harness-protocol) · [Writing and running checks](#writing-and-running-checks) ·
@@ -203,7 +206,7 @@ the age and owner; a manual `owner-*` lock is released by its owner with `MODKIT
 ### The pattern for several agents
 
 1. Do all offline work first: edit, build, run unit tests. No slot needed.
-2. `python testing/game_slots.py lock any <lane> --wait 0` (one attempt, no waiting). Note the slot number it prints.
+2. `python testing/game_slots.py lock <N> <lane> --wait 0` (one attempt, no waiting; name a free slot from `status`).
    No slot free: stop, file a `ready-for-agent` issue holding the run's steps, and report.
 3. Install, run, look. Put the slot and the run id on **every** command:
    `MODKIT_RUN=<lane> python testing/game_checks.py run --slot 2`.
