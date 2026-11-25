@@ -66,6 +66,25 @@ Each entry: the rule, what happens when a mod breaks it, and the fix. "Plugin" m
 | D2R's portal routines link levels **within the same act** only (`0x3e2b5c8` level -> act) | Cross-act portal refused | Design portals per act |
 | Classic map tiles (`.dt1`/`.ds1` under `data/global/tiles`) are loaded even in HD | Black screen / crash on entering an area whose tile file is missing | Ship every tile a level type references; `.ds1` reference objects by number (renumbering objects breaks them) |
 
+### Reported by a third-party level generator (source-read, not verified here)
+
+Facts a mod that generates its own levels listed as limits it hit. Most were read from 1.10f code or its own tests, not
+checked on build 93847; treat them as leads and verify before relying on one.
+
+| Rule | Symptom when broken | Fix |
+|---|---|---|
+| Levels of one act must not overlap in world space: the server keeps an unloaded room's units by world position | Overlapping levels swap units (bosses showed up in the wrong level) | Give each new level its own world rectangle; keep positions under 13,107 tiles (16-bit subtiles) |
+| Act V preset slots are 8-bit | Slot numbers past 256 do not fit | Keep new Act V presets under 256 |
+| Some maze routines place the stairs-down room only for hard-coded level ids (Act II tombs 55-58, Durance 100-101, sewers); Abaddon's routine ignores the `lvlmaze` Rooms | A new level of that type has no stairs down | Clone only tilesets whose routine places stairs for any id; give the others their stairs rooms from a plugin |
+| A red portal lands on the first special room the maze routine assigned, often beside the exit | The player arrives next to the way out | Add a self-linked entry warp per theme; outdoor levels need an entry preset placed first |
+| A second way into an arena asserts `hDungeonRoomOther` in the client on mouse-over | Client assert | Exactly one exit per arena |
+| `minion1`/`minion2` never spawn for a monster placed by a DS1 preset; a skill-slot aura in mode `NU` does not activate | No escorts or aura | Use a superunique with `MinGrp`/`MaxGrp` and put auras and procs in a dedicated monprop row |
+| `Portal=1` is a bit in a 32-bit mask (1.10 asserts above 32) | Assert or wrong portal | Trim `Portal=1` rows (unverified on D2R) |
+| Exit markers stacked on a wall tile are not drawn on the automap; `wre`/`wle` rows must sit inside the level type's contiguous automap block | Missing automap exits | Put a marker alone in its cell; add rows per level type |
+| Maze levels take their stairs direction from the stock DS1's main index, not from `Warp` | Stairs lead the wrong way | Wire `Vis0`/`Vis1` as vanilla does |
+| Town ids are hard-coded (1, 40, 75, 103, 109) | Shifted towns break | Append rows only; never shift a town |
+| Travincal's stairs are `NoInteract` unless an OpenWarp object sits over them | Stairs cannot be used | Keep the object as UnfoldingStairRight (objects row 195) |
+
 ## Items, inventory, sets, runes, cube
 
 | Rule | Symptom when broken | Fix |

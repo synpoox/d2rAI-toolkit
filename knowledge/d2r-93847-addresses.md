@@ -1,6 +1,6 @@
 # D2R address registry: build 93847
 
-**Build 93847 only**: D2R 3.3.0 under D2RLoader 1.3.1, image PE timestamp **`0x6ab3782c`**. All values are RVAs
+**Build 93847 only**: D2R 3.3.0 under D2RLoader 1.3.1, image PE timestamp **`0x6ab3782c`**. A game install of 3.4.0 (build 95032) runs under the loader on this same 3.3 image, so these RVAs apply to it too. All values are RVAs
 (image base + RVA) or byte offsets. Before using any of them on another build, verify in Ghidra
 ([engine-re.md](engine-re.md)). Signatures are Windows x64; "dataFlag" is the game's data-table selector byte
 (`game + 0x106`, or `0x34a0e0(unit)`). Sources: a working D2RLoader plugin (hooked or called in game) and its
