@@ -5,6 +5,13 @@ overhaul released to players. Plugin API details: [engine-re.md](engine-re.md) a
 `third_party/PluginSDK`. What the loader and SDK can do, system by system, with the versions they ship:
 [d2rloader-capabilities.md](d2rloader-capabilities.md).
 
+## Starting a mod
+
+After install, restart the game fully. For plugins or extended saves start `D2RLoader.exe` and select the mod;
+otherwise `D2R.exe -mod <Name> -txt` also works. Use the slot harness for agent tests. For a player install,
+set Default Mod and restart after the first cache-building start. See the first-start and Default Mod
+sections below for the evidence and failure cases.
+
 ## How D2RLoader picks the mod
 
 | Fact | Detail |

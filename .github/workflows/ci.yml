@@ -18,5 +18,10 @@ jobs:
           python-version: "3.12"
       - name: Unit tests
         run: python -m unittest discover tests
+      - name: Context budgets and paired static benchmark
+        run: |
+          python -m pip install tiktoken==0.12.0
+          python -m tools.context_budget
+          python -m tools.context_benchmark
       - name: Public-release scan (e-mails, IPs, user paths, keys, PNG metadata)
         run: python tools/check_public.py --history

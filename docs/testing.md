@@ -43,9 +43,9 @@ cp testing/testing.example.toml modkit-testing.toml
 python testing/game_slots.py setup
 python testing/game_slots.py status
 
-# 3. Take a slot for yourself. "any" = the first free slot. One attempt, no waiting (--wait 0 is the default):
+# 3. Choose a permitted named slot from status. Make one attempt with --wait 0:
 #    if none is free, stop, file a `ready-for-agent` issue for the run and report.
-python testing/game_slots.py lock any my-lane --wait 0           # prints which slot you got
+python testing/game_slots.py lock 2 my-lane --wait 0           # fails at once if slot 2 is taken
 
 # 4. Put your mod into that slot (the slot copy skips the mods folder by default). Keeps the slot's own savepath.
 MODKIT_RUN=my-lane python testing/slot_install.py --slot 2 my-project
@@ -455,11 +455,29 @@ One shot should answer the question. Before each shot:
 - **Before and after pairs** for a visual change: the same spot and settings, old build and new, or HD and legacy.
 - A picture that is not blank is not proof of the effect: say what you expected, then what you saw.
 
-### The game-check recipe
+### Slot commands for a lane
 
-Lock a slot, install and check the savepath, pin the DS1 variant if there are several, start the game, set cheats, warp,
-shoot, stop, unlock, report (pass, fail and skip counts). Hold one lock from install to cleanup, and never `lock any`.
-The steps with the commands are in the `d2r-in-game-testing` skill.
+The [testing skill](../.claude/skills/d2r-in-game-testing/SKILL.md) sets the sequence and safety rules.
+Set `MODKIT_RUN=<lane>` for every run and `MODKIT_PROJECT=<project>` when a slot registry is configured. Set
+`MODKIT_TESTING_CONFIG` unless using `./modkit-testing.toml`. PowerShell uses `$env:NAME='value'`.
+Run the Python scripts below from `<toolkit>/testing/` or use their full paths.
+
+| Step | Command |
+|---|---|
+| Choose and lock one allowed slot | `game_slots.py status`, then `game_slots.py lock <N> <lane> --wait 0` |
+| Check ownership before installing or stopping | `game_slots.py check <N> <lane>` |
+| Install built mod | `slot_install.py --slot <N> <project>`. For plugin-only use `powershell -ExecutionPolicy Bypass -File <toolkit>/tools/install_plugins.ps1 -Game <N> -Project <mod> -Plugins <name>`. For releases see [Test what players get](#test-what-players-get). |
+| Verify savepath | `game_checks.py --module stock_checks run slot-savepath --slot <N>`. `--module` precedes `run`. Plain `modkit install` writes the project save path, not the slot's. |
+| Start and control | `game_ctl.py --slot <N> start`, then `game_ctl.py --slot <N> console "<line>"` (one line at a time). |
+| Stop and return the slot | `game_ctl.py --slot <N> stop`, restore any [DS1 pin](#pin-a-ds1-variant) or release install, `game_slots.py unlock <N> <lane>`, then `game_slots.py status`. |
+
+After reaching the menu with the full plugin set, use the following scan or its shell equivalent.
+New disabled parts count as findings even when the named check passes. Existing hooks can obscure the
+entry bytes ([signature guidance](../knowledge/engine-re.md#resolve-addresses-by-signature)).
+
+```sh
+grep -E -i -h "matches nowhere|skipped [^:]+: ([0-9]+ matches|bad pattern)|off: engine address|not found on this game image" <slot>/mods/<mod>/d2rloader/logs/*.log <slot>/d2rloader/logs/*.log
+```
 
 ## Reading units (unit_probe)
 
@@ -554,16 +572,24 @@ python -m unittest discover -s tests -p "test_testing_*.py"
 ## Who runs the check
 
 Agents run in-game checks themselves, in a slot; the human is asked only when a check needs one (a real-player
-judgement, input the harness cannot send, or the human's own game). The order of work, the screenshot rules and the
-testing rules are in the `d2r-in-game-testing` skill (`.claude/skills/d2r-in-game-testing/SKILL.md`).
+judgement, input the harness cannot send, or the human's own game). The required order and safety rules are in the `d2r-in-game-testing` skill (`.claude/skills/d2r-in-game-testing/SKILL.md`).
+
+Hand off only for harness-inaccessible input (for example Item Spawner double-click), real-player judgement,
+the owner's game, or 5 minutes without progress. A progressing check may run longer. On a stall, stop your
+game, restore and unlock, then file `ready-for-human` (or the project label) with completed and remaining
+steps. Create the label with `gh label create ready-for-human` if needed. Include slot, owner and unlock
+command in the handoff. Leave the owner's game untouched.
 
 ### The test character
 
-Every test character is **level 99 with experience 3520485254, 490 stat points and 98 skill points** (owner rule,
-2026-11-11). Make it with the game closed: `python -m modkit save-set <save.d2s> level=99 experience=3520485254
-statpts=490 newskills=98` (backs the folder up first; add `--extended` for a mod with `"extendedSaves": true`), and open Hell with `save_edit.unlock_difficulties(<save.d2s>)` (a function, no command line; the call is in the `d2r-in-game-testing` skill). The level-99 line has not yet been run on a real save. Create it with the
-Reign of the Warlock game version (the default). A Classic or Lord of Destruction character plays D2R's vanilla base
-tables, not the mod's, unless the mod also writes `excel/base/`; see [cheat-commands.md](../knowledge/cheat-commands.md).
+Level 99, experience 3520485254, 490 stat points, 98 skill points, **Reign of the Warlock** (Classic/LoD characters play vanilla base tables, not the mod's; `cheat expansion 2` crashed the game). Hell open.
+Run checks on Hell, where monsters live long enough to show a skill.
+**Each slot keeps one such character per class, with all skills unlocked: reuse the one for your class.** A skill added beyond the class's existing rows still needs `python -m modkit save-set <save.d2s> --skill <SLOT>=<points>`. Only if the character is missing, with the game closed:
+1. Create it in the slot's game (RotW is the default), save and exit, `game_ctl.py --slot <N> stop`.
+2. `python -m modkit save-set <save.d2s> level=99 experience=3520485254 statpts=490 newskills=98` (backs the folder up; add `--extended` when `mod.json` has `"extendedSaves": true`, `--project <mod>` when the mod changes itemstatcost `CSvBits`; `save-info` shows the result; look at the level in game once).
+3. Open Hell: `python -c "import sys; sys.path.insert(0, r'<toolkit>/testing'); from save_edit import unlock_difficulties; unlock_difficulties(r'<save.d2s>')"`.
+
+The level-99 edit command was documented before it had been run on a real save.
 
 ## Evidence levels
 
@@ -617,7 +643,7 @@ What went wrong in real test runs.
 |---|---|
 | `slot 1 is the user's own game ...` | You asked for slot 1. Use a slot from 2 to `game.slot_count`. This is on purpose. |
 | `no testing config found` | No config was found, so the tool refused to touch a slot (it never falls back to the built-in defaults). Check `--config`, `MODKIT_TESTING_CONFIG`, or that `./modkit-testing.toml` exists in the current folder. |
-| `slot 2 held by <owner> pid=...` | Somebody has the slot. Take another (`lock any`) or look at `status`; if none is free, stop and file a `ready-for-agent` issue. |
+| `slot 2 held by <owner> pid=...` | Somebody has the slot. Stop after the failed lane attempt and file a `ready-for-agent` issue. |
 | A lock shows `STALE` | Its process died. The next `lock` replaces it. For a `pid=0` lock of a lane that has gone, `unlock N --force`. |
 | `slot 2 is not locked by MODKIT_RUN=...` | `release_install.py` needs the lock *and* the same name in `MODKIT_RUN`. Take it with `lock 2 <lane>`, then run with `MODKIT_RUN=<lane>`. |
 | `the game of slot 2 is not running` | Run `game_ctl.py --slot 2 start`, or use `ctx.ensure_running()` in the check. |

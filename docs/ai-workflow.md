@@ -110,7 +110,7 @@ the targets (and any `-Cache` folders; a relative symlink target counts from the
 
 Rules that keep this safe:
 
-- A lane branch is named `ticket/<n>-<slug>` (`research/<topic>`, `refactor/<topic>`; see the `d2r-project-conventions` skill) and starts from the current `origin/main`. Say so in the prompt. A lane
+- A lane branch is named `ticket/<n>-<slug>` (`research/<topic>`, `refactor/<topic>`; see the `d2r-project-conventions` skill) and starts from the current `origin/main`. The conventions skill and agent contract carry this rule. A lane
   that starts from some other branch drags that branch's changes into its PR.
 - **Implementers open PRs and never merge.** A separate reviewer reads the diff and checks the tests; the
   orchestrator squash-merges once the reviewer reports no blocking findings and resolves conflicts. This is the main quality gate.
@@ -119,7 +119,7 @@ Rules that keep this safe:
 - **At most 2 fix cycles per PR.** A cycle is: reviewer findings, implementer fix, re-review. After the second, merge
   what stands alone and file a follow-up issue for the rest. A third cycle rarely converges.
 - **Workers never wait on CI and never touch runners.** Push, open the PR, report. The reviewer or orchestrator reads
-  the checks later. A docs-only PR skips CI unless it touches the gate inputs (`d2r-project-conventions` skill).
+  the checks later. A docs-only PR skips the gate unless it touches its configured inputs (`d2r-project-conventions` skill).
 - A lane only edits the files its job needs. If it finds a second problem, it writes it down in its report instead
   of fixing it. The orchestrator turns that into a new issue and a new lane.
 - Merge in a separate worktree (`git worktree add --detach ../merge-wt origin/main`), not in the checkout a release
@@ -134,10 +134,10 @@ Rules that keep this safe:
 
 ### How the orchestrator runs a round
 
-1. Read the open issues and the plan. Pick the next jobs. Close duplicates (`duplicate of #N`) before any work.
-2. Write one prompt per job (from the template). Start the implementers, each on a fresh branch from `main`, never
+1. Read the open issues and the plan. Pick the next jobs. Close duplicates (`duplicate of #N`) before any work. A shared symptom, crash address or table is a lead. If two active lanes converge, keep one fix and turn the other into a self-check.
+2. Write one prompt per job (from the template). Start the implementers, each on a fresh branch from the configured base, never
    more than 5 implementer agents at once (reviewers do not count).
-3. While they run, answer the owner (one line per vital update or blocker) and start a reviewer for each arriving PR.
+3. While they run, answer the owner (one line per vital update or blocker) and start a reviewer for each arriving PR using [`templates/reviewer-prompt.md`](../templates/reviewer-prompt.md).
 4. Reviewer findings go back to the implementer (fix cycle 1, then 2 at most). When the reviewer reports no blocking findings,
    squash-merge in a separate worktree and run the targeted checks for the merged code.
 5. Clean up: delete the branch, remove the worktree, clear stale slot locks.
@@ -146,10 +146,35 @@ Rules that keep this safe:
 
 ### Handoff
 
+Keep only issue numbers, PR links and one-line statuses in orchestrator context. Reviewers read the diff and
+the minimum evidence files. Run each game check in a short-lived agent so screenshots leave context.
+Restart a lane around 200k with progress on the PR. Write the orchestrator handoff around 240k or earlier on
+clients with lower limits. Spawn child tasks with unique request IDs and read provider choices at dispatch.
+
 The orchestrator's context is finite. Before it fills, fill in [`templates/handoff.md`](../templates/handoff.md) (state,
 running agents, waiting items, next jobs, decisions and traps not yet recorded elsewhere) and push it as the only file on
 an **orphan branch** `handoff/orchestrator-<YYYY-MM-DD>`. Orphan, so it shares no history with `main` and never
 shows in a diff; kept, never merged and never deleted. The next orchestrator starts by reading the newest one.
+
+### Worktree cleanup and project options
+
+Before deleting a merged lane branch, retarget any PR based on it (`gh pr list --base <branch>`, then
+`gh pr edit <n> --base <default>`). Use `tools/worktree_remove.ps1 -Path <worktree> [-DeleteBranch] -Cache <shared_cache>`
+for configured junctions. If the script cannot run, unlink each junction with nonrecursive `cmd /c rmdir <worktree>\<name>`
+before `git worktree remove`. Never use force, recursive removal or `gh pr merge --delete-branch` on a
+checkout with junctions. Regenerate files listed in `[testing].generated` by changing their inputs or generator.
+
+Use the [example configuration](../templates/d2r-project.example.toml), [issue commands](../templates/agents/issue-tracker.md)
+and [workflow templates](../templates/workflows/). GitHub relationships use the database ID for REST calls.
+For commits use a conventional subject with the issue number and a model attribution trailer with a noreply address.
+If runners are offline, paste the clean final-head `[gate].command` report. GitHub's report names the merge commit;
+rerun after updating the base. Only the owner can add `[gate].drop_ok_label`.
+
+Optional `[issues].wayfinder`: one `wayfinder:map` issue tracks decisions and questions. Sub-issues are
+`wayfinder:research`, `wayfinder:prototype`, `wayfinder:grilling` or `wayfinder:task`. Link blockers and claim
+the first unassigned, unblocked child in map order (`gh issue edit <n> --add-assignee @me`). Comment the answer,
+close and link the map's decision. Keep research branches and use `issue-assets` only for historical links;
+screenshots stay out of all branches.
 
 ### Decision records
 
@@ -196,7 +221,7 @@ Agents that run the real game need somewhere to run it. Sharing the player's own
 - Make a few **slots**: frozen copies of the game install in their own folders, each with its own save folder.
   Keep your own real game out of the pool and mark it "never touch".
 - **Slots are queued, not added.** Do not make a new slot for every lane. A lane does all its offline work first,
-  then makes one lock attempt on a slot that does not wait (`lock any <lane> --wait 0`), runs, restores the slot, and
+  then makes one lock attempt on a slot that does not wait (`lock <N> <lane> --wait 0`, after status; never `lock any`), runs, restores the slot, and
   releases the lock. If no slot is free it stops, files (or asks the orchestrator to file) a `ready-for-agent` issue
   that holds the run's steps, and reports. It never polls or waits for a slot.
   Evidence: a long project settled on this because waits tie up an agent slot for nothing.
@@ -274,7 +299,11 @@ Hard-won rules:
   attribution line, if the owner wants them. Say which in the lane rules.
 - **Private words list.** Keep a text file *outside* the repo with names that must never be published (other
   projects, real names, hosts, addresses). Run a scan against it before every commit and before every push to
-  a public place. See `tools/check_public.py`. The list itself never goes in the repo.
+  a public place. See `tools/check_public.py`. The list itself never goes in the repo. Scan a mod with
+  `py -3 <toolkit>/tools/check_public.py --root <mod repo>`; without `--root` it scans the current folder, so never
+  run it from the toolkit folder for a mod. Install the mod's commit hooks with
+  `py -3 <toolkit clone>/tools/install_hooks.py --root <mod repo>` from a toolkit clone, not the plugin cache: the
+  hooks keep that path.
 - **Never commit game files.** Blizzard's files are read from the user's own install. Not dumps, not extracted
   tables, not saves, not screenshots of the game.
 - **Ask before anything public, paid or destructive**: making a repo public, publishing a release, a force-push,
@@ -298,30 +327,11 @@ Don't ask a question the code, the docs or a sensible default can answer; pick t
 
 ## 9. Writing a good lane prompt
 
-A lane starts with no memory. Your prompt is everything it knows. A good prompt is short and complete:
+A lane starts with no memory, but the issue, agent contract and pinned skills are its context. Use [lane-prompt.md](../templates/lane-prompt.md) for one scoped outcome, exact references, verified facts versus hypotheses, ruled-out approaches, task-only constraints and concrete acceptance checks. If the issue already specifies these, reference it instead of copying it.
 
-1. **The goal in one sentence**, and why it matters.
-2. **Read first**: `AGENTS.md` and the two or three docs that matter. Name them by path.
-3. **Scope**: the files and areas the lane may change. Everything else is out of bounds.
-4. **What is already known**: cause found, things already ruled out, the issue. This stops it redoing your work
-   and stops it confirming your guess too eagerly. If you suspect a cause, say it is a suspicion.
-5. **Done means**: the tests that must pass and the evidence to include. "Fixed" is not evidence; a check result is.
-6. **Git**: branch name, base, commit identity, open a PR to `main`, do not merge.
-7. **Shared resources**: how to get a game slot and what to do while waiting.
-8. **Report format**: PR link, head commit, files changed, tests run with results, what is left, any incidents.
-9. **Never end your turn while something you started is still running.**
+State whether a game check is needed and name it; the testing skill owns slot policy. For RE name the target image and address references; the engine skill owns byte re-verification, unique signatures and compatibility. The agent contract and project conventions own Git, safety, required tests and reporting. Never repeat them in every brief.
 
-Rules that every lane needs live in the repo's `AGENTS.md` (from [`templates/agents/AGENTS.md`](../templates/agents/AGENTS.md)) and the
-`d2r-project-conventions` skill, so the prompt itself starts with "read AGENTS.md and follow it" and only carries the job-specific parts. When you learn
-a new rule the hard way, add it to `AGENTS.md` with the date, so every future lane gets it.
-
-Tips:
-
-- One job per prompt. If the prompt needs "and also", write two prompts.
-- Prefer concrete paths, commands and expected output over adjectives.
-- Say what *not* to do when the obvious approach is wrong ("don't patch the table; the crash is in the loader").
-- For reverse-engineering lanes, give the build number and the address list, and tell the lane to re-verify every
-  address by checking the bytes.
+Keep new standing rules at their canonical owner, not in each prompt. See the maintainer-only [migration ledger](context-rule-ledger.md). A reviewer uses [reviewer-prompt.md](../templates/reviewer-prompt.md).
 
 ## 10. Common failure modes and their fixes
 
@@ -347,11 +357,13 @@ Tips:
 
 ## 11. Starter checklist
 
+For a new project follow [orchestrator setup](orchestrator-setup.md); do not reload it for every lane.
+
 Setting up a project:
 
 - [ ] Repo created, `main` protected in practice (only the orchestrator merges).
 - [ ] `docs/PLAN.md`, `docs/deviations.md`, `changelog.d/` (and `CHANGELOG.md` from its README) created from the templates.
-- [ ] `AGENTS.md` and `docs/agents/` written; private-words list created outside the repo; `tools/check_public.py` wired in (`tools/install_hooks.py --root <mod repo>`).
+- [ ] `AGENTS.md` and `docs/agents/` written; private-words list created outside the repo; `tools/check_public.py` wired in (`tools/install_hooks.py --root <mod repo>` from a toolkit clone, see section 7).
 - [ ] Commit identity decided (noreply address) and written into the rules.
 - [ ] Game slots set up and locked-down; the owner's real install marked untouchable.
 - [ ] Tokens and keys placed by the owner in files in their home folder.

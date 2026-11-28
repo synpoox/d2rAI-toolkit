@@ -26,9 +26,8 @@ testing.md, release.md, distribution.md and downloader.md, and the method in ai-
    separate reviewer checks each PR (at most 2 fix cycles), the orchestrator squash-merges and releases and never
    implements; duplicate issues are closed before fixing. Details:
    `docs/ai-workflow.md`.
-6. **Plugins and installers:** `plugin-template/`, `downloader/` and `release/` code follows rule 9 of the
-   `d2r-toolkit` skill: the game-image check, major.minor version checks (never a build number) and the item-type
-   step.
+6. **Plugins and installers:** `plugin-template/`, `downloader/` and `release/` code follows the
+   `d2r-engine` skill for image guards and major.minor checks. See the plugin template's 'Item type ids' section for the item-type check.
 7. **In-game checks are run by agents,** in a game slot (`testing/`, the `d2r-in-game-testing` skill), not left to
    the user. Ask the human only when a check needs one. Test characters are level 99 (experience 3520485254, 490 stat
    points, 98 skill points).
@@ -37,5 +36,5 @@ testing.md, release.md, distribution.md and downloader.md, and the method in ai-
 
 ## Consumer guide
 What the toolkit offers, where, and the craft rules a mod follows (data before code, start from vanilla, build and
-validate, respect the limits, no game files in a mod, saves, plugins and the game image) are in the skill
-`.claude/skills/d2r-toolkit/SKILL.md`. Keep it in step with this file when a rule that applies to both changes.
+validate, respect the limits, no game files in a mod, saves) are in the skill
+`.claude/skills/d2r-toolkit/SKILL.md`; plugins and the game image are in `d2r-engine`. Keep it in step with this file when a rule that applies to both changes.

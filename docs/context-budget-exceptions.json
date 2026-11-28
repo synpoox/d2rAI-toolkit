@@ -1,0 +1,6 @@
+{
+  "templates/agents/AGENTS.md": {
+    "limit": 545,
+    "reason": "Preserve the P1 startup safety and delivery contract while measuring agent behavior. Revisit when the live paired benchmark can verify a shorter version."
+  }
+}

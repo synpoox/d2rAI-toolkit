@@ -35,7 +35,7 @@ rules) is covered in [porting-classic-mods.md](porting-classic-mods.md).
 
 - **RVAs are for build 93847 only** (D2R image under D2RLoader 1.3.1, PE timestamp `0x6ab3782c`). Before using an RVA
   on any other build, **verify it in Ghidra** against a fresh dump (the function's shape, its callers, its entry
-  bytes). A plugin must check the image timestamp at load and install nothing on a mismatch.
+  bytes). Parts using fixed RVAs require that image stamp. New hooks use unique signatures. Signature-only parts rely on exact-one matches for their declared signatures and fail closed individually.
 - Every hook and table write is byte-checked (`InstallInlineHook` / `PatchWriteU64` with the expected bytes); a
   mismatch must refuse, never patch blind.
 - Data before code: many "new" behaviours are an existing D2R function with different table values.

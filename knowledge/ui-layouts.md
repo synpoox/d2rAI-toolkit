@@ -38,7 +38,7 @@ Common widget types: `ImageWidget` (`filename`, `frame`), `ButtonWidget` (`filen
 ```
 
 - `cellCount` must equal inventory.txt `gridX`/`gridY` for that page (set **every** matching inventory.txt row:
-  two rows per page).
+  two rows per page). Personal stash, inventory and cube save positions in 4 bits (16 × 16).
 - **Items draw at 98 px per cell whatever `cellSize` says.** Shrinking `cellSize` to fit a larger grid makes items
   overlap. To fit a bigger grid: keep `cellSize` `{ "x": 98, "y": 92 }` (or 98 x 98) and give the grid's `rect` a
   `"scale"` so the whole widget shrinks. The drawn cell is `98 * scale` px: a 12 x 12 grid in the space of
@@ -64,6 +64,11 @@ panel by shipping your sprite under a new folder (e.g. `panel/mymod/inventory.sp
    panel's top-left).
 3. Grid `rect.x/y` = top-left of the first cell; with a `scale`, the drawn cell is `98 * scale` wide.
 4. Iterate from in-game screenshots: a few pixels off is normal on the first pass.
+
+For widget discovery run `python -m modkit widgets bankexpansionlayouthd.json`. To inspect art, run
+`python -m modkit fetch --set hd-ui`, then `python -m modkit sprite2png <cached .sprite> out.png`.
+Use `layouts.scaled()` when the source art uses another size. For patch ops use the
+[UI operations](modkit-ops.md#ui) and the [showcase](../examples/showcase/) stash example.
 
 ## Main layout files (93847 baseline)
 
@@ -96,10 +101,18 @@ references widgets by name).
 `tabPadding`; `filename` (tab sprite with inactive/active/disabled frames per tab), `textStrings` per tab,
 `onSwitchTabMessage`. Move the whole bar with its `rect`; it does not wrap.
 
-Skill tree tabs are separate `TabWidget`s. More than D2R's 3 work: 8 TabWidgets in one row (`ActivateTab:0` ..
-`ActivateTab:7`) with their own `TextBoxWidget` labels were confirmed. D2R's panel fills tab titles only for
-`textTab0-2`, and the stock per-tab `Background` frames assume 3 tabs (move them off screen). Keep the stock
-`TextTab0-2` widgets (off screen) in case the code looks them up.
+For the separate skill tree widgets see [Skill tree tabs](#skill-tree-tabs).
+
+## Skill tree tabs
+
+In `skillstreepanelhd.json`, `skilldesc` SkillPage/Row/Column select tab and icon positions. The background
+sprites are `data/hd/global/ui/spells/skill_trees/<xx>skilltree.sprite`.
+
+Eight `TabWidget`s in one row (`ActivateTab:0` through `ActivateTab:7`), with their own `TextBoxWidget`
+labels, were confirmed in HD. Stock titles stop at `textTab0-2`. Use separate labels or draw titles in the
+art. Move the stock per-tab `Background` frames off screen because they assume three tabs. Keep the stock
+`TextTab0-2` widgets off screen in case the code looks them up. More than eight tabs or using `SkillPage`
+above 3 remains unverified. Check each tab in game.
 
 ## Gold widgets
 

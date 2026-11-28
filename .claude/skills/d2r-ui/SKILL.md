@@ -1,51 +1,10 @@
 ---
 name: d2r-ui
-description: Change Diablo II Resurrected's HD user interface in a modkit mod - inventory, stash, cube and trade grid sizes, panel backgrounds and art, widget positions, tabs, gold and buttons, skill tree layout, fonts/text in UI. Use when a request involves how a game screen looks or is laid out.
+description: Change Diablo II Resurrected HD layouts, inventory/stash/cube/trade grids, panel art, widgets, buttons, tabs, skill tree, fonts or UI text.
 ---
 
 # HD UI: layouts, panels and grids
 
-Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you are inside the toolkit repo: use its root). Run `python -m modkit` with that folder as the working directory and the mod project as an argument.
-
-Read ${CLAUDE_PLUGIN_ROOT}/knowledge/ui-layouts.md first. D2R's HD UI = layout files `data/global/ui/layouts/*hd.json` (widget trees)
-+ sprites under `data/hd/global/ui/`. Controller layouts are separate files (`*controller*` / `*hd.json` pairs):
-change both if the mod supports controllers.
-
-## Find what to change
-- `python -m modkit widgets bankexpansionlayouthd.json` lists the widgets with their rects.
-- `python -m modkit sprite2png d2r-data/<build>/data/hd/global/ui/panel/<...>.sprite out.png` shows any panel art
-  (fetch it first with `python -m modkit fetch --set hd-ui`).
-- Positions are panel pixels: HD panels are 1162 x 1507. Measure on the art you use; scale with
-  `layouts.scaled()` if the art was drawn at another size.
-
-## Grid sizes (inventory, stash, cube, trade)
-Two places must agree:
-1. inventory.txt `gridX` / `gridY` for the page (rows per page exist twice, e.g. `Big Bank Page 1` and
-   `Big Bank Page2`, `Amazon` and `Amazon2`: set both). This is what the game uses for item placement and saves.
-2. The layout's `InventoryGridWidget`: `cellCount`. Items always draw at 98 px per cell whatever `cellSize` says,
-   so a bigger grid in the same space uses `"cellSize": {"x": 98, "y": 92}`-style sizes plus a rect `"scale"`
-   (e.g. 0.8) to shrink the whole grid, items included. Equipment slots: keep D2R's width/height, give the rect
-   the same scale, and centre it on the slot art.
-Example op: `{"op": "layout", "file": "bankexpansionlayouthd.json", "widget": "grid", "set": {"cellCount": {"x": 12, "y": 12}, "cellSize": {"x": 98, "y": 92}, "rect": {"x": 89, "y": 219, "scale": 0.8}}}` (the showcase example's stash).
-The personal stash, inventory and cube grids save item positions in 4 bits: at most 16 x 16.
-
-## Panel art
-`panel` op: a PNG (scaled to 1162 x 1507) becomes `PANEL\<mod>\<name>` and the layout's image reference switches to
-it (`replaceImage`: the old `PANEL\...` name(s), e.g. both the personal and the shared stash backgrounds).
-If your art has elements where D2R draws its own widgets (tabs, gold, buttons), either move them in the art or
-move the widgets (`layout` op on their `rect`). Tab bars (`TabBarWidget`) draw all tabs in one row from `rect`
-with `tabSize` + `tabPadding`; hidden tabs (e.g. stash extra tabs) still take their slot if they appear.
-
-## Skill tree
-skillstreepanelhd.json: tabs, icon positions per row/column (skilldesc SkillPage/Row/Column feed it), the
-background sprites `data/hd/global/ui/spells/skill_trees/<xx>skilltree.sprite`. More than 3 tabs is layout work,
-not engine work: 8 TabWidgets (`ActivateTab:0` .. `ActivateTab:7`) with their own `TextBoxWidget` labels were
-confirmed in HD (${CLAUDE_PLUGIN_ROOT}/knowledge/ui-layouts.md, "Skill tree tabs"). What stops at 3 is the stock tab titles (`textTab0-2`),
-so draw titles in art or add labels of your own. Also move the stock per-tab `Background` frames off screen (they
-assume 3 tabs) and keep the stock `TextTab0-2` widgets, off screen, in case the code looks them up. Beyond 8 tabs is
-untested. Pointing skilldesc `SkillPage` above 3 at the new tabs is untested too: check each tab in game.
-
-## Build and test
-Build, install with the game closed. Ask for a screenshot of each changed screen: check grid lines against the art,
-items in the far corners, tab clicks, gold display, both HD and controller layouts if used, and low texture
-quality (the .lowend sprites).
+1. Find widgets with `modkit widgets <layout>`. Retrieve `ui-layouts` → `Main layout files` if the file is unknown, or `Measuring positions` for art discovery. Change applicable controller variants too.
+2. For grids retrieve `ui-layouts` → `Grids`. Match both inventory records and the layout. Respect the 16 × 16 save limit for personal stash, inventory and cube. Preserve equipment dimensions and match rect scales. For art and skill trees retrieve `Panel backgrounds`, `Tab bars` or `Skill tree tabs` as appropriate.
+3. Build to zero errors. In a slot with `d2r-in-game-testing`, verify grid alignment, far corners, tabs, gold, low textures and supported controller layouts. Treat unproven skill-page ranges as unverified.
