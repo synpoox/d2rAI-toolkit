@@ -9,7 +9,7 @@ Read `AGENTS.md` and follow the pinned toolkit. Lane: `<lane-name>`.
 <Issue including relevant comments; exact paths, applicable skills and evidence.>
 
 ## Scope
-<Allowed files/globs; all others out of scope.>
+<Allowed files, or directories ending in `/` (no wildcards); all others out of scope.>
 
 ## Findings
 <Verified cause and evidence; separate hypotheses and ruled-out approaches. For RE, name the image/build and address references; verify bytes and unique signatures per d2r-engine.>

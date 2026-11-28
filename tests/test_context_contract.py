@@ -137,6 +137,10 @@ class LaneTests(unittest.TestCase):
                          ["outside scope: outside.txt", "outside scope: untracked.txt"])
         (self.root / "toolkit.version").write_text("0000000")
         self.assertTrue(any("pins" in issue for issue in self.problems("preflight")))
+        self.manifest.write_text(json.dumps({"issue": 42, "allowed_paths": ["patches/*.json"],
+                                             "player_visible": False, "required_checks": ["fixture"]}))
+        with self.assertRaisesRegex(ValueError, "invalid scope path"):
+            self.problems("preflight")
 
     def test_delivery_requires_current_pr_and_acceptance_results_and_fragment(self):
         (self.root / "allowed.txt").write_text("new")

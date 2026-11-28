@@ -1,4 +1,4 @@
-# Context rule migration ledger (P0–P2)
+# Context rule migration ledger (P0–P7)
 
 Maintainer audit; **not** mandatory worker context. Baseline: `5d59cb6dbf6fabe34f17c8a14c73d6ddf45ba2bd`. Scope: standing instructions and prompt contract, not rewriting all technical skills. The 15 skill files were inspected for overlapping lock, hook, safety and routing instructions; topic-specific procedures/evidence remain in their original owners. Subsequent domain-skill compression is P3.
 
@@ -39,7 +39,7 @@ workflow section. No skill-local reference needs separate ownership.
 
 | Skill | Canonical destination and overlap removed |
 |---|---|
-| Toolkit | `docs/toolkit-finder.md` owns pin mechanics and `docs/README.md` owns the map. `README.md` owns privacy-hook installation; `plugin-template/README.md` owns the item-type command. Craft, safety and routing remain inline. |
+| Toolkit | `docs/toolkit-finder.md` owns pin mechanics and `docs/README.md` owns the map. `docs/ai-workflow.md` §7 owns the mod privacy scan (`--root`) and hook installation from a clone; `plugin-template/README.md` owns the item-type command. Craft, safety and routing remain inline. |
 | Engine | `knowledge/engine-re.md` owns dump, Ghidra commands, hook evidence and checked dispatch writes. `plugin-template/README.md` owns ABI, build/install, guard and function examples. Removed the parallel command catalog. |
 | In-game testing | `docs/testing.md` owns named slot commands, startup scan, save setup, DS1, release restore, handoff and evidence. `knowledge/cheat-commands.md` owns observed console behavior. The skill owns lifecycle safety; examples no longer tell lanes to use an unqualified lock. |
 | Project conventions | Skill owns mandatory issue, branch, PR, gate, generated-data and junction rules. `docs/ai-workflow.md` owns commands, optional Wayfinder and cleanup; config and issue/workflow templates supply exact settings. |
@@ -57,4 +57,15 @@ workflow section. No skill-local reference needs separate ownership.
 
 [Context tooling](context-tooling.md) documents the retrieval and validation commands. The
 [cumulative benchmark](context-benchmark.md) compares the previous selective route against the consolidated reads.
-Consumer AGENTS files continue to migrate deliberately at a pin update.
+Consumer AGENTS files continue to migrate deliberately at a pin update. Skills come from the plugin copy, which
+can be newer than a mod's pin: the toolkit skill tells agents to read the named heading directly when the pinned
+checkout has no `knowledge` command.
+
+## P4–P7 tooling
+
+| Phase | Rule enforced | Owner and check |
+|---|---|---|
+| P4 | Cited retrieval: verbatim lines, source, line range, SHA-256, build provenance | `modkit/knowledge.py`; `tests/test_context_contract.py` |
+| P5 | Lane prerequisites: config, pin, ticket branch, current base, literal scope, owned slot | `modkit preflight`; reviewers still check the issue |
+| P6 | Delivery: clean tree, final-head evidence, open PR linkage, fragment, privacy scan | `modkit verify-lane`; reviewers still check the proof |
+| P7 | Context budgets, duplicate instructions and the paired scripted benchmark | `tools/context_budget.py`, `tools/context_benchmark.py` in CI |

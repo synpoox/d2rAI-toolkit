@@ -17,7 +17,7 @@ The default limit is 8,000 bytes of output per call, a context-size proxy. The b
 
 ## Validate a lane
 
-Copy the accepted scope and check names from the issue into a JSON manifest outside the checkout. Use literal paths relative to the mod repo root, with a trailing slash for a directory. Include the changelog directory in scope if a player-facing change needs a fragment.
+Copy the accepted scope and check names from the issue into a JSON manifest outside the checkout. Use literal paths relative to the mod repo root, with a trailing slash for a directory. Wildcards are rejected. Include the changelog directory in scope if a player-facing change needs a fragment.
 
     {"issue":42,"allowed_paths":["patches/","changelog.d/"],
      "player_visible":true,"required_checks":["validate","runtime-stash"]}

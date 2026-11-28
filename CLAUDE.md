@@ -36,5 +36,5 @@ testing.md, release.md, distribution.md and downloader.md, and the method in ai-
 
 ## Consumer guide
 What the toolkit offers, where, and the craft rules a mod follows (data before code, start from vanilla, build and
-validate, respect the limits, no game files in a mod, saves, plugins and the game image) are in the skill
-`.claude/skills/d2r-toolkit/SKILL.md`. Keep it in step with this file when a rule that applies to both changes.
+validate, respect the limits, no game files in a mod, saves) are in the skill
+`.claude/skills/d2r-toolkit/SKILL.md`; plugins and the game image are in `d2r-engine`. Keep it in step with this file when a rule that applies to both changes.

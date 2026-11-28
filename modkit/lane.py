@@ -42,7 +42,7 @@ def scope(data):
     paths = strings(data, "allowed_paths")
     for path in paths:
         parts = PurePosixPath(path).parts
-        if not parts or any(p in (".", "..", ".git") for p in parts) or (
+        if not parts or any(p in (".", "..", ".git") for p in parts) or any(c in path for c in "*?[") or (
             "/".join(parts) != path.rstrip("/") or "\\" in path or ":" in path
         ):
             raise ValueError(f"invalid scope path: {path}")
@@ -85,7 +85,7 @@ def inspect(root, args):
     problems = []
     if not (root / "toolkit.version").is_file():
         problems.append("toolkit.version is missing")
-    toolkit = find_toolkit_dir(TOOLKIT)
+    toolkit = find_toolkit_dir(root)
     if toolkit != TOOLKIT:
         problems.append("the configured toolkit differs from the checkout running modkit")
     if problem := check_pin(root, toolkit):

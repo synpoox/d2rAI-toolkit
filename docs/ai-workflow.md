@@ -299,7 +299,11 @@ Hard-won rules:
   attribution line, if the owner wants them. Say which in the lane rules.
 - **Private words list.** Keep a text file *outside* the repo with names that must never be published (other
   projects, real names, hosts, addresses). Run a scan against it before every commit and before every push to
-  a public place. See `tools/check_public.py`. The list itself never goes in the repo.
+  a public place. See `tools/check_public.py`. The list itself never goes in the repo. Scan a mod with
+  `py -3 <toolkit>/tools/check_public.py --root <mod repo>`; without `--root` it scans the current folder, so never
+  run it from the toolkit folder for a mod. Install the mod's commit hooks with
+  `py -3 <toolkit clone>/tools/install_hooks.py --root <mod repo>` from a toolkit clone, not the plugin cache: the
+  hooks keep that path.
 - **Never commit game files.** Blizzard's files are read from the user's own install. Not dumps, not extracted
   tables, not saves, not screenshots of the game.
 - **Ask before anything public, paid or destructive**: making a repo public, publishing a release, a force-push,
@@ -359,7 +363,7 @@ Setting up a project:
 
 - [ ] Repo created, `main` protected in practice (only the orchestrator merges).
 - [ ] `docs/PLAN.md`, `docs/deviations.md`, `changelog.d/` (and `CHANGELOG.md` from its README) created from the templates.
-- [ ] `AGENTS.md` and `docs/agents/` written; private-words list created outside the repo; `tools/check_public.py` wired in (`tools/install_hooks.py --root <mod repo>`).
+- [ ] `AGENTS.md` and `docs/agents/` written; private-words list created outside the repo; `tools/check_public.py` wired in (`tools/install_hooks.py --root <mod repo>` from a toolkit clone, see section 7).
 - [ ] Commit identity decided (noreply address) and written into the rules.
 - [ ] Game slots set up and locked-down; the owner's real install marked untouchable.
 - [ ] Tokens and keys placed by the owner in files in their home folder.

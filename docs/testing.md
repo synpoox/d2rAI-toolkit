@@ -45,7 +45,7 @@ python testing/game_slots.py status
 
 # 3. Choose a permitted named slot from status. Make one attempt with --wait 0:
 #    if none is free, stop, file a `ready-for-agent` issue for the run and report.
-python testing/game_slots.py lock 2 my-lane --wait 0           # prints which slot you got
+python testing/game_slots.py lock 2 my-lane --wait 0           # fails at once if slot 2 is taken
 
 # 4. Put your mod into that slot (the slot copy skips the mods folder by default). Keeps the slot's own savepath.
 MODKIT_RUN=my-lane python testing/slot_install.py --slot 2 my-project
@@ -583,7 +583,8 @@ command in the handoff. Leave the owner's game untouched.
 ### The test character
 
 Level 99, experience 3520485254, 490 stat points, 98 skill points, **Reign of the Warlock** (Classic/LoD characters play vanilla base tables, not the mod's; `cheat expansion 2` crashed the game). Hell open.
-**Reuse an existing level 99 Reign of the Warlock save with Hell open in the slot's save folder first.** Only if none exists, with the game closed:
+Run checks on Hell, where monsters live long enough to show a skill.
+**Each slot keeps one such character per class, with all skills unlocked: reuse the one for your class.** A skill added beyond the class's existing rows still needs `python -m modkit save-set <save.d2s> --skill <SLOT>=<points>`. Only if the character is missing, with the game closed:
 1. Create it in the slot's game (RotW is the default), save and exit, `game_ctl.py --slot <N> stop`.
 2. `python -m modkit save-set <save.d2s> level=99 experience=3520485254 statpts=490 newskills=98` (backs the folder up; add `--extended` when `mod.json` has `"extendedSaves": true`, `--project <mod>` when the mod changes itemstatcost `CSvBits`; `save-info` shows the result; look at the level in game once).
 3. Open Hell: `python -c "import sys; sys.path.insert(0, r'<toolkit>/testing'); from save_edit import unlock_difficulties; unlock_difficulties(r'<save.d2s>')"`.
