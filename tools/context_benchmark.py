@@ -99,11 +99,11 @@ def measure(original, previous, encode):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline", default=ORIGINAL, help="original full-document comparison")
-    parser.add_argument("--previous", default=PREVIOUS, help="previous selective route; skipped when not in history")
+    parser.add_argument("--previous", help=f"previous selective route (default {PREVIOUS}, skipped when not in history)")
     args = parser.parse_args()
     try:
         baseline = git("rev-parse", "--verify", "--end-of-options", f"{args.baseline}^{{commit}}").decode().strip()
-        previous = args.previous if available(args.previous) else None
+        previous = args.previous or (PREVIOUS if available(PREVIOUS) else None)
         rows = measure(baseline, previous, tokenizer())
         head = git("rev-parse", "HEAD").decode().strip()
         dirty = bool(git("status", "--porcelain"))
