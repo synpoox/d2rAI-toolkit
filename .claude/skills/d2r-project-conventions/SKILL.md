@@ -5,10 +5,9 @@ description: Apply Diablo II Resurrected project conventions before issue, PR, b
 
 # Project conventions
 
-Use `.d2r-project.toml` for project values, and [preflight and verify-lane](../../../docs/context-tooling.md#validate-a-lane) for deterministic checks.
+Use `.d2r-project.toml` for per-repo choices. Before acting read the applicable [lane workflow](../../../docs/ai-workflow.md#3-lanes-one-job-one-branch-one-pr) section; use [preflight and verify-lane](../../../docs/context-tooling.md#validate-a-lane) for manifest checks.
 
-- Before issue or PR operations, read [Issues and PRs](reference.md#issues-and-prs). Verify the repo, create real issue relationships and start the PR body with its issue linkage.
-- Before branching or committing, read [Branches and commits](reference.md#branches-and-commits). Use current configured base, one isolated lane, noreply identity and issue-tagged conventional commits. Follow the protected branch rules. Player-visible changes use fragments.
-- Before merging, read [Merge gate](reference.md#merge-gate). Implementers never merge. Check final-head status and parity requirements per config.
-- Before removing a worktree, read [Worktrees](reference.md#worktrees). Use the junction-safe remover. Regenerate files in `[testing].generated` from their source.
-- For repository setup or Wayfinder, use [the project scaffold](../../../templates/agents/) or [Wayfinder](reference.md#wayfinder-optional-issueswayfinder).
+- **Issues/PRs:** verify repo identity first. Use body files, real issue/sub-issue and blocker links, and `Closes #N` or `Part of #N` as the opening line. Create an issue first when missing. Comment before closing. Use project issue tracker/triage docs and avoid PR triage unless enabled.
+- **Branch/commit:** fetch the configured default base, use an isolated lane and configured prefixes (default `ticket/<n>-<slug>`). Keep protected branches. Pull LFS for pointer files. Use noreply, an issue-tagged conventional subject and model attribution trailer. Player-visible PRs add fragments; bump versions only when assigned.
+- **Merge:** implementers never merge. A docs-only PR skips the gate except configured inputs. Otherwise require MERGEABLE and green checks for the final head; refresh after merging the base. If runners are offline, run the configured gate on a clean final head and paste its report. Only the owner may approve a parity drop.
+- **Cleanup:** remove junctions with the toolkit's worktree remover, never plain recursive deletion. Keep configured branches; delete ordinary merged branches locally and remotely. Regenerate `[testing].generated` from its source. Consult [worktree cleanup and project options](../../../docs/ai-workflow.md#worktree-cleanup-and-project-options) for exact commands and optional Wayfinder.

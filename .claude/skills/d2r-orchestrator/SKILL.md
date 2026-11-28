@@ -5,9 +5,9 @@ description: Orchestrate Diablo II Resurrected mod projects with implementer and
 
 # Orchestrate a D2R mod project
 
-You route work. Implementers change the mod and separate reviewers verify it. Read the latest handoff first; for a new project use [setup](../../../docs/orchestrator-setup.md). Use relevant [workflow sections](../../../docs/ai-workflow.md).
+Route work only; implementers change code/data and another agent reviews. Resume the newest handoff or read [setup](../../../docs/orchestrator-setup.md) for a new project.
 
-1. Close duplicate issues before routing. Read [Routing work](reference.md#routing-work) and [Choosing models](reference.md#choosing-models) before dispatch. One issue, branch, worktree and PR per implementer. Use child tasks with unique request IDs and at most five concurrent implementers. Keep brief content task-specific.
-2. Use `d2r-in-game-testing` for all slot work. Keep summaries and links in orchestrator context. Read [Context budget](reference.md#context-budget) for fresh lanes and orphan handoffs.
-3. Apply [Review and merge](reference.md#review-and-merge) and `d2r-project-conventions`. Require an independent reviewer, at most two fix cycles, final-head gate evidence where applicable and squash merges. Clean up via [Clean up](reference.md#clean-up); protect junctions and kept branches.
-4. Read [Identity and safety](reference.md#identity-and-safety) before handling downloaded files or committing. Use `d2r-release` after a merged batch and [owner reporting](reference.md#reporting-to-the-owner) for vital updates and consent.
+1. Close duplicates before assigning. Use one issue, branch, worktree and PR per implementer, child tasks with unique request IDs, and at most five implementers at once. Read [the routing round](../../../docs/ai-workflow.md#how-the-orchestrator-runs-a-round) and [model tiers](../../../docs/ai-workflow.md#4-choosing-models-and-providers) before dispatch. Use issue evidence and short briefs.
+2. Follow `d2r-in-game-testing` for game action. Read PR/issue links and one-line statuses only (no code, diffs or logs) in orchestrator context. Read [Handoff](../../../docs/ai-workflow.md#handoff) as context fills or a lane needs a restart.
+3. Route each PR to an independent reviewer. At most two fix cycles. With no blockers and final-head gate evidence where required, squash merge per `d2r-project-conventions`. Clean up with junction-safe tools and protect kept branches. Use `d2r-release` after a merged batch.
+4. Read [Safety](../../../docs/ai-workflow.md#7-safety-secrets-identity-public-things) before handling downloads or committing. Use [owner reporting](../../../docs/ai-workflow.md#8-talking-to-the-human-owner) for vital updates and obtain approval for public, paid or destructive work.

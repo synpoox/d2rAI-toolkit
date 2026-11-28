@@ -53,6 +53,29 @@ class KnowledgeTests(unittest.TestCase):
         self.assertEqual(self.cli("address", "--symbol", "NoSuchSymbol")[0], 1)
         self.assertEqual(self.cli("get", "../CLAUDE", "--section", "Rules")[0], 2)
 
+    def test_workflow_get_is_cited_and_does_not_load_the_manual(self):
+        args = ("get", "docs/testing", "--section", "The test character")
+        code, output, error = self.cli(*args)
+        self.assertEqual(code, 0, error)
+        hit, = json.loads(output)["results"]
+        self.assertEqual(hit["source"], "docs/testing.md")
+        self.assertIn("3520485254", hit["text"])
+        code, output, error = self.cli(*args, "--format", "text", "--max-bytes", "900")
+        self.assertEqual(code, 0, error)
+        self.assertLessEqual(len(output.encode("utf-8")), 900)
+        self.assertIn("docs/testing.md#the-test-character:", output)
+        self.assertIn(hit["source_sha256"], output)
+        self.assertIn("Continue with --start-line", output)
+        self.assertNotIn("The harness protocol", output)
+        self.assertEqual(self.cli("get", "docs/../CLAUDE", "--section", "Rules")[0], 2)
+
+    def test_compact_address_keeps_build_provenance_and_evidence_legend(self):
+        code, output, error = self.cli("address", "--symbol", "ClientFindUnit", "--format", "text")
+        self.assertEqual(code, 0, error)
+        self.assertIn("Build 93847 only", output)
+        self.assertIn("**R** read from the dumped image", output)
+        self.assertIn("ClientFindUnit", output)
+
     def test_index_ignores_fenced_headings_and_distinguishes_duplicates(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "sample.md"
@@ -144,10 +167,17 @@ class ContextDocsTests(unittest.TestCase):
     def test_skill_links_resolve(self):
         skills = sorted((knowledge.ROOT / ".claude/skills").glob("*/SKILL.md"))
         self.assertEqual(len(skills), 15)
+        self.assertFalse(list((knowledge.ROOT / ".claude/skills").glob("*/reference.md")))
+        index = knowledge.Index()
         for path in skills:
             with self.subTest(path=path.parent.name):
                 source = path.read_text(encoding="utf-8")
-                self.assertIn("reference.md", source)
+                self.assertNotIn("reference.md", source)
+                for doc, heading in re.findall(r"`([a-z0-9/-]+)` → `([^`]+)`", source):
+                    args = argparse.Namespace(lookup="get", document=doc, section=heading, start_line=None,
+                                              max_bytes=knowledge.OUTPUT_BYTES, format="text")
+                    with self.subTest(document=doc, heading=heading):
+                        self.assertTrue(knowledge.lookup(args, index))
                 for link in re.findall(r"\]\(([^ )]+)\)", source):
                     dest, _, slug = link.partition("#")
                     target = path.parent / dest

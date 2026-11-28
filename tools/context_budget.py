@@ -34,7 +34,7 @@ def surfaces(root):
         if empty or not (match := re.search(r"^description: (.+)$", metadata, re.M)):
             raise ValueError(f"{name}: expected a single-line description in frontmatter")
         yield name + ":description", match[1], 60
-        yield name, body.strip(), 500 if path.parent.name == "d2r-toolkit" else 800
+        yield name, body.strip(), 500 if path.parent.name == "d2r-toolkit" else 550
     for name, limit in TEMPLATE_BUDGETS.items():
         yield name, (root / name).read_text(encoding="utf-8").strip(), limit
 
@@ -73,8 +73,16 @@ def audit(root, encode, exceptions):
             problems.append(f"{name}: {tokens} exceeds {limit} tokens")
         rows.append({"path": name, "tokens": tokens, "limit": limit})
     problems.extend(f"unknown budget exception: {name}" for name in sorted(exceptions.keys() - active))
-    for sentence, paths in duplicates((name, content) for name, content, _ in docs).items():
-        problems.append(f"duplicate instruction ({', '.join(paths)}): {sentence}")
+    front_door = {name for name, _, _ in docs}
+    manuals = [
+        (path.relative_to(root).as_posix(), path.read_text(encoding="utf-8"))
+        for directory in ("knowledge", "docs", "plugin-template")
+        for path in sorted((root / directory).glob("*.md"))
+    ]
+    inputs = [(name, content) for name, content, _ in docs] + manuals
+    for sentence, paths in duplicates(inputs).items():
+        if front_door.intersection(paths):
+            problems.append(f"duplicate instruction ({', '.join(paths)}): {sentence}")
     return rows, problems
 
 

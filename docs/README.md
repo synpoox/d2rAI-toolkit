@@ -13,6 +13,16 @@ the table below.
 | Look up a patch operation | [knowledge/modkit-ops.md](../knowledge/modkit-ops.md) |
 | Copy a ready patch (Terror Zones off) | [examples/patches/](../examples/patches/no-terror-zones.json) |
 
+## Modkit project layout
+
+`modkit new` creates `mod.json` (name, savepath, title, version, plugins, extended save setting), ordered
+JSON `patches/`, `assets/` and `files/data/` for already-prepared files. Keep the mod in its own repository.
+Explicitly add the string `namespace` if needed; see [string namespaces](../knowledge/strings.md#d2rloader-namespaces-alternative-not-used-by-the-port) for valid
+characters and installed metadata. Use `extendedSaves` only for explicitly supported saves, e.g. wider
+stat/item IDs or more than 30 class skills. `modkit build` rebuilds `out/data` from pristine data and writes
+`out/validation.md`. `modkit install` writes `<game>/mods/<Name>/` including modinfo and loader metadata.
+For the agent's install and restore procedure see [slot commands](testing.md#slot-commands-for-a-lane).
+
 ## Running a project
 
 | Guide | What it covers |

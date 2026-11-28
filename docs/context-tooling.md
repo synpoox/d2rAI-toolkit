@@ -5,14 +5,15 @@ Use the pinned toolkit checkout as the working directory for the commands below.
 ## Retrieve knowledge
 
 - **Find:** python -m modkit knowledge search "renderer pool" --limit 3
-- **Read:** python -m modkit knowledge get ui-layouts --section Grids
+- **Read:** python -m modkit knowledge get ui-layouts --section Grids --format text
+- **Get one workflow procedure:** python -m modkit knowledge get docs/testing --section "The test character" --format text
 - **Look up an address:** python -m modkit knowledge address --symbol ClientFindUnit
 
-The local index is rebuilt from the checkout on each invocation. Search ranks matching terms and headings. Get accepts an exact heading, anchor or a unique heading substring. Address prefers exact registry symbol/RVA rows and can also return source mentions when no row matches. A mention alone does not establish an address or ABI.
+The local index is rebuilt from the checkout on each invocation. Search and address index the knowledge base. Get can also select an existing top-level workflow document using `docs/<stem>`. Search ranks matching terms and headings. Get accepts an exact heading, anchor or a unique heading substring. Address prefers exact registry symbol/RVA rows and can also return source mentions when no row matches. A mention alone does not establish an address or ABI.
 
-Output is JSON with the source path, heading, one-based inclusive line range, source SHA-256 and verbatim prose or table rows. Document introductions carry scope and build provenance when present. Exact address rows include the table introduction and its evidence labels when present. Read the source around an excerpt when a caveat is outside the returned lines. Follow next_line with get --start-line to continue; for earlier context, start at the heading.
+The default JSON and optional `--format text` both include the source path, heading, one-based inclusive line range, source SHA-256 and verbatim prose or table rows. Knowledge introductions carry scope and build provenance when present. Workflow excerpts include their document title. Exact address rows include the table introduction and its evidence labels when present. Read the source around an excerpt when a caveat is outside the returned lines. Follow the next line marker with get --start-line to continue; for earlier context, start at the heading.
 
-The default limit is 8,000 bytes of serialized output per call, a context-size proxy. The benchmark checks its reference reads against a separate 2,000-token budget. You can reduce or increase the byte limit explicitly. The command exits 1 if it cannot find evidence and 2 for an invalid or ambiguous selection or an insufficient get/address budget.
+The default limit is 8,000 bytes of output per call, a context-size proxy. The benchmark checks the sum of all reference reads for a task against a separate 2,000-token budget. You can reduce or increase the byte limit explicitly. The command exits 1 if it cannot find evidence and 2 for an invalid or ambiguous selection or an insufficient get/address budget.
 
 ## Validate a lane
 
@@ -39,6 +40,6 @@ Delivery requires a clean checkout, in-scope diff, a fragment for a player-visib
 
 ## Check context budgets
 
-Install tiktoken==0.12.0 and run python -m tools.context_budget from the toolkit root. Token counts use o200k_base. The first run downloads the tokenizer vocabulary if uncached. CI checks skill descriptions and bodies and the startup, lane, orchestrator, handoff and reviewer templates. Review and justify any exception in context-budget-exceptions.json. The duplicate check looks for repeated substantive sentences after basic Markdown and whitespace normalization. Paraphrases and the supporting references still require review.
+Install tiktoken==0.12.0 and run python -m tools.context_budget from the toolkit root. Token counts use o200k_base. The first run downloads the tokenizer vocabulary if uncached. CI checks skill descriptions (60 tokens) and bodies (500 toolkit, 550 domain) and the startup, lane, orchestrator, handoff and reviewer templates. Review and justify any exception in context-budget-exceptions.json. The duplicate check looks for repeated substantive sentences after basic Markdown and whitespace normalization. It checks repeated sentences among entry points and between entry points and existing manuals. Historical overlap confined to manuals and paraphrases still require review.
 
 See [benchmark methodology](context-benchmark.md) for the paired measurement and live-run protocol.

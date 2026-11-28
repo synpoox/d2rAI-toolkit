@@ -5,7 +5,7 @@ description: Diagnose Diablo II Resurrected mod crashes, asserts, hangs, missing
 
 # Debug a D2R mod
 
-1. Read [Where to look](reference.md#where-to-look-newest-first) and start with the newest logs and asserts. Route crash RVAs or last-resort reports to `d2r-crash`. Use [loader notes](../../../knowledge/d2rloader.md) for installation or plugin load surprises.
-2. Match evidence to [Symptom → usual cause](reference.md#symptom---usual-cause) or [debugging knowledge](../../../knowledge/debugging.md). Back up saves and use supported save tooling only. For a hang, compare repeated busy-thread samples.
-3. Bisect plugin features or patch ops per [Bisect](reference.md#bisect). Rebuild to zero errors and use `d2r-in-game-testing` to isolate and reproduce in an owned slot.
-4. Fix the cause and record evidence and a regression check in TESTING.md. Report unresolved hypotheses separately.
+1. Retrieve `debugging` → `Where to look first`. Start with the newest logs and post-startup asserts; route a crash RVA or last-resort report to `d2r-crash`. For plugin load or install surprises, search `d2rloader` by symptom.
+2. Search knowledge with the exact assert, symptom or log text. Inspect the matching row in `debugging` → `Symptom table` if the excerpt needs context. For hangs retrieve `Hangs` and map repeated samples of the busy thread. Back up saves before changes and use supported save tools.
+3. Halve enabled plugin features with `<plugin>-off.txt` or halve patch ops, rebuilding/reinstalling between trials. Respect feature dependencies. Compare the isolated row to vanilla and use an owned slot via `d2r-in-game-testing`.
+4. Fix the cause, rebuild to zero errors and record evidence and the regression check in TESTING.md. Separate confirmed causes from hypotheses.

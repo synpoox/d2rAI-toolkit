@@ -228,6 +228,11 @@ skills `delay` -> `localdelay`, uniqueitems `enabled` -> `spawnable`, missiles `
 | **overlay** | `overlay` (47), row = ID | `Filename` (classic DCC), **`Character`** (HD folder), `Trans`, `AnimRate`, `Height1-4` |
 | **monstats** | `Id` (47), row = ID | `BaseId`/`NextInClass`, `MonStatsEx` (monstats2 row; blank = row 0), `MonType`, `AI`, `Code` (classic animation set, also used in HD for timing), `Skill1-8` + `Sk1mode-Sk8mode` (a **monmode code or a monseq name**), `TreasureClass*`, `coldeffect` (signed), `spawnx/spawny` (signed), per-difficulty columns `(N)`/`(H)` |
 | **monstats2** | `Id`, row = ID | visual columns: sizes, `HitClass`, part variants, modes `m*`/directions `d*`, `isSel`/`isAtt` (hover/target), `noGfxHitTest`, `automapCel`, `Light`, `Utrans` |
+
+### Item and affix tables
+
+| Table | Key / ID | What to watch |
+|---|---|---|
 | **armor / weapons / misc** | `code` (3 characters in practice: `items.json` is keyed by the first 3 characters, so a 4-character code finds no picture and spawns nothing; see hd-graphics.md) | `type`/`type2` (itemtypes), `namestr` (string key), `invfile`/`uniqueinvfile`/`setinvfile`, `invwidth`/`invheight`, `normcode`/`ubercode`/`ultracode` (armor/weapons tiers), `level`/`levelreq`, `spawnable`, vendor `*Min/*Max` columns, misc `pSpell` (0-19), `spellicon` (signed, -1 none), `stat1-3`/`calc1-3` (timed potion `pSpell` 3: calc is the total over `len` for hp / mana / manarecovery / hpregen, a per-frame value for other stats), `state`/`cstate1-2`, `len`. HD picture: `hd/items/items.json` by code |
 | **itemtypes** | `Code` | `Equiv1/2` (parent types: the type tree drives affixes, auto TCs, sockets), `BodyLoc1/2`, `MaxSockets1-3` + thresholds, `TreasureClass` (auto `weapN`/`armoN`), `StorePage`, `Class`, `VarInvGfx`/`InvGfx1-6` |
 | **uniqueitems** | `index` | `code` (base item), `lvl`, `lvl req`, `rarity`, `spawnable`, `nolimit`, `prop1-12` + `par`/`min`/`max`, `invfile`. HD picture: `hd/items/uniques.json` key = index lowercased, spaces/hyphens `_`, apostrophes dropped |
@@ -237,6 +242,11 @@ skills `delay` -> `localdelay`, uniqueitems `enabled` -> `spawnable`, missiles `
 | **properties** | `code` (47), row = ID | `func1-7` (D2R uses 1-25, 36), `stat1-7` (itemstatcost), `set`/`val`. Items reference properties by code |
 | **itemstatcost** | `Stat` (47), row = ID | `Signed`, `Send Bits`/`Send Param Bits` (network), `Saved`, `CSvBits`/`CSvParam` (character save width), `Save Bits`/`Save Add`/`Save Param Bits` (item save width), `Encode` (a property with function 28, "layer = param", on a stat with no `Save Param Bits` makes D2R's item writer fail: the client crashes when the item drops), `op`/`op param`/`op base`/`op stat1-3` (derived stats), `descpriority`/`descfunc` (D2R uses 5-29)/`descval`/`descstrpos`/`descstrneg`/`descstr2`, `dgrp*`. **Widths change the save format**: decide them before players have saves |
 | **treasureclassex** | `Treasure Class` | `group`, `level`, `Picks`, `Unique/Set/Rare/Magic` ratios, `NoDrop`, `Item1-10` + `Prob1-10` (items by code; quoted entries with modifiers like `"gld,mul=2560"`), `ConditionCalc`. Auto classes `weapN`/`armoN` pull every spawnable base of that level band: remove vanilla bases you don't want dropping |
+
+### World and character tables
+
+| Table | Key / ID | What to watch |
+|---|---|---|
 | **levels** | `Name`, `Id` (row = ID) | `Act`, `LevelType` (lvltypes row, **0-35 only for automap**), `DrlgType`, `SubType`, `Teleport` (0 no, 1 yes, 2 only with a clear line), `Vis0-7`/`Warp0-7`, `MonLvl*`, `MonDen*`, `mon1-25`/`nmon1-25`/`umon*`, `Waypoint`, `Quest`, `Portal`, `Layer` (**< 100**: index into the 100-bucket per-character map memory), `Position` (1 = arrive in a random entry room of the maze preset: **clear it on new maze levels** that have none, or the game crashes on entry). Level portal links are bytes in many places: keep IDs <= 255 |
 | **lvlprest / lvltypes / lvlwarp / lvlmaze / lvlsub** | lvlprest `Def`, lvltypes `Name` (36 types + `Expansion` row) | lvlprest `File1-6` (.ds1 maps), lvltypes `File 1-32` (.dt1 tiles). Ship every tile file referenced. .ds1 maps hold object IDs by number |
 | **automap** | (`LevelName`, `TileName`, `Style`, `StartSequence`, `EndSequence`, `Cel1-4`) | `LevelName` must be one of the 36 lvltypes names in a reformatted form ("Act 1 - Town" -> "1 Town"); others assert `ii < NUM_LEVEL_TYPES`. `Cel1-4` **<= 1498** (the atlas has 1,499 cels; a higher cel stored in a character's map memory hangs the next save) |
@@ -248,6 +258,77 @@ skills `delay` -> `localdelay`, uniqueitems `enabled` -> `spawnable`, missiles `
 | **difficultylevels** | `Name` (3 rows) | resist penalties, `DeathExpPenalty`, damage-vs rules, gamble rates, `ResistFloor` |
 | **plrmode / monmode** | row = mode index | Keep D2R's `Code` column exactly (Sequence `SQ`, Knockback `KB`; the `Token` column is `GH` for both) |
 | **skillcalc / misscalc** | row = code number | D2R's rows first in D2R's order; append new codes (they need a plugin to evaluate) |
+
+## Cube recipe fields
+- `description` (description used by modkit lookup, any text), `enabled` 1, `version` 100 (expansion), `min diff`, `class` (restrict).
+- Inputs: `numinputs` (total item count), `input 1-7`: an item code, item type, unique/set name in quotes, with
+  qualifiers after commas: `"rin,mag"` (magic ring), `qty=3`, `sock=2`, `nos` (no sockets), `pre=`/`suf=`, `upg`,
+  `bas`/`exc`/`eli`, `nru`, `noe`. Quote a cell with commas.
+- Output: `output` (code, type, "Cow Portal", "Pandemonium Portal", "Red Portal,lvl=<level id>" (a red portal to any level of the same act), "useitem", "usetype", ...) with qualifiers
+  (`mag`, `rar`, `uni`, `set`, `crf`, `tmp`, `sock=N`, `rep`, `rch`, `pre=`, `suf=`, `reg`, `exc`, `eli`,
+  `uns`, `rem`), `lvl`/`plvl`/`ilvl` (item level rules), `mod 1-5` + `chance`/`param`/`min`/`max` (properties);
+  `output b`/`output c` with the same columns for extra outputs.
+
+## Base item and vendor fields
+
+Set `name`/`namestr` and give the name a string in `item-names.json`. The clone's damage/defence,
+`reqstr`/`reqdex`, `gemsockets`, `rarity` and `cost` are separate from item level and requirements.
+For gems/runes as socket fillers, `gems.txt` has `weaponMod`/`helmMod`/`shieldMod` 1–3 per target.
+The classic picture is the DC6 named by `invfile`; for the HD entry see [item pictures](hd-graphics.md#item-pictures).
+New stat behavior (procs, conversions) needs engine support; new display can use vanilla descfuncs.
+For drops, layer and save-width limits see [item limits](engine-limits.md#items-inventory-sets-runes-cube).
+
+Vendor stock lives in `<Vendor>Min/Max/MagicMin/MagicMax/MagicLvl` on weapons, armor and misc. Vendors include
+Charsi, Gheed, Akara, Fara, Lysander, Drognan, Hratli, Alkor, Ormus, Elzix, Asheara, Cain, Halbu, Jamella,
+Larzuk, Malah and Anya.
+
+## Treasure classes and affixes
+
+In `treasureclassex`, negative `Picks` selects each item for its stated count. Entries can be base codes,
+other TC names, unique/set names or automatic `weapN`/`armoN` classes (item levels grouped in steps of 3).
+Monsters use `TreasureClass` / `TreasureClassChamp` / `TreasureClassUnique` / `TreasureClassQuest` with
+`(N)`/`(H)` variants and `TreasureClassDesecrated*` for Terror Zones. Superuniques use `TC`. For affix name
+strings see `name` in affix rows and `rareprefix`/`raresuffix` for rare item names. The per-table cheat
+sheet above lists spawn, level, group, weighting and item type fields.
+
+## Monster records and skills
+
+1. Clone `monstats` for behavior. In addition to the cheat sheet, set `NameStr`, `Level`, `minHP`/`maxHP`,
+   `AC`, `Exp`, `A1MinD`/`A1MaxD`/`A1TH`, `ResDm`/`ResMa`/`ResFi`/`ResLi`/`ResCo`/`ResPo`, `Velocity`/`Run`,
+   `aip1-8`, `MissA1` etc., `minion1/2`, `PartyMin/Max` and `MinGrp/MaxGrp` as applicable. Use difficulty
+   variants where present. `AI` selects a `monai.txt` behavior which decides which `Skill1-8` slot to cast.
+   Choose an AI that casts the way you need. Pair each skill with its `Sk*lvl` and a real `Sk*mode`
+   (monmode such as `S1`, `A2` or `SC`, or a monseq name).
+2. Clone `monstats2` for graphics. Set body parts (`HD` through `S8`), mode flags (`mDT` through `mRN`),
+   size, light, selection and `Height`. Palette shifts such as `Utrans` only affect classic mode.
+   Reuse the right animation `Code` and map the exact `Id` for [HD](hd-graphics.md#monsters).
+3. Add a `string` op in `monsters.json` for `NameStr`.
+
+## Monster spawns and difficulty
+
+- `superuniques` uses `Superunique` (key), `Name` (string), `Class` (monstats Id), `Mod1-3` (monumod),
+  `MinGrp/MaxGrp` and `TC`/`TC(N)`/`TC(H)`. Placement comes from presets or quests. New `monumod` behavior
+  beyond existing functions requires engine code. Quest monsters and act bosses keep their role.
+- In `levels`, `mon1-25` are normal spawns, `nmon1-25` nightmare/hell spawns, and `umon1-25` unique candidates.
+  `NumMon` counts the mon slots used; `MonUMin/MonUMax*` control unique packs. `MonDen*` controls density.
+- `MonLvl`/`MonLvl(N)`/`MonLvl(H)` and `MonLvlEx*` set area levels (the Ex columns are expansion).
+  `monlvl` has per-level scaling with separate L columns by difficulty. `difficultylevels` controls resist
+  penalties, mercenary/pet rules and drops. Check [level limits](engine-limits.md#levels-and-areas)
+  before changing maps and automap behavior.
+
+## Skill damage and animation fields
+
+- **Damage**: `EType` / `EMin` / `EMax` / `EMinLev1-5` / `EMaxLev1-5` (elemental), `MinDam`/`MaxDam` +
+  `MinLevDam1-5` (physical), all scaled by `HitShift` (8 = whole points, lower = fractions of a point; keep the
+  clone's), `ELen` + `ELevLen1-3` in frames (25 per second) for cold/poison/burn lengths, `SrcDam` = share of weapon
+  damage (128 = 100%).
+  Synergies: `EDmgSymPerCalc` / `DmgSymPerCalc` formulas like `(skill('Ice Bolt'.blvl)+skill('Ice Blast'.blvl))*15`.
+- **Animation**: `anim` must be a plrmode code (`SC` cast, `A1`/`A2` attack, `S1`-`S4` special, `TH` throw, `KK` kick,
+  `SQ` sequence). `GH` is *get hit*, never a skill animation. `SQ` needs `seqnum`/`seqtrans` from a vanilla sequence
+  skill and an HD state (the op copies one: `hdSequenceLike` must be a skill of the same class that has one, e.g.
+  Whirlwind, Zeal, Fend, Strafe, Double Swing). Skills built on Whirlwind's functions keep its stop functions
+  (srvstopfunc/cltstopfunc 1); without them the spin never ends.
+- **Mana**: `mana`, `lvlmana`, `minmana`, `manashift` (mana = (mana + lvlmana*(lvl-1)) << manashift >> 8).
 
 ## Mod folder layout under D2RLoader (as the port installed it)
 

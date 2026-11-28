@@ -5,6 +5,6 @@ description: Change Diablo II Resurrected HD layouts, inventory/stash/cube/trade
 
 # HD UI: layouts, panels and grids
 
-1. Read relevant [UI layouts](../../../knowledge/ui-layouts.md) sections. Use [widget and asset discovery](reference.md#find-what-to-change) to find the actual widget IDs, bounds and art. Change controller variants when supported.
-2. For grids, read [Grid sizes](reference.md#grid-sizes-inventory-stash-cube-trade). Match both inventory records to the layout and respect the 16 × 16 save limit for personal stash, inventory and cube. Preserve equipment dimensions. For art or tree tabs, read the corresponding [reference heading](reference.md), including stock widget compatibility and untested page ranges.
-3. Build and validate. Use `d2r-in-game-testing` and [the screen checklist](reference.md#build-and-test) to verify geometry, interactions, controller and low-texture layouts as applicable.
+1. Find widgets with `modkit widgets <layout>`. Retrieve `ui-layouts` → `Main layout files` if the file is unknown, or `Measuring positions` for art discovery. Change applicable controller variants too.
+2. For grids retrieve `ui-layouts` → `Grids`. Match both inventory records and the layout. Respect the 16 × 16 save limit for personal stash, inventory and cube. Preserve equipment dimensions and match rect scales. For art and skill trees retrieve `Panel backgrounds`, `Tab bars` or `Skill tree tabs` as appropriate.
+3. Build to zero errors. In a slot with `d2r-in-game-testing`, verify grid alignment, far corners, tabs, gold, low textures and supported controller layouts. Treat unproven skill-page ranges as unverified.

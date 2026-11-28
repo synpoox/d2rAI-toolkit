@@ -27,8 +27,7 @@ testing.md, release.md, distribution.md and downloader.md, and the method in ai-
    implements; duplicate issues are closed before fixing. Details:
    `docs/ai-workflow.md`.
 6. **Plugins and installers:** `plugin-template/`, `downloader/` and `release/` code follows the
-   `d2r-engine` skill for image guards and major.minor checks. See the toolkit skill's 'Rules for a mod' reference
-   for the item-type check.
+   `d2r-engine` skill for image guards and major.minor checks. See the plugin template's 'Item type ids' section for the item-type check.
 7. **In-game checks are run by agents,** in a game slot (`testing/`, the `d2r-in-game-testing` skill), not left to
    the user. Ask the human only when a check needs one. Test characters are level 99 (experience 3520485254, 490 stat
    points, 98 skill points).

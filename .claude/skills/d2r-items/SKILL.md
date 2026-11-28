@@ -5,10 +5,7 @@ description: Change Diablo II Resurrected loot, base items, item types, uniques,
 
 # Items, affixes and loot
 
-Read the item sections of [tables](../../../knowledge/tables.md) and [engine limits](../../../knowledge/engine-limits.md). Start from the nearest vanilla row. For reusable or charged items read [charged items](../../../knowledge/charged-items.md).
-
-- For base items or pictures, read [Base items](reference.md#base-items-weaponstxt-armortxt-misctxt). Keep a unique three-character code and classic and HD art entries.
-- For stats, sets, runewords, affixes, drops or vendors, read the corresponding heading in [item reference](reference.md). Append indexed stats and respect save bit widths, set size and runeword slot limits.
-- Read [Engine traps](reference.md#engine-traps) for itemtypes, layered stats or potions. Preserve D2R item type IDs and run the item type checker after changes.
-
-Build to zero errors. Use `d2r-in-game-testing` for applicable tooltip, HD/classic picture, socket, runeword, vendor and actual drop checks.
+1. Clone the nearest vanilla row and retrieve only the relevant `tables` heading: `Base item and vendor fields`, `Treasure classes and affixes`, or `Item and affix tables` for uniques, sets, runewords, stat display and affix fields. Read `charged-items` by section for reusable or charged items.
+2. Use unique three-character codes across weapons/armor/misc. Supply classic and HD pictures; retrieve `hd-graphics` → `Item pictures` for assets. Preserve D2R itemtype IDs, then run [the ID checker](../../../plugin-template/README.md#item-type-ids).
+3. Append indexed stats, respect saved widths, validate function-28 layers against Save Param Bits, and stay within six items per set and seven property slots per runeword. For layered stats, timed potions or save changes retrieve `engine-limits` → `Items, inventory, sets, runes, cube` or the affected `saves` section.
+4. Build to zero errors. In a slot via `d2r-in-game-testing`, spawn the item and verify tooltip, HD/classic picture, sockets/runeword and vendors as applicable. Verify drops from the intended monster using repeated kills or a treasure-class check.

@@ -751,6 +751,15 @@ These were paid for in real releases.
 - **Keep secrets out.** Keys and tokens live in files in your home folder. `python tools/check_public.py` must print
   nothing before you push.
 
+## Recover a failed publication
+
+Stop at the first failure and inspect the captured log. Repair and rerun the whole release script without
+skipping ahead or changing branches. A failed upload or launcher validation may leave a private draft.
+If a page escaped before the version went live, unpublish it and inform the owner. If the wrong commit
+was tagged, get owner approval before retagging from the captured SHA. Never force-push a public repo
+without explicit approval. Fix an already published release with a new version. For a public mirror,
+use [the scrub-and-mirror procedure](../tools/publish_mirror.md) after scanning; carry direct owner edits back first.
+
 ## Troubleshooting
 
 | Symptom | Cause and fix |

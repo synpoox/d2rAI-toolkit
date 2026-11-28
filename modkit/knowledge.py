@@ -8,6 +8,7 @@ import re
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
+from functools import cached_property
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,10 +34,11 @@ class Section:
     lines: tuple[str, ...]
     provenance: tuple[str, ...]
     sha256: str
+    collection: str
 
     def excerpt(self, first, stop):
         return {
-            "source": f"knowledge/{self.doc}.md",
+            "source": f"{self.collection}/{self.doc}.md",
             "heading": self.title,
             "anchor": self.slug,
             "start_line": self.start + first,
@@ -48,8 +50,12 @@ class Section:
         }
 
 
-def sections(path):
+def sections(path, collection="knowledge"):
     raw = path.read_bytes()
+    yield from parse_sections(raw, path.stem, collection)
+
+
+def parse_sections(raw, doc, collection):
     lines = raw.decode("utf-8-sig").splitlines()
     headings = []
     fence = None
@@ -64,9 +70,9 @@ def sections(path):
         if fence is None and (match := HEADING.match(line)):
             headings.append((i, match[2]))
     if not headings or headings[0][0]:
-        headings.insert(0, (0, path.stem))
+        headings.insert(0, (0, doc))
     provenance_end = headings[1][0] if len(headings) > 1 else 1
-    provenance = tuple(lines[:provenance_end])
+    provenance = tuple(lines[:1 if collection == "docs" else provenance_end])
     digest = hashlib.sha256(raw).hexdigest()
     used = set()
     for (start, title), (end, _) in zip(headings, headings[1:] + [(len(lines), "")]):
@@ -77,11 +83,12 @@ def sections(path):
             slug = f"{base}-{suffix}"
         used.add(slug)
         if end > start:
-            yield Section(path.stem, title, slug, start + 1, tuple(lines[start:end]), provenance, digest)
+            yield Section(doc, title, slug, start + 1, tuple(lines[start:end]), provenance, digest, collection)
 
 
 class Index:
     def __init__(self, root=ROOT):
+        self.root = root
         self.sections = []
         self.postings = defaultdict(set)
         self.symbols = defaultdict(list)
@@ -99,6 +106,14 @@ class Index:
                         ):
                             for key in {cell.strip(" \x60").casefold() for cell in cells[:2]}:
                                 self.symbols[key].append((section, row))
+
+    @cached_property
+    def docs(self):
+        return [
+            section
+            for path in sorted((self.root / "docs").glob("*.md"))
+            for section in sections(path, "docs")
+        ]
 
     def search(self, query):
         terms = words(query)
@@ -136,11 +151,40 @@ def encode(results):
     return json.dumps({"results": results}, ensure_ascii=True, indent=2)
 
 
-def bounded(section, first, results, budget):
+def render(results, output_format="json"):
+    if output_format == "json":
+        return encode(results)
+    blocks = []
+    for hit in results:
+        source = hit["source"]
+        start, end = hit["start_line"], hit["end_line"]
+        header = f"{source}#{hit['anchor']}:{start}-{end} (sha256 {hit['source_sha256']})"
+        if "match" in hit:
+            header += f" [{hit['match']}]"
+        parts = [header]
+        context = hit["provenance"].strip()
+        excerpt = hit["text"].rstrip()
+        if context and not excerpt.startswith(context):
+            parts.append(context)
+        table = hit.get("table_context", "").strip()
+        if table:
+            parts.append(table)
+        parts.append(excerpt)
+        if hit["next_line"] is not None:
+            parts.append(f"Continue with --start-line {hit['next_line']}.")
+        blocks.append("\n\n".join(parts))
+    return "\n\n---\n\n".join(blocks)
+
+
+def size(results, output_format):
+    return len(render(results, output_format).encode("utf-8")) + 1
+
+
+def bounded(section, first, results, budget, output_format):
     """Fit whole source lines, always offering a line number to resume at."""
     for stop in range(first + 1, len(section.lines) + 1):
         hit = section.excerpt(first, stop)
-        if len(encode(results + [hit]).encode("utf-8")) + 1 > budget:
+        if size(results + [hit], output_format) > budget:
             return previous if stop > first + 1 else None
         previous = hit
     return previous
@@ -160,25 +204,32 @@ def add_parser(sub):
     p.add_argument("query")
     p.add_argument("--limit", type=positive, default=5)
     p = commands.add_parser("get")
-    p.add_argument("document")
+    p.add_argument("document", help="knowledge stem or docs/<document>")
     p.add_argument("--section", required=True, help="heading title or exact anchor")
     p.add_argument("--start-line", type=positive, help="resume from next_line in earlier output")
     p = commands.add_parser("address")
     p.add_argument("--symbol", required=True, help="exact registry symbol or hexadecimal RVA")
     for p in commands.choices.values():
+        p.add_argument("--format", choices=("json", "text"), default="json",
+                       help="text keeps citations and source excerpts with less formatting overhead")
         p.add_argument("--max-bytes", type=positive, default=OUTPUT_BYTES,
-                       help=f"bound serialized JSON output (default: {OUTPUT_BYTES})")
+                       help=f"bound serialized output (default: {OUTPUT_BYTES})")
 
 
 def lookup(args, index):
+    output_format = args.format
     if args.lookup == "address":
         hits = index.address(args.symbol)
-        if len(encode(hits).encode("utf-8")) + 1 > args.max_bytes:
+        if size(hits, output_format) > args.max_bytes:
             raise ValueError("address results exceed budget; use a more specific symbol or raise --max-bytes")
         return hits
     if args.lookup == "get":
         doc = args.document.removesuffix(".md").casefold()
-        choices = [s for s in index.sections if s.doc.casefold() == doc]
+        collection, separator, stem = doc.partition("/")
+        if not separator:
+            collection, stem = "knowledge", doc
+        entries = index.docs if collection == "docs" else index.sections if collection == "knowledge" else ()
+        choices = [s for s in entries if s.doc.casefold() == stem]
         # Prefer an exact anchor/title over a unique partial title.
         matches = [s for s in choices if args.section.casefold() == s.slug]
         if not matches:
@@ -191,7 +242,7 @@ def lookup(args, index):
         first = (args.start_line or section.start) - section.start
         if first < 0 or first >= len(section.lines):
             raise ValueError("--start-line is outside this section")
-        hit = bounded(section, first, [], args.max_bytes)
+        hit = bounded(section, first, [], args.max_bytes, output_format)
         if hit is None:
             raise ValueError("budget cannot fit the next source line and its provenance; raise --max-bytes")
         return [hit]
@@ -202,10 +253,10 @@ def lookup(args, index):
         # Keep the best hits diverse, and start at the strongest matching line within a large section.
         terms = words(args.query)
         share = max(args.max_bytes // args.limit, 1600)
-        hit = bounded(section, 0, results, min(args.max_bytes, len(encode(results)) + share))
+        hit = bounded(section, 0, results, min(args.max_bytes, size(results, output_format) + share), output_format)
         if hit is None or hit["next_line"] is not None:
             first = max(range(len(section.lines)), key=lambda n: len(words(section.lines[n]) & terms))
-            hit = bounded(section, first, results, min(args.max_bytes, len(encode(results)) + share))
+            hit = bounded(section, first, results, min(args.max_bytes, size(results, output_format) + share), output_format)
         if hit is not None:
             results.append(hit)
     return results
@@ -220,5 +271,9 @@ def run(args):
     if not results:
         print("knowledge: no matching evidence within the output budget", file=sys.stderr)
         return 1
-    print(encode(results))
+    output = render(results, args.format) + "\n"
+    if hasattr(sys.stdout, "buffer"):
+        sys.stdout.buffer.write(output.encode("utf-8"))
+    else:
+        sys.stdout.write(output)
     return 0

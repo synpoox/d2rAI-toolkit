@@ -30,26 +30,31 @@ Maintainer audit; **not** mandatory worker context. Baseline: `5d59cb6dbf6fabe34
 - **Prompt completeness:** the old lane brief said both to avoid shared rules and to repeat Git/slot/report policy. Issue + mandatory agent contract/skill reads now supply shared policy. No acceptance evidence may be dropped.
 - **Local overrides:** project game-check guidance may specialize configuration and proof, not silently waive safety or no-wait.
 
-## P3–P7 follow-through
+## Consolidation of the P3–P7 skill references
 
-Every skill now has an execution guide and a sibling reference. Mandatory prerequisites, safety and completion stay visible in the guide. The detailed steps, commands, caveats, examples and numeric limits keep their original headings in the reference. The only shared introductory text removed from those references was the repeated toolkit root setup; its canonical owner is d2r-toolkit. The former toolkit rule 9 routes plugin work to d2r-engine and retains the item-type check in the toolkit reference.
+Audited every `reference.md` at `f491e56` against its skill and the destinations below. The 15 sibling
+copies are retired. The skills retain mandatory actions, safeguards, acceptance checks and loading
+triggers. Load technical evidence by heading via Modkit, and detailed operations by their specific
+workflow section. No skill-local reference needs separate ownership.
 
-| Skill | Reference sections carrying the original detailed constraints |
+| Skill | Canonical destination and overlap removed |
 |---|---|
-| Toolkit | Finding the toolkit and the pin, Where things are, New generic work, Rules for a mod |
-| Engine | The plugin, Common jobs, Finding code, Debug |
-| In-game testing | The recipe, The test character, Rules, When to hand it over |
-| Project conventions | Issues and PRs, Branches and commits, Merge gate, Worktrees, Generated data, Wayfinder |
-| Orchestrator | Start, Context budget, Routing work, Choosing models, Game slots, Review and merge, Clean up, Reporting, Identity and safety, Common traps |
-| Crash | Collection, Read before guessing, Environment, Fix and record |
-| Cube | Recipe row, Conditions, Build and test |
-| Debug | Logs, Symptom to cause, Bisect |
-| Items | Base items, Stats, Uniques/sets/runewords, Affixes, Drops, Vendors, Engine traps, Build and test |
-| Mod setup | One-time setup, New mod, The loop, Test characters, Shipping |
-| Monsters | New monster, Bosses, Skills, Spawns, Difficulty, Build and test |
-| Classic port | Policy, Steps, Table completion |
-| Release | Prerequisites, Steps, Launcher, Failure, Mirror |
-| Skill crafting | Design, Vanilla selection, Class skills, Write the op, Build, Port traps, Runtime checklist |
-| UI | Discovery, Grid sizes, Panel art, Skill tree, Build and test |
+| Toolkit | `docs/toolkit-finder.md` owns pin mechanics and `docs/README.md` owns the map. `README.md` owns privacy-hook installation; `plugin-template/README.md` owns the item-type command. Craft, safety and routing remain inline. |
+| Engine | `knowledge/engine-re.md` owns dump, Ghidra commands, hook evidence and checked dispatch writes. `plugin-template/README.md` owns ABI, build/install, guard and function examples. Removed the parallel command catalog. |
+| In-game testing | `docs/testing.md` owns named slot commands, startup scan, save setup, DS1, release restore, handoff and evidence. `knowledge/cheat-commands.md` owns observed console behavior. The skill owns lifecycle safety; examples no longer tell lanes to use an unqualified lock. |
+| Project conventions | Skill owns mandatory issue, branch, PR, gate, generated-data and junction rules. `docs/ai-workflow.md` owns commands, optional Wayfinder and cleanup; config and issue/workflow templates supply exact settings. |
+| Orchestrator | `docs/ai-workflow.md` owns dispatch, provider choice, handoff, review/cleanup and reporting. `docs/orchestrator-setup.md` owns new project setup. Removed parallel workflow and safety prose. |
+| Crash | `knowledge/crash-triage.md` already owns exact files, report interpretation, Ghidra, environment checks, worked findings and closeout. Skill keeps the evidence chain and regression criteria. |
+| Debug | `knowledge/debugging.md` owns logs, symptoms and hang evidence, `knowledge/d2rloader.md` owns load surprises. Skill keeps bisection and regression steps. |
+| Cube | `knowledge/tables.md` owns row and qualifier syntax; `knowledge/engine-limits.md` has a targeted gating and portals section, preserving build and observed/unverified distinctions. |
+| Items | `knowledge/tables.md` owns item, vendor, treasure, affix and stat fields; asset, save/width and item/function rules stay in their existing technical references. Item test criteria remain inline. |
+| Mod setup | The README quick start and requirements own CASC setup, `docs/README.md` owns project layout, `knowledge/d2rloader.md` owns launch selection and startup behavior. Slot character setup belongs to testing. |
+| Monsters | `knowledge/tables.md` owns record/AI, spawn and difficulty details; `hd-graphics` and `engine-limits` own asset and area limits. The skill keeps quest-role and runtime acceptance. |
+| Classic port | `knowledge/porting-classic-mods.md` already owns inventory, collisions, conversion and parity evidence. The skill keeps permission, fidelity, ordered execution and milestone constraints. |
+| Release | `docs/release.md` owns publication scripts, launcher and recovery; distribution and mirror guides own channel details. The skill keeps permission, ordering, live proof and issue closeout. |
+| Skill crafting | `knowledge/modkit-ops.md` carries the operation example and `knowledge/tables.md` the damage/animation fields. Existing limits, graphics and port sections own their specifics. The skill keeps replacement, sequence/asset rules and exact runtime acceptance. |
+| UI | `knowledge/ui-layouts.md` owns widget discovery, grids, scaling and confirmed/unverified tree-tab behavior. `knowledge/modkit-ops.md` and showcase supply patch forms. The skill keeps size and controller constraints and runtime proof. |
 
-See [context tools](context-tooling.md) for selective retrieval, deterministic lane checks and context budgets. See [the benchmark](context-benchmark.md) for the static comparison and live trial protocol. Existing consumer copies of AGENTS.md remain subject to intentional migration at their next pin update.
+[Context tooling](context-tooling.md) documents the retrieval and validation commands. The
+[cumulative benchmark](context-benchmark.md) compares the previous selective route against the consolidated reads.
+Consumer AGENTS files continue to migrate deliberately at a pin update.

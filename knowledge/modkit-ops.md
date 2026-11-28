@@ -49,10 +49,26 @@ Plain numbers stay as they are.
 ## Skills
 
 `skill` builds a whole skill (skills + skilldesc rows, strings, tree slot, icon, missiles, states, HD
-animation). Its fields are documented at the top of `modkit/skill.py` and in `.claude/skills/d2r-skill/SKILL.md`.
+animation). Its fields are documented at the top of `modkit/skill.py` and the [skill guide](../.claude/skills/d2r-skill/SKILL.md) gives the workflow.
 New class skills: each class has exactly 30, and saves keep one byte per class skill. Without
 `"extendedSaves": true` in mod.json (D2RLoader's extended save format) the op refuses to add a 31st, so
 rework an existing skill with `replace` instead.
+
+Place the operation in `<project>/patches/NNN-<topic>.json`. For icons pass a PNG (square works best) or `{"from": "<skill>"}` to reuse a same-class icon.
+
+```json
+{"ops": [{
+  "op": "skill", "name": "Frost Cyclone", "replace": "Double Throw", "clone": "Whirlwind",
+  "skills": {"EType": "cold", "EMin": 4, "EMax": 8, "EMinLev1": 3, "EMaxLev1": 6, "ELen": 75},
+  "skilldesc": {"descline1": "", "dsc2line1": ""},
+  "tree": {"page": 1, "row": 3, "column": 2},
+  "text": {"name": "Frost Cyclone", "short": "Frost Cyclone", "long": "Spin through enemies, chilling them", "alt": "Frost Cyclone"},
+  "icon": "assets/frost_cyclone.png",
+  "missiles": [{"name": "frostcyclonebolt", "clone": "icebolt", "set": {"Vel": 25}, "hdLike": "icebolt"}],
+  "states": [{"name": "frostcycloned", "clone": "freeze", "set": {}}],
+  "hdSequenceLike": "Whirlwind"
+}]}
+```
 
 ## Validation errors and their causes
 

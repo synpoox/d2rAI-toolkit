@@ -5,7 +5,7 @@ description: Set up d2r-modkit or a Diablo II Resurrected mod project. Use for m
 
 # Set up the toolkit and a mod project
 
-1. For dependencies, missing CASC data or an initial checkout, use [One-time setup](reference.md#one-time-setup-windows). Keep extracted Blizzard files outside Git.
-2. Run `python -m modkit new <dir> --name <ModName>` for a new project. Read [A new mod](reference.md#a-new-mod) for mods with plugins, namespaces or extended saves. Port an existing classic mod through `d2r-port`.
-3. Use the relevant domain skill, then `python -m modkit build <dir>`. Fix all errors and review warnings. Read [The loop](reference.md#the-loop) for loader selection and restart behavior. Use `d2r-in-game-testing` before installing to a slot or making a test character.
-4. Record check evidence in TESTING.md. Use `d2r-debug` on failure and [Shipping](reference.md#shipping) plus `d2r-release` for packaging.
+1. For prerequisites or missing CASC data use [Quick start](../../../README.md#quick-start-5-minutes) and [Requirements](../../../README.md#requirements). Keep Blizzard files and outputs outside Git.
+2. Start with `python -m modkit new <dir> --name <ModName>`. For project layout, namespaces, plugins or extended saves read [Modkit project layout](../../../docs/README.md#modkit-project-layout). Route creator-approved classic ports through `d2r-port`.
+3. Apply the relevant domain skill and run `python -m modkit build <dir>`. Review warnings and clear validator errors. Install with the game closed. Use `d2r-in-game-testing` for agent installs, launches and test characters; for launch mode and first startup retrieve `d2rloader` → `Starting a mod`.
+4. Record TESTING.md evidence. Use `d2r-debug` for failures and `d2r-release` for packaging. Ship only mod files, with D2RLoader when using plugins or extended saves.
