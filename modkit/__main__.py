@@ -1,5 +1,7 @@
 """modkit command line: python -m modkit <command> ...   (python -m modkit <command> -h for options)
 
+  knowledge search|get|address        retrieve cited D2R knowledge
+  preflight / verify-lane              validate an issue lane and its delivery
   fetch [--set S]... [--prefix P]...   copy game files into the local cache d2r-data/<build>/
   new DIR --name NAME                  start a mod project
   build DIR [--no-validate]            pristine game files + DIR/files + DIR/patches -> DIR/out/data
@@ -22,7 +24,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-from . import images, layouts
+from . import images, knowledge, lane, layouts
 from .base import DEFAULT_SETS, SETS, Base
 from .tsv import Table
 
@@ -83,7 +85,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--skill", action="append", default=[], help="SLOT=POINTS (class skill slot, 0-based)")
     p.add_argument("--extended", action="store_true")
     p.add_argument("--project")
+    knowledge.add_parser(sub)
+    lane.add_parsers(sub)
     args = ap.parse_args(argv)
+
+    if args.cmd == 'knowledge':
+        return knowledge.run(args)
+    if args.cmd in ('preflight', 'verify-lane'):
+        return lane.run(args)
 
     if args.cmd == "new":
         d = Path(args.dir)

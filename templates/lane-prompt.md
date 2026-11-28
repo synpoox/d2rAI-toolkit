@@ -21,3 +21,5 @@ Read `AGENTS.md` and follow the pinned toolkit. Lane: `<lane-name>`.
 <Concrete behavior, check commands, expected output and evidence. Include any extra deliverables.>
 
 Shared Git, slot, safety, test and reporting rules are in the agent contract and required skills; do not repeat them. If the issue already contains a complete specification, cite it instead of copying it. No omission of required acceptance evidence.
+
+For a lane with an issue manifest, run preflight before work and verify-lane at delivery (toolkit docs/context-tooling.md).

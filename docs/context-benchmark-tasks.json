@@ -1,0 +1,106 @@
+[
+  {
+    "id": "stash-grid",
+    "prompt": "Resize the shared stash grid and verify the item placement and controller layout.",
+    "skill": "ui",
+    "doc": "ui-layouts",
+    "section": "Grids",
+    "evidence": "cellCount",
+    "reference_sections": [
+      "Grid sizes (inventory, stash, cube, trade)",
+      "Build and test"
+    ],
+    "live_acceptance": [
+      "Keep inventory records and any controller variant in agreement.",
+      "Respect the 16 by 16 personal stash bound.",
+      "Verify far-corner placement after build."
+    ]
+  },
+  {
+    "id": "cube-gating",
+    "prompt": "Design a cube recipe gated on an item stat and explain what to test.",
+    "skill": "cube",
+    "doc": "engine-limits",
+    "section": "Items, inventory, sets, runes, cube",
+    "evidence": "cube",
+    "reference_sections": [
+      "A recipe row",
+      "Conditions (op/param/value): D2R hard limits",
+      "Build and test"
+    ],
+    "live_acceptance": [
+      "Use an allowed item gate and explain the silent-pass risk.",
+      "Specify exact, missing and extra inputs plus output statistics."
+    ]
+  },
+  {
+    "id": "skill-animation",
+    "prompt": "Replace a class skill with a sequence skill and explain the save and animation constraints.",
+    "skill": "skill",
+    "doc": "engine-limits",
+    "section": "Skills",
+    "evidence": "30",
+    "reference_sections": [
+      "3. Class skills: replace, don't add",
+      "4. Write the op"
+    ],
+    "live_acceptance": [
+      "Preserve the class skill save slot.",
+      "Set SQ with a same-class HD sequence state.",
+      "Verify tooltip and animation."
+    ]
+  },
+  {
+    "id": "port-functions",
+    "prompt": "Port a classic table that refers to occupied skill function numbers.",
+    "skill": "port",
+    "doc": "porting-classic-mods",
+    "section": "5. Function numbers",
+    "evidence": "172",
+    "reference_sections": [
+      "Policy (tell the user, then follow it)",
+      "Steps",
+      "Before you say \"done\" with a table"
+    ],
+    "live_acceptance": [
+      "Require permission.",
+      "Preserve D2R hard-coded IDs and remap occupied function numbers.",
+      "Name validation and parity proof."
+    ]
+  },
+  {
+    "id": "renderer-triage",
+    "prompt": "Triage a renderer pool crash from a report in the reference build.",
+    "skill": "crash",
+    "doc": "crash-triage",
+    "section": "5. Worked example: a renderer pool crash",
+    "evidence": "Renderer Pool",
+    "reference_sections": [
+      "2. Read before guessing",
+      "3. Rule out the environment",
+      "4. Fix and record"
+    ],
+    "live_acceptance": [
+      "Identify the image, access type and faulting instruction from the supplied example.",
+      "Separate observations from cause and remediation.",
+      "Cite evidence with build provenance."
+    ]
+  },
+  {
+    "id": "test-character",
+    "prompt": "Prepare a reusable level 99 character in an authorized test slot.",
+    "skill": "in-game-testing",
+    "doc": "cheat-commands",
+    "section": "Test characters and game versions",
+    "evidence": "Reign of the Warlock",
+    "reference_sections": [
+      "The recipe",
+      "The test character"
+    ],
+    "live_acceptance": [
+      "Choose a permitted, named slot with a one-attempt lock.",
+      "Check savepath and use a level 99 RotW character with Hell open.",
+      "Give cleanup and runtime evidence."
+    ]
+  }
+]

@@ -30,6 +30,26 @@ Maintainer audit; **not** mandatory worker context. Baseline: `5d59cb6dbf6fabe34
 - **Prompt completeness:** the old lane brief said both to avoid shared rules and to repeat Git/slot/report policy. Issue + mandatory agent contract/skill reads now supply shared policy. No acceptance evidence may be dropped.
 - **Local overrides:** project game-check guidance may specialize configuration and proof, not silently waive safety or no-wait.
 
-## Deferred work and validation
+## P3–P7 follow-through
 
-P3–P7 remain out of scope: comprehensive domain skill compression, indexed retrieval, automated enforcement, token budgets and task benchmark. Existing long workflow/reference material remains available; setup and this ledger are not routinely loaded. Source-size measurements are not runtime-token or cache measurements. Existing consumer copies of AGENTS.md must be migrated intentionally at their next pin update; do not silently overwrite project exceptions.
+Every skill now has an execution guide and a sibling reference. Mandatory prerequisites, safety and completion stay visible in the guide. The detailed steps, commands, caveats, examples and numeric limits keep their original headings in the reference. The only shared introductory text removed from those references was the repeated toolkit root setup; its canonical owner is d2r-toolkit. The former toolkit rule 9 routes plugin work to d2r-engine and retains the item-type check in the toolkit reference.
+
+| Skill | Reference sections carrying the original detailed constraints |
+|---|---|
+| Toolkit | Finding the toolkit and the pin, Where things are, New generic work, Rules for a mod |
+| Engine | The plugin, Common jobs, Finding code, Debug |
+| In-game testing | The recipe, The test character, Rules, When to hand it over |
+| Project conventions | Issues and PRs, Branches and commits, Merge gate, Worktrees, Generated data, Wayfinder |
+| Orchestrator | Start, Context budget, Routing work, Choosing models, Game slots, Review and merge, Clean up, Reporting, Identity and safety, Common traps |
+| Crash | Collection, Read before guessing, Environment, Fix and record |
+| Cube | Recipe row, Conditions, Build and test |
+| Debug | Logs, Symptom to cause, Bisect |
+| Items | Base items, Stats, Uniques/sets/runewords, Affixes, Drops, Vendors, Engine traps, Build and test |
+| Mod setup | One-time setup, New mod, The loop, Test characters, Shipping |
+| Monsters | New monster, Bosses, Skills, Spawns, Difficulty, Build and test |
+| Classic port | Policy, Steps, Table completion |
+| Release | Prerequisites, Steps, Launcher, Failure, Mirror |
+| Skill crafting | Design, Vanilla selection, Class skills, Write the op, Build, Port traps, Runtime checklist |
+| UI | Discovery, Grid sizes, Panel art, Skill tree, Build and test |
+
+See [context tools](context-tooling.md) for selective retrieval, deterministic lane checks and context budgets. See [the benchmark](context-benchmark.md) for the static comparison and live trial protocol. Existing consumer copies of AGENTS.md remain subject to intentional migration at their next pin update.

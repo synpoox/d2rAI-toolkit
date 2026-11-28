@@ -35,4 +35,4 @@ def run(ctx): ...
 A new pass is then a new file and no edit to anything else. A test lists the discovered modules with their `ORDER` and
 fails on a duplicate `ORDER` or a module without one. The same holds in C++: each hook is its own source file that
 registers itself with an `ORDER`, and the plugin applies them sorted; the plugin still checks the game build and the
-expected bytes before patching (rule 9 of the `d2r-toolkit` skill).
+expected bytes before patching (see the `d2r-engine` skill).
