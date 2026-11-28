@@ -236,6 +236,8 @@ def lookup(args, index):
             matches = [s for s in choices if args.section.casefold() == s.title.casefold()]
         if not matches:
             matches = [s for s in choices if args.section.casefold() in s.title.casefold()]
+        if not choices:
+            raise ValueError(f"no document {args.document}")
         if len(matches) != 1:
             raise ValueError("select a unique section: " + ", ".join(s.slug for s in (matches or choices)))
         section = matches[0]

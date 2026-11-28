@@ -7,12 +7,16 @@ import re
 import subprocess
 import sys
 import tomllib
+import importlib.util
 from fnmatch import fnmatchcase
 from pathlib import Path, PurePosixPath
 
-from tools.toolkit_path import ToolkitNotFound, check_pin, find_toolkit_dir
-
 TOOLKIT = Path(__file__).resolve().parents[1]
+# Load the finder by path: a mod's own `tools` package would shadow `tools.toolkit_path`.
+_spec = importlib.util.spec_from_file_location("_d2r_toolkit_path", TOOLKIT / "tools/toolkit_path.py")
+_finder = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_finder)
+ToolkitNotFound, check_pin, find_toolkit_dir = _finder.ToolkitNotFound, _finder.check_pin, _finder.find_toolkit_dir
 
 
 def git(root, *args):
@@ -86,7 +90,7 @@ def inspect(root, args):
     if not (root / "toolkit.version").is_file():
         problems.append("toolkit.version is missing")
     toolkit = find_toolkit_dir(root)
-    if toolkit != TOOLKIT:
+    if toolkit.resolve() != TOOLKIT:
         problems.append("the configured toolkit differs from the checkout running modkit")
     if problem := check_pin(root, toolkit):
         problems.append(problem)

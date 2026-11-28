@@ -28,7 +28,7 @@ Before work, refresh the configured origin branch, resolve the pinned toolkit, a
 
 Preflight checks the project config, clean toolkit pin, ticket branch, locally fetched base and changed paths, including staged and untracked paths. With --slot N --owner <lane>, it checks an existing allowed slot lock using game_slots.py. It never acquires a lock. Run the normal slot ownership check again immediately before game operations as the testing skill requires.
 
-At delivery, save the PR metadata using gh pr view --repo <owner/repo> <pr> --json headRefOid,headRefName,baseRefName,state,body and add a repository field with the same owner/name. Save a separate evidence JSON using the final full commit ID and actual observed outputs or evidence links:
+At delivery, save the PR metadata using gh pr view --repo <owner/repo> <pr> --json headRefOid,headRefName,baseRefName,state,body and add a repository field with the same owner/name (self-reported, so reviewers confirm it). Save a separate evidence JSON using the final full commit ID and actual observed outputs or evidence links:
 
     {"head":"<final full commit>",
      "checks":{"validate":{"status":"passed","evidence":"0 errors"},

@@ -3,9 +3,11 @@ import contextlib
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -168,6 +170,15 @@ class LaneTests(unittest.TestCase):
 
 
 class ContextDocsTests(unittest.TestCase):
+    def test_modkit_imports_beside_a_mod_tools_package(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "tools").mkdir()
+            (Path(tmp) / "tools/__init__.py").write_text("")
+            env = {**os.environ, "PYTHONPATH": str(knowledge.ROOT)}
+            result = subprocess.run([sys.executable, "-m", "modkit", "-h"], cwd=tmp, env=env,
+                                    capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr.decode("utf-8", "replace"))
+
     def test_skill_links_resolve(self):
         skills = sorted((knowledge.ROOT / ".claude/skills").glob("*/SKILL.md"))
         self.assertEqual(len(skills), 15)
