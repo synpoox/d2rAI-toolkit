@@ -21,6 +21,12 @@ def git(*args):
     return subprocess.check_output(["git", "-C", str(ROOT), *args])
 
 
+def available(revision):
+    # A squash merge leaves the earlier PR head out of main's history.
+    return subprocess.run(["git", "-C", str(ROOT), "cat-file", "-e", f"{revision}^{{commit}}"],
+                          capture_output=True).returncode == 0
+
+
 def at(revision, path):
     return git("show", f"{revision}:{path}")
 
@@ -65,24 +71,27 @@ def measure(original, previous, encode):
         doc = f"knowledge/{case['previous']['doc']}.md"
         original_tokens = count(encode, [case["prompt"], *(at(original, path).decode("utf-8")
                                                          for path in (*files, doc))])
-        prior = previous_reads(case, previous, skill.replace("SKILL.md", "reference.md"))
-        previous_tokens = count(encode, [case["prompt"], *(at(previous, path).decode("utf-8")
-                                                         for path in files), *prior])
+        previous_tokens = None
+        if previous:
+            prior = previous_reads(case, previous, skill.replace("SKILL.md", "reference.md"))
+            previous_tokens = count(encode, [case["prompt"], *(at(previous, path).decode("utf-8")
+                                                             for path in files), *prior])
         retrieved = current_reads(case, index)
         retrieval_tokens = count(encode, retrieved)
         if retrieval_tokens > RETRIEVAL_TOKENS:
             raise ValueError(f"{case['id']}: {retrieval_tokens} reference tokens exceed the cumulative budget")
         current = [(ROOT / path).read_text(encoding="utf-8") for path in files]
         consolidated_tokens = count(encode, [case["prompt"], *current, *retrieved])
-        if consolidated_tokens >= previous_tokens:
-            raise ValueError(f"{case['id']}: {consolidated_tokens} tokens did not improve on {previous_tokens}")
+        reference = previous_tokens or original_tokens
+        if consolidated_tokens >= reference:
+            raise ValueError(f"{case['id']}: {consolidated_tokens} tokens did not improve on {reference}")
         rows.append({
             "task": case["id"],
             "original_tokens": original_tokens,
             "previous_tokens": previous_tokens,
             "consolidated_tokens": consolidated_tokens,
             "cumulative_retrieval_tokens": retrieval_tokens,
-            "reduction_vs_previous_pct": round(100 * (1 - consolidated_tokens / previous_tokens), 1),
+            "reduction_vs_previous_pct": previous_tokens and round(100 * (1 - consolidated_tokens / previous_tokens), 1),
         })
     return rows
 
@@ -90,10 +99,12 @@ def measure(original, previous, encode):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline", default=ORIGINAL, help="original full-document comparison")
+    parser.add_argument("--previous", default=PREVIOUS, help="previous selective route; skipped when not in history")
     args = parser.parse_args()
     try:
         baseline = git("rev-parse", "--verify", "--end-of-options", f"{args.baseline}^{{commit}}").decode().strip()
-        rows = measure(baseline, PREVIOUS, tokenizer())
+        previous = args.previous if available(args.previous) else None
+        rows = measure(baseline, previous, tokenizer())
         head = git("rev-parse", "HEAD").decode().strip()
         dirty = bool(git("status", "--porcelain"))
     except (ImportError, OSError, ValueError, KeyError, StopIteration, subprocess.CalledProcessError) as exc:
@@ -101,7 +112,7 @@ def main():
         return 2
     print(json.dumps({"method": "scripted source reads; no agent execution",
                       "tokenizer": f"tiktoken {TOKENIZER_VERSION} / {ENCODING}",
-                      "original": baseline, "previous": PREVIOUS, "consolidated_head": head,
+                      "original": baseline, "previous": previous, "consolidated_head": head,
                       "working_tree_dirty": dirty, "live_agent_results": None, "tasks": rows}, indent=2))
     return 0
 
