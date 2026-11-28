@@ -1,11 +1,11 @@
 # templates: fill-in files for a mod project
 
-Copy a file into the mod project, replace every `<PLACEHOLDER>`, and delete what does not apply. Nothing here names a
+Copy a file into the mod project, replace every applicable `<PLACEHOLDER>`, and delete what does not apply. Keep issue specifications in the issue, shared rules in `agents/AGENTS.md` and the referenced skills, and prompts as task invocations. New orchestrators use [setup](../docs/orchestrator-setup.md); the [rule migration ledger](../docs/context-rule-ledger.md) is for maintainers, not routine agent context. Nothing here names a
 real mod. How the files fit together is in [`docs/ai-workflow.md`](../docs/ai-workflow.md).
 
 | File | What it is for |
 |---|---|
-| `orchestrator-prompt.md`, `handoff.md`, `agents/AGENTS.md` (the lane rules), `lane-prompt.md`, `owner-update.md` | Running lanes and reporting to the owner |
+| `orchestrator-prompt.md`, `handoff.md`, `agents/AGENTS.md` (the lane rules), `lane-prompt.md`, `reviewer-prompt.md`, `owner-update.md` | Running lanes and reporting to the owner |
 | `PLAN.md` | The roadmap: lettered work items, one session each, status on issues, a Blocked-by column |
 | `ADR.md` | One decision record, kept at `docs/adr/NNNN-<slug>.md` |
 | `deviations.md` | The deviations ledger: how a port differs from its source, one row each, feeding the table-diff gate |

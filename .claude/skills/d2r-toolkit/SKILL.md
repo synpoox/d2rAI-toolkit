@@ -96,8 +96,7 @@ address, a fix), add it to `${CLAUDE_PLUGIN_ROOT}/knowledge/` in the toolkit and
 6. **Install only with the game closed**; restart the game after every install (in a slot, `python ${CLAUDE_PLUGIN_ROOT}/testing/game_ctl.py --slot <N> start`).
 7. **You run the in-game checks, in a game slot; you diagnose from files.** The `d2r-in-game-testing` skill has the
    recipe and the rules. Ask the human only when a check needs one. Keep a TESTING.md in the mod project with a row per
-   installed change (what, how, expected) and keep working. Every test character is level 99 (experience 3520485254,
-   490 stat points, 98 skill points), made with the Reign of the Warlock game version; don't stop to ask for each test. On "it crashed", read
+   installed change (what, how, expected) and keep working. The testing skill owns the character recipe and slot policy; don't stop to ask for each test. On "it crashed", read
    the logs (d2r-debug skill) before asking anything. A player's crash report goes through the d2r-crash skill and
    ${CLAUDE_PLUGIN_ROOT}/knowledge/crash-triage.md. Porting a classic mod goes through the d2r-port skill and
    ${CLAUDE_PLUGIN_ROOT}/knowledge/porting-classic-mods.md, and only with the mod creators' permission: confirm it with the user first.
@@ -112,13 +111,7 @@ address, a fix), add it to `${CLAUDE_PLUGIN_ROOT}/knowledge/` in the toolkit and
    **Item types:** keep D2R-only itemtypes rows at D2R's numbers, and run
    `py -3 ${CLAUDE_PLUGIN_ROOT}/plugin-template/tools/item_type_ids.py <project>/out/data/global/excel/itemtypes.txt`
    after every itemtypes change (${CLAUDE_PLUGIN_ROOT}/knowledge/porting-classic-mods.md).
-10. **Keep the repo public-clean.** No real names, e-mails, hosts, IPs or tokens; no other projects' names. Keep
-    a private-words list outside the repo (`~/.d2r-modkit/private_terms.txt`, one word per line) and run
-    `py -3 ${CLAUDE_PLUGIN_ROOT}/tools/check_public.py --root <mod repo>` before every commit; `py -3 <toolkit clone>/tools/install_hooks.py --root <mod repo>` (a clone, not the plugin cache: the hooks keep its path) makes git run it
-    on every commit (it also refuses screenshot-size PNGs). Commit with a noreply identity.
-11. **Working with agents:** one bug or feature per lane (own branch, own worktree, PR); lanes never merge; a
-    separate reviewer checks each PR (at most 2 fix cycles), the orchestrator squash-merges and releases and never
-    implements; duplicate issues are closed before fixing. Details:
-    `${CLAUDE_PLUGIN_ROOT}/docs/ai-workflow.md`.
+10. **Keep the repo public-clean.** Follow the safety and privacy contract in the mod's `AGENTS.md` (if absent, use `${CLAUDE_PLUGIN_ROOT}/templates/agents/AGENTS.md`). Keep private terms outside git at `~/.d2r-modkit/private_terms.txt`; install the privacy hook from a toolkit clone with `py -3 <toolkit clone>/tools/install_hooks.py --root <mod repo>` (not the plugin cache; hooks keep its path). It also refuses screenshot-size PNGs.
+11. **Working with agents:** the agent contract and `d2r-project-conventions` own lane delivery; `d2r-orchestrator` owns separate review, at most two fix cycles and squash merge. Follow them before acting.
 12. **Ask the human before** anything public, paid or destructive (publishing, making a repo public, force-push,
     deleting saves or branches, spending money, touching their real game install). Never ask for secrets in chat.

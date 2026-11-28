@@ -24,9 +24,8 @@ lives), then build it part by part with this skill.
    `<game>/mods/<Mod>/d2rloader/plugins/`. Players run the mod through D2RLoader. Keep `src/plugin.rc` (the ABI
    manifest resource) in every plugin, including one written from scratch: without it D2RLoader rejects the DLL as
    "an old alpha plugin" (${CLAUDE_PLUGIN_ROOT}/knowledge/d2rloader.md).
-2. The plugin only hooks the exact game image it was written for (PE timestamp check, 0x6ab3782c = D2R 3.3.0
-   build 93847 under D2RLoader 1.3.1). After a game or loader update: re-dump, re-find every address, update.
-3. Keep the template's guards on: build guard (image stamp, off on mismatch), environment guard (other plugins,
+2. New hooks resolve by unique signature, never fixed RVA. Signature-only parts install on any image where all their declared signatures match exactly once; otherwise disable that part alone. Existing fixed-RVA parts require their exact image stamp (0x6ab3782c = reference build 93847). Re-verify addresses and ABI after game/loader updates; never infer compatibility from one build. Installer requirements use major.minor, not build number.
+3. Keep the template's guards on: image guard for fixed-RVA parts, signature uniqueness for signature-only parts, environment guard (other plugins,
    stray copies, `default_mod`), sound guard (bad sound ids, the cache-building start), item type id self-check.
    Each part has a status line in the `<plugin>` console command and one log line at load (`log.h`).
 4. Every feature has a word in the off-switch file `<plugin>-off.txt` (next to the DLL): list words to turn
@@ -37,7 +36,7 @@ lives), then build it part by part with this skill.
   `skill_functions.cpp`, register it in a free srvdofunc slot (172-190; D2R uses up to 171), set the skill's
   `srvdofunc` to that number. The template's slot-172 missile fan shows target lookup, calc evaluation and missile
   creation.
-- **Hook a function**: `InstallInlineHook(rva, entryBytes, size, Hook, &original)`. Entry bytes must be whole
+- **Hook a function**: resolve a unique signature first; `InstallInlineHook(rva, entryBytes, size, Hook, &original)` describes the lower-level validated operation, not permission to hard-code an RVA. Entry bytes must be whole
   instructions (REX prefixes like 40/48 included), copied from the disassembly (`Disasm.java`), ending on an
   instruction boundary. There is no 14-byte minimum: 8- to 12-byte signatures ran in game; longer is only safer
   against a false match (${CLAUDE_PLUGIN_ROOT}/knowledge/engine-re.md section 6). The SDK refuses on mismatch. Hook function pointer types must be `noexcept`.
@@ -62,8 +61,7 @@ lives), then build it part by part with this skill.
    `D2Common\src\DataTbls\HoradricCube.cpp`): StringXrefs the file name -> NearRefs the descriptor -> Refs the
    tiny assert stub -> the functions of that source file. Then decompile and match by constants, switch shapes and
    record offsets (FindDisp on a data-table offset lists every reader of a table).
-4. Record every confirmed address in ${CLAUDE_PLUGIN_ROOT}/knowledge/d2r-93847-addresses.md (or your build's file) with its signature
-   and entry bytes.
+4. Record every confirmed address in ${CLAUDE_PLUGIN_ROOT}/knowledge/d2r-93847-addresses.md (or your build's file) with its signature, uniqueness result in the target dump, and entry bytes. Mark static RE separately from runtime proof.
 
 ## Debug
 Logs and crash dumps: d2r-debug skill. Add one log line per feature at install (installed / skipped and why).

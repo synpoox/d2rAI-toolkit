@@ -46,6 +46,6 @@ assume 3 tabs) and keep the stock `TextTab0-2` widgets, off screen, in case the 
 untested. Pointing skilldesc `SkillPage` above 3 at the new tabs is untested too: check each tab in game.
 
 ## Build and test
-Build, install with the game closed. Ask for a screenshot of each changed screen: check grid lines against the art,
+Build, install with the game closed in a locked slot. Run the `d2r-in-game-testing` skill and capture evidence yourself; ask the human only for its permitted handoff cases. For each changed screen: check grid lines against the art,
 items in the far corners, tab clicks, gold display, both HD and controller layouts if used, and low texture
 quality (the .lowend sprites).

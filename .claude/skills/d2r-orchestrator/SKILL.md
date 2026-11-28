@@ -10,10 +10,10 @@ Toolkit root: `${CLAUDE_PLUGIN_ROOT}` (if you see the placeholder itself, you ar
 You are the orchestrator: you **route**. You plan, brief, merge reviewed work, clean up and report. **You never implement**
 (no code, no data edits, no doc rewrites beyond the plan, the handoff and merge fixes); every change goes to an
 implementer agent and is checked by a separate reviewer agent. The full method is in
-`${CLAUDE_PLUGIN_ROOT}/docs/ai-workflow.md`; the fill-in files are in `${CLAUDE_PLUGIN_ROOT}/templates/`. Read the
-workflow doc once at the start of a project.
+`${CLAUDE_PLUGIN_ROOT}/docs/ai-workflow.md`; the fill-in files are in `${CLAUDE_PLUGIN_ROOT}/templates/`. Read relevant workflow sections (roles/routing, review, merge, handoff); do not load the entire guide for routine tasks.
 
 ## Start of a project
+Read the newest handoff first if one exists; resume it rather than repeating setup. For a new project, read `${CLAUDE_PLUGIN_ROOT}/docs/orchestrator-setup.md` (permission, source inventory, owner decisions, phases and provider routing).
 1. Fill in `${CLAUDE_PLUGIN_ROOT}/templates/orchestrator-prompt.md` (name, game version and build, loader, repo, hosting, providers). Ask
    the owner for anything you can't decide: **name, hosting, public or private, which providers they have.** Pick
    sensible defaults for everything else and say which.
@@ -27,7 +27,7 @@ workflow doc once at the start of a project.
 
 ## Context budget
 - The orchestrator holds issue numbers, PR URLs and one-line statuses only. It never reads code, diffs or logs.
-- At ~240k context, write the handoff to the newest handoff branch and restart.
+- At ~240k context (or earlier if the client limit is lower), write the handoff using the template as the only file on a new orphan `handoff/orchestrator-<YYYY-MM-DD>` branch; never merge/delete it. Restart from it.
 - Lane reports: PR URL, CI state, one line per check. Detail goes on the PR.
 - Each game check runs in its own short-lived subagent, so its screenshots leave context when it ends.
 - Reviewers read `gh pr diff`, plus only the files they need to check.
@@ -40,9 +40,7 @@ workflow doc once at the start of a project.
   `${CLAUDE_PLUGIN_ROOT}/templates/lane-prompt.md`, a PR at the end. **Implementers never merge.**
 - Start agents as child tasks of your session so their reports come back to you, each with a unique request id.
   Not as separate top-level conversations.
-- Give every prompt: goal, files to read, scope (files it may touch), what is known/ruled out, how "done" is
-  proven, git instructions, slot instructions, report format, and "never end your turn while something you
-  started is still running". The brief rules are in the lane prompt template.
+- Give each prompt the issue/goal, named reads, scope, known facts vs hypotheses/ruled-out approaches, task-only constraints, game-check need and acceptance evidence. Refer to the agent contract for shared rules; cite complete issue sections instead of copying them. At most 5 concurrent implementers; reviewers do not count.
 - Provide specific yet concise instructions for the implementer and the reviewer. 
 - Start lanes from `main`.
 - A worker never waits on CI and never touches runners: it pushes, opens the PR and reports. The reviewer or you
@@ -60,15 +58,10 @@ workflow doc once at the start of a project.
 The implementer and the reviewer of one PR are different agents.
 
 ## Game slots
-- A lane does offline work first, uses the `d2r-in-game-testing` skill, locks a slot (`${CLAUDE_PLUGIN_ROOT}/testing/game_slots.py lock N <lane>`) for its game session, runs with
-  the run id set, restores the slot, unlocks at once. One lock attempt, no waiting. No slot free: the lane
-  stops, files (or asks the orchestrator to file) a `ready-for-agent` issue for the run, and reports.
-- Slot number on **every** command that touches saves or a game folder. Never kill processes by filter. Never touch
-  slot 1.
-- Tests: targeted (map changed files to checks). Full suite only at milestones, one game at a time.
+Require `d2r-in-game-testing` for every lane touching a slot; that skill owns locking, cleanup, test proof and blocked-slot behavior. Offline work first; full suites only at milestones, one game at a time.
 
 ## Review and merge
-1. When an implementer's PR arrives, start a **reviewer** (a separate agent). It reads the diff and
+1. When an implementer's PR arrives, start a **reviewer** (a separate agent) using `${CLAUDE_PLUGIN_ROOT}/templates/reviewer-prompt.md`. It reads the diff and
    checks: in scope, the claimed test is real (output pasted), docs are updated, a changelog fragment exists for a
    player-visible change, `${CLAUDE_PLUGIN_ROOT}/tools/check_public.py --root <mod repo>` passes.
 2. Findings go back to the implementer as a fix cycle. **At most 2 fix cycles.** Still not right after the second:

@@ -15,6 +15,8 @@ Per-repo values (repo, labels, kept branches, gate, game slots, junctions) are i
 - After a PR merges, delete its branch on the remote and locally.
 
 ## Branches and commits
+- Start from fresh `origin/main` (or configured default branch): `git fetch origin`, own branch/worktree, `git lfs pull` if assets are pointer text. One topic; open PR to the default branch, never merge as implementer.
+- Use noreply commit identity; commit trailer `Co-Authored-By: <model> <noreply@anthropic.com>`. PR body: what changed, tests/evidence, what remains. Implementers do not bump versions unless assigned; player-visible changes add a `changelog.d/` fragment, never edit `CHANGELOG.md`.
 - Prefixes come from `[branches]` (defaults): `ticket/<n>-<slug>` for an issue, `research/<topic>` for findings, `refactor/<topic>`, `backup/<topic>` to preserve unfinished work.
 - Branches in `[branches].keep` (default `research/*`, `issue-assets`, `handoff/*`, `backup/*`) are never merged and never deleted: docs and issues link to them. `issue-assets` keeps old links only: never add a game screenshot to it or to any other branch.
 - Commit subject: conventional prefix plus issue number, e.g. `fix(items): stop affix overflow (#123)`; prefixes `feat fix docs refactor test chore`.
