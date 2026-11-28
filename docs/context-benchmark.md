@@ -10,10 +10,10 @@ The same task prompts and acceptance requirements are recorded in [the task mani
 | Arm | Additional reads |
 |---|---|
 | Original (5d59cb6) | The full topic knowledge file |
-| Previous PR (f491e56) | The same skill-local sections and JSON knowledge excerpt as the previous PR's benchmark |
+| Previous PR (f491e56) | The same skill-local sections and JSON knowledge excerpt as the previous PR's benchmark (measured only when `f491e56` is in the local history, e.g. a fetched PR #337 ref; `main` CI skips it and gates against the original arm) |
 | Consolidated | All listed calls to `modkit knowledge get --format text`, with citations, for the workflow and technical sections the task needs |
 
-The read plan charges for **every listed read**, including repeated provenance and citation text. It includes both the entry guides and the references. Each task must improve on the previous selective route, return all expected evidence in complete sections and stay within 2,000 cumulative reference tokens. The previous arm's excerpt is JSON (its only format), the consolidated reads use text, so part of the gain is serialization. Counts use o200k_base and exclude provider message framing, caching and generated text. The runner records the commits and whether local edits are present. Source fingerprints can tokenize slightly differently across checkout line-ending settings.
+The read plan charges for **every listed read**, including repeated provenance and citation text. It includes both the entry guides and the references. Each task must improve on the previous selective route (the original arm when that route is skipped), return all expected evidence in complete sections and stay within 2,000 cumulative reference tokens. The previous arm's excerpt is JSON (its only format), the consolidated reads use text, so part of the gain is serialization. Counts use o200k_base and exclude provider message framing, caching and generated text. The runner records the commits and whether local edits are present. Source fingerprints can tokenize slightly differently across checkout line-ending settings.
 
 This is a scripted comparison of cumulative instructional input, using stronger evidence than a file-size comparison but still a proxy for agent consumption. An agent may choose a different read plan. Smoke markers prove the selected sections contain expected details. They cannot establish task correctness, completion or compliance.
 
